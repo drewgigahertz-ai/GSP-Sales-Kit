@@ -1,0 +1,54 @@
+{
+  "name": "saleskit-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GigaHertz SalesKit desktop application",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "dist": "electron-builder --win nsis",
+    "postinstall": "electron-rebuild -f -w better-sqlite3"
+  },
+  "dependencies": {
+    "@fontsource/outfit": "^5.3.0",
+    "@fontsource/plus-jakarta-sans": "^5.3.0",
+    "better-sqlite3": "^12.2.0",
+    "bootstrap": "^5.3.8",
+    "bootstrap-icons": "^1.13.1",
+    "googleapis": "^183.0.0",
+    "html2canvas": "^1.4.1"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.1",
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.gigahertz.saleskit",
+    "productName": "GigaHertz SalesKit",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      "saleskit.html",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "mydata.db",
+        "to": "mydata.db"
+      }
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

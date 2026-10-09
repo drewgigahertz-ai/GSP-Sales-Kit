@@ -1,0 +1,2112 @@
+function doGet(e) {
+  try {
+    let output;
+    let initialData = null;
+    try {
+      initialData = getInitialData();
+    } catch (dErr) {
+      console.warn('Non-blocking: could not pre-load initial data:', dErr);
+    }
+
+    let scriptUrl = '';
+    try {
+      scriptUrl = ScriptApp.getService().getUrl();
+    } catch (urlErr) {
+      console.warn('Could not get ScriptApp URL:', urlErr);
+    }
+
+    const requestedPage = (e && e.parameter && e.parameter.page) ? String(e.parameter.page).toLowerCase().trim() : '';
+    const isSalesKit = requestedPage.includes('saleskit') || requestedPage.includes('sales_kit') || requestedPage.includes('sales-kit') || requestedPage === 'sk';
+    
+    // Comprehensive candidate template names (both with and without .html extension)
+    const candidateTemplates = isSalesKit 
+      ? [
+          'saleskit', 'saleskit.html', 'SalesKit', 'SalesKit.html', 'sales_kit', 'sales_kit.html', 'sales-kit', 'sales-kit.html',
+          'recotable', 'recotable.html', 'RecoTable', 'RecoTable.html', 'reco_table', 'reco_table.html',
+          'index', 'index.html', 'Index', 'Index.html',
+          'page', 'page.html', 'main', 'main.html', 'app', 'app.html'
+        ] 
+      : [
+          'recotable', 'recotable.html', 'RecoTable', 'RecoTable.html', 'reco_table', 'reco_table.html', 'reco-table', 'reco-table.html',
+          'saleskit', 'saleskit.html', 'SalesKit', 'SalesKit.html', 'sales_kit', 'sales_kit.html', 'sales-kit', 'sales-kit.html',
+          'index', 'index.html', 'Index', 'Index.html',
+          'page', 'page.html', 'main', 'main.html', 'app', 'app.html'
+        ];
+
+    const loadErrors = [];
+
+    // Attempt 1: Templated evaluation
+    for (let i = 0; i < candidateTemplates.length; i++) {
+      const tName = candidateTemplates[i];
+      try {
+        const template = HtmlService.createTemplateFromFile(tName);
+        template.serverInitialData = initialData;
+        template.serverPage = isSalesKit ? 'saleskit' : 'recotable';
+        template.scriptUrl = scriptUrl;
+        output = template.evaluate();
+        if (output) break;
+      } catch (tErr) {
+        loadErrors.push(tName + ' (template): ' + tErr.toString());
+      }
+    }
+
+    // Attempt 2: Direct HTML file creation fallback if template evaluation failed
+    if (!output) {
+      for (let i = 0; i < candidateTemplates.length; i++) {
+        const tName = candidateTemplates[i];
+        try {
+          output = HtmlService.createHtmlOutputFromFile(tName);
+          if (output) break;
+        } catch (fErr) {
+          loadErrors.push(tName + ' (direct): ' + fErr.toString());
+        }
+      }
+    }
+
+    if (!output) {
+      output = HtmlService.createHtmlOutput(
+        '<div style="font-family:sans-serif;padding:32px;max-width:700px;margin:40px auto;border:1.5px solid #cbd5e1;border-radius:12px;background:#f8fafc;">' +
+        '<h2 style="color:#0012b3;margin-top:0;">GigaHertz Online Sales Dashboard</h2>' +
+        '<h3 style="color:#b91c1c;">Template File Not Found</h3>' +
+        '<p>Google Apps Script could not find an HTML file in this project. Please make sure you have added an HTML file in your Apps Script project editor (e.g. <code>saleskit.html</code> or <code>recotable.html</code> or <code>index.html</code>).</p>' +
+        '<details style="margin-top:16px;background:#ffffff;padding:12px;border:1px solid #e2e8f0;border-radius:8px;">' +
+        '<summary style="cursor:pointer;font-weight:bold;color:#475569;">Diagnostics &amp; Attempted File Names</summary>' +
+        '<pre style="font-size:12px;white-space:pre-wrap;margin-top:8px;color:#64748b;">' + loadErrors.slice(0, 10).join('\n') + '</pre>' +
+        '</details>' +
+        '</div>'
+      );
+    }
+
+    output
+      .setTitle('GigaHertz Online Sales Dashboard')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+
+    // Retrieve Browser Tab Favicon Image safely from Pictures!Q2 (with fallbacks to P2 and R2)
+    try {
+      let favUrl = 'https://www.gigahertz.com.ph/cdn/shop/files/GHZ_LOGO_-_WITH_TAGLINE-02-01.png';
+      if (initialData && initialData.tabLogoUrl) {
+        favUrl = initialData.tabLogoUrl;
+      } else if (initialData && initialData.websiteLogoUrl) {
+        favUrl = initialData.websiteLogoUrl;
+      } else {
+        const ss = SpreadsheetApp.getActiveSpreadsheet();
+        const picturesSheet = ss ? ss.getSheetByName('Pictures') : null;
+        if (picturesSheet) {
+          const sheetFavUrl = getFaviconDirectUrlFromSheet(picturesSheet);
+          if (sheetFavUrl) {
+            favUrl = sheetFavUrl;
+          }
+        }
+      }
+      if (favUrl) {
+        output.setFaviconUrl(favUrl);
+      }
+    } catch (favErr) {
+      console.warn('Non-blocking: could not set server favicon URL:', favErr);
+    }
+
+    return output;
+  } catch (e) {
+    return HtmlService.createHtmlOutput('<h3>Error loading application: ' + e.toString() + '</h3>');
+  }
+}
+
+/**
+ * Returns the current deployed web app URL for navigation between tabs.
+ */
+function getScriptUrl() {
+  try {
+    return ScriptApp.getService().getUrl();
+  } catch (err) {
+    return '';
+  }
+}
+
+/**
+ * ============================================================
+ * DRIVE SHARING HELPER
+ * ============================================================
+ * Any Drive file referenced by URL/ID from the spreadsheet needs
+ * "Anyone with the link: Viewer" sharing, or both server-side
+ * UrlFetchApp/DriveApp.getBlob() calls AND direct <img src> loads
+ * from the client can silently fail (blank image, no thrown error
+ * on the client side). This is called from every code path that
+ * resolves a Drive file ID, so sharing is fixed once, automatically,
+ * the first time any given file is touched.
+ *
+ * This can only succeed if the script's running account has
+ * permission to change sharing on the file (i.e. it owns the file,
+ * or is an Editor on a Shared Drive). If the file lives in another
+ * user's My Drive with only Viewer access shared to the script's
+ * account, this will fail silently and the file must be copied to
+ * a location the script's account owns.
+ */
+const _drivePublicMemCache = {};
+
+function ensureDriveFilePublic_(fileId) {
+  if (!fileId) return;
+  if (_drivePublicMemCache[fileId]) return;
+  _drivePublicMemCache[fileId] = true;
+  try {
+    const cache = CacheService.getScriptCache();
+    if (cache && cache.get('drv_p_' + fileId)) {
+      return;
+    }
+    const file = DriveApp.getFileById(fileId);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    if (cache) {
+      cache.put('drv_p_' + fileId, '1', 21600); // 6 hours
+    }
+  } catch (e) {
+    // Non-blocking
+  }
+}
+
+/**
+ * Extracts a Google Drive file ID from any of the common URL shapes
+ * Drive's "Get link" / "Share" dialogs can produce, or a bare file ID.
+ * Centralized here so every function that needs a Drive ID uses the
+ * same (wider) matching instead of each keeping its own partial regex
+ * — a link format missed by one function used to slip through as a
+ * raw, non-image URL and render blank instead of erroring.
+ */
+function extractDriveFileId_(raw) {
+  if (!raw) return '';
+  const str = String(raw).trim();
+  if (!str) return '';
+
+  const patterns = [
+    /\/file\/d\/([a-zA-Z0-9_-]{15,})/,          // .../file/d/ID/view
+    /\/d\/([a-zA-Z0-9_-]{15,})/,                 // .../d/ID (thumbnail, uc, etc.)
+    /[?&]id=([a-zA-Z0-9_-]{15,})/,               // ...?id=ID or &id=ID (open?id=, uc?id=)
+    /drive\.google\.com\/open\?id=([a-zA-Z0-9_-]{15,})/,
+    /drive\.google\.com\/thumbnail\?id=([a-zA-Z0-9_-]{15,})/,
+    /lh3\.googleusercontent\.com\/d\/([a-zA-Z0-9_-]{15,})/,
+    /drive\.usercontent\.google\.com\/download\?id=([a-zA-Z0-9_-]{15,})/
+  ];
+
+  for (let i = 0; i < patterns.length; i++) {
+    const m = str.match(patterns[i]);
+    if (m && m[1]) return m[1];
+  }
+
+  // Bare file ID pasted directly (no URL wrapper)
+  if (/^[a-zA-Z0-9_-]{15,60}$/.test(str)) return str;
+
+  return '';
+}
+
+/**
+ * Extracts the direct public CDN favicon URL from the Pictures sheet (Q2 -> P2 -> R2).
+ */
+function getFaviconDirectUrlFromSheet(sheet) {
+  if (!sheet) return '';
+  try {
+    // 1. Primary: Cell Q2 (Browser Tab Logo)
+    const q2Val = getCellUrlOrFormula(sheet, 'Q2');
+    if (q2Val) {
+      const direct = resolveToDirectCdnImageUrl(q2Val);
+      if (direct) return direct;
+    }
+
+    // 2. Secondary check in 2nd row columns (Q=16, P=15, R=17)
+    const data = sheet.getDataRange().getValues();
+    if (data.length > 1) {
+      if (data[1].length > 16 && data[1][16]) {
+        const direct = resolveToDirectCdnImageUrl(data[1][16]);
+        if (direct) return direct;
+      }
+      if (data[1].length > 15 && data[1][15]) {
+        const direct = resolveToDirectCdnImageUrl(data[1][15]);
+        if (direct) return direct;
+      }
+      if (data[1].length > 17 && data[1][17]) {
+        const direct = resolveToDirectCdnImageUrl(data[1][17]);
+        if (direct) return direct;
+      }
+    }
+  } catch (err) {
+    console.error('Error in getFaviconDirectUrlFromSheet:', err);
+  }
+  return '';
+}
+
+/**
+ * Reads a cell's string value, display value, or IMAGE formula target URL.
+ */
+function getCellUrlOrFormula(sheet, cellNotation) {
+  try {
+    const range = sheet.getRange(cellNotation);
+    const formula = range.getFormula();
+    if (formula) {
+      const matchQuote = formula.match(/=IMAGE\s*\(\s*"([^"]+)"/i);
+      if (matchQuote && matchQuote[1]) return matchQuote[1];
+      const matchRef = formula.match(/=IMAGE\s*\(\s*([A-Za-z]+[0-9]+)\s*\)/i);
+      if (matchRef && matchRef[1]) {
+        return getCellUrlOrFormula(sheet, matchRef[1]);
+      }
+    }
+    // Rich-text hyperlink (Insert > Link): the link target can differ from
+    // the visible text, so check it explicitly before falling back to
+    // plain cell text.
+    try {
+      const richValue = range.getRichTextValue();
+      if (richValue) {
+        const linkUrl = richValue.getLinkUrl();
+        if (linkUrl && String(linkUrl).trim()) {
+          return String(linkUrl).trim();
+        }
+        const runCount = richValue.getRuns ? richValue.getRuns().length : 0;
+        for (let i = 0; i < runCount; i++) {
+          const runUrl = richValue.getRuns()[i].getLinkUrl();
+          if (runUrl && String(runUrl).trim()) {
+            return String(runUrl).trim();
+          }
+        }
+      }
+    } catch (richErr) {}
+    const val = range.getValue();
+    if (val && String(val).trim() && !String(val).startsWith('#')) {
+      return String(val).trim();
+    }
+    const displayVal = range.getDisplayValue();
+    if (displayVal && String(displayVal).trim() && !String(displayVal).startsWith('#')) {
+      return String(displayVal).trim();
+    }
+  } catch (e) {}
+  return '';
+}
+
+/**
+ * Converts any Google Drive URL, File ID, or web link to a strictly valid image URL for Google Apps Script setFaviconUrl.
+ * Apps Script setFaviconUrl requires the URL to end in a valid image extension (.png, .ico, .gif, .jpg).
+ */
+function resolveToDirectCdnImageUrl(raw) {
+  if (!raw) return '';
+  const str = String(raw).trim();
+  if (!str) return '';
+
+  const fileId = extractDriveFileId_(str);
+
+  if (fileId) {
+    ensureDriveFilePublic_(fileId);
+    // Google Drive direct export URL ending with &format=png so Apps Script setFaviconUrl accepts the extension
+    return 'https://drive.google.com/uc?id=' + fileId + '&export=download&format=png';
+  }
+
+  if (str.startsWith('http://') || str.startsWith('https://')) {
+    // Strip query parameters if URL has .png / .ico / .jpg / .gif before ? to satisfy Apps Script URL checker
+    const cleanUrl = str.split('?')[0];
+    if (/\.(png|ico|gif|jpg|jpeg)$/i.test(cleanUrl)) {
+      return cleanUrl;
+    }
+    return str;
+  }
+
+  return '';
+}
+
+/**
+ * Helper to convert any Google Drive file or image URL to a clean Base64 data URL.
+ * Server-side conversion has full Drive permissions and bypasses all browser CORS / hotlinking blocks.
+ */
+const _base64MemCache = {};
+
+function getImageBase64(rawUrl) {
+  if (!rawUrl) return '';
+  try {
+    const str = String(rawUrl).trim();
+    if (!str) return '';
+
+    // If it's already a base64 string
+    if (str.startsWith('data:image/')) return str;
+    if (_base64MemCache[str]) return _base64MemCache[str];
+
+    const cache = CacheService.getScriptCache();
+    let cacheKey = '';
+    if (cache) {
+      try {
+        const hash = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, str);
+        cacheKey = 'b64_' + hash.slice(0, 8).map(function(b) { return (b < 0 ? b + 256 : b).toString(16); }).join('');
+        const cachedB64 = cache.get(cacheKey);
+        if (cachedB64) {
+          _base64MemCache[str] = cachedB64;
+          return cachedB64;
+        }
+      } catch (cErr) {}
+    }
+
+    const fetchHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+    };
+
+    const fileId = extractDriveFileId_(str);
+
+    let blob = null;
+    if (fileId) {
+      ensureDriveFilePublic_(fileId);
+      try {
+        blob = DriveApp.getFileById(fileId).getBlob();
+      } catch (e) {
+        try {
+          const res = UrlFetchApp.fetch('https://drive.google.com/thumbnail?id=' + fileId + '&sz=w1000', {
+            muteHttpExceptions: true,
+            headers: fetchHeaders
+          });
+          blob = res.getBlob();
+        } catch (e2) {
+          try {
+            const res = UrlFetchApp.fetch('https://lh3.googleusercontent.com/d/' + fileId, {
+              muteHttpExceptions: true,
+              headers: fetchHeaders
+            });
+            blob = res.getBlob();
+          } catch (e3) {}
+        }
+      }
+    } else if (str.startsWith('http')) {
+      let originGuess = '';
+      try {
+        const originMatch = str.match(/^https?:\/\/([^\/]+)/i);
+        if (originMatch && originMatch[1]) originGuess = 'https://' + originMatch[1] + '/';
+      } catch (eOrigin) {}
+
+      const attempts = [];
+      if (originGuess) {
+        attempts.push(Object.assign({}, fetchHeaders, { 'Referer': originGuess }));
+      }
+      attempts.push(fetchHeaders); // no Referer
+
+      for (let a = 0; a < attempts.length && !blob; a++) {
+        try {
+          const res = UrlFetchApp.fetch(str, {
+            muteHttpExceptions: true,
+            followRedirects: true,
+            headers: attempts[a]
+          });
+          const code = res.getResponseCode();
+          const testBlob = res.getBlob();
+          const testType = testBlob.getContentType() || '';
+          if (code === 200 && (testType.indexOf('image/') !== -1 || testType.indexOf('svg') !== -1)) {
+            blob = testBlob;
+          } else {
+            console.warn('getImageBase64: fetch attempt ' + a + ' for ' + str + ' returned code ' + code + ', content-type "' + testType + '"');
+          }
+        } catch (eFetch) {
+          console.warn('getImageBase64: fetch attempt ' + a + ' for ' + str + ' threw: ' + eFetch);
+        }
+      }
+    }
+
+    if (blob) {
+      const contentType = blob.getContentType() || '';
+      if (contentType.indexOf('image/') !== -1 || contentType.indexOf('svg') !== -1) {
+        const resultB64 = 'data:' + contentType + ';base64,' + Utilities.base64Encode(blob.getBytes());
+        _base64MemCache[str] = resultB64;
+        if (cache && cacheKey && resultB64.length < 95000) {
+          try {
+            cache.put(cacheKey, resultB64, 21600); // 6 hours
+          } catch (cPutErr) {}
+        }
+        return resultB64;
+      }
+    } else {
+      console.warn('getImageBase64: no usable image blob obtained for ' + rawUrl);
+    }
+  } catch (err) {
+    console.error('Error converting image to base64:', err);
+  }
+  return '';
+}
+
+/**
+ * Fetches all dropdown data and matching mappings from the active Spreadsheet.
+ */
+function getInitialData(forceRefresh) {
+  // 0. High-performance multi-chunk CacheService check: returns in < 15ms if warm
+  const cache = CacheService.getScriptCache();
+  const CACHE_PREFIX = 'ghz_init_v4_';
+  if (!forceRefresh && cache) {
+    try {
+      const countStr = cache.get(CACHE_PREFIX + 'count');
+      if (countStr) {
+        const count = parseInt(countStr, 10);
+        let json = '';
+        let ok = true;
+        for (let i = 0; i < count; i++) {
+          const chunk = cache.get(CACHE_PREFIX + 'c_' + i);
+          if (chunk) {
+            json += chunk;
+          } else {
+            ok = false;
+            break;
+          }
+        }
+        if (ok && json) {
+          return JSON.parse(json);
+        }
+      }
+    } catch (cErr) {
+      console.warn('CacheService read notice:', cErr);
+    }
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Pictures Sheet layout:
+  // Column E (index 4): Brand Name in Brand Logo lookup table (e.g. HP, ASUS, DELL, LENOVO, ACER)
+  // Column G (index 6): Brand Logo Image Drive link or URL
+  // Column I (index 8): SKU
+  // Column J (index 9): Laptop / SKU Product Image (Website URL or Drive link)
+  // Column K (index 10): Alternate image link (optional fallback)
+  // Column L (index 11): Brand Name of the SKU / laptop (matches Column E)
+  // Column M (index 12): Model Description / Series of the SKU / laptop
+  // Column N (index 13): Specific Model Code / Name of the SKU / laptop
+  // Column P (cell P2): App / Main Logo Google Drive link or image URL
+  // Column Q (cell Q2): Browser Tab Favicon Logo Google Drive link or image URL
+  // Column R (cell R2): Gigahertz Website Logo with Tagline link or image URL
+  const picturesSheet = ss ? ss.getSheetByName('Pictures') : null;
+  const picturesData = picturesSheet ? picturesSheet.getDataRange().getValues() : [];
+
+  // Fetch P2 (Main Logo), Q2 (Browser Tab Logo), and R2 (Gigahertz Website
+  // Tagline Logo — this is also the source for the header bar circular icon)
+  let rawAppLogo = '';
+  let rawTabLogo = '';
+  let rawWebsiteLogo = '';
+  if (picturesSheet) {
+    try {
+      const topRange = picturesSheet.getRange('P2:R2');
+      const topFormulas = topRange.getFormulas()[0] || [];
+      const topVals = topRange.getValues()[0] || [];
+      const topDisp = topRange.getDisplayValues()[0] || [];
+
+      function extractCellItem(formula, val, disp) {
+        if (formula) {
+          const m1 = formula.match(/=IMAGE\s*\(\s*"([^"]+)"/i);
+          if (m1 && m1[1]) return m1[1];
+        }
+        const sVal = (val && !String(val).startsWith('#')) ? String(val).trim() : '';
+        if (sVal) return sVal;
+        const sDisp = (disp && !String(disp).startsWith('#')) ? String(disp).trim() : '';
+        return sDisp;
+      }
+      rawAppLogo = extractCellItem(topFormulas[0], topVals[0], topDisp[0]);
+      rawTabLogo = extractCellItem(topFormulas[1], topVals[1], topDisp[1]);
+      rawWebsiteLogo = extractCellItem(topFormulas[2], topVals[2], topDisp[2]);
+    } catch (eBatch) {
+      rawAppLogo = getCellUrlOrFormula(picturesSheet, 'P2');
+      rawTabLogo = getCellUrlOrFormula(picturesSheet, 'Q2');
+      rawWebsiteLogo = getCellUrlOrFormula(picturesSheet, 'R2');
+    }
+  }
+  if (!rawAppLogo && picturesData.length > 1 && picturesData[1].length > 15 && picturesData[1][15]) {
+    rawAppLogo = String(picturesData[1][15]).trim();
+  }
+  if (!rawTabLogo && picturesData.length > 1 && picturesData[1].length > 16 && picturesData[1][16]) {
+    rawTabLogo = String(picturesData[1][16]).trim();
+  }
+  if (!rawWebsiteLogo && picturesData.length > 1 && picturesData[1].length > 17 && picturesData[1][17]) {
+    rawWebsiteLogo = String(picturesData[1][17]).trim();
+  }
+
+  const skuList = [];
+  const skuImageMap = {};
+  const skuBrandImageMap = {};
+  const skuBrandMap = {};
+  const skuModelMap = {};
+  const skuFeaturesMap = {};
+  const skuBenefitsMap = {};
+  const brandLogoMap = {};
+
+  // Check header row of Pictures sheet for SKU-level feature / UKSP columns
+  const picturesHeaderRow = (picturesData.length > 0) ? picturesData[0] : [];
+  let skuFeatureColIndices = [];
+  let skuBenefitColIndices = [];
+
+  for (let c = 0; c < picturesHeaderRow.length; c++) {
+    const colHeader = String(picturesHeaderRow[c] || '').toLowerCase().trim();
+    if (colHeader) {
+      if (colHeader.includes('uksp') || colHeader.includes('feature') || (colHeader.startsWith('spec') && !colHeader.includes('benefit'))) {
+        skuFeatureColIndices.push(c);
+      } else if (colHeader.includes('benefit') || colHeader.includes('performance benefit')) {
+        skuBenefitColIndices.push(c);
+      }
+    }
+  }
+
+  // Helper to extract clean image URL or Google Drive direct preview URL
+  function formatImageUrl(raw) {
+    if (!raw) return '';
+    const str = String(raw).trim();
+    if (!str) return '';
+
+    if (str.startsWith('data:image/')) return str;
+
+    const fileId = extractDriveFileId_(str);
+    if (fileId) {
+      ensureDriveFilePublic_(fileId);
+      return 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w1000';
+    }
+
+    return str;
+  }
+
+  const appLogoUrl = rawAppLogo ? formatImageUrl(rawAppLogo) : '';
+  const tabLogoUrl = rawTabLogo ? formatImageUrl(rawTabLogo) : '';
+  const tabLogoBase64 = rawTabLogo ? getImageBase64(rawTabLogo) : '';
+  const websiteLogoUrl = rawWebsiteLogo ? formatImageUrl(rawWebsiteLogo) : '';
+  // Header bar circular icon (upper-left, next to the dashboard title) uses
+  // the same Pictures!R2 value as websiteLogoUrl.
+  const headerLogoUrl = websiteLogoUrl;
+  const headerLogoBase64 = rawWebsiteLogo ? getImageBase64(rawWebsiteLogo) : '';
+
+  // STEP 1: Scan all rows to build Brand Name (Col E) -> Brand Logo (Col F / Col G) mapping
+  for (let i = 1; i < picturesData.length; i++) {
+    const row = picturesData[i];
+    if (row && row.length > 5) {
+      const brandNameInColE = (row.length > 4 && row[4]) ? String(row[4]).trim() : ''; // Column E (index 4)
+      // Column G (index 6) is the Direct Drive Link, Column F (index 5) is the Image Formula/URL
+      const brandLogoRaw = (row.length > 6 && row[6]) ? row[6] : ((row.length > 5 && row[5]) ? row[5] : '');
+
+      if (brandNameInColE && brandLogoRaw) {
+        const normBrand = brandNameInColE.toLowerCase();
+        if (!brandLogoMap[normBrand]) {
+          const formatted = formatImageUrl(brandLogoRaw);
+          brandLogoMap[normBrand] = formatted;
+          brandLogoMap[brandNameInColE] = formatted;
+        }
+      }
+    }
+  }
+
+  // STEP 2: Scan all SKU rows and match SKU Brand (Col L) with Brand Logo (Col E)
+  for (let i = 1; i < picturesData.length; i++) {
+    const row = picturesData[i];
+    if (row && row.length > 8) {
+      const rawSku = row[8]; // Column I (index 8) - SKU
+      // Column J (index 9) is the primary Product Image column (with Col K as fallback if J is empty)
+      const rawImgUrl = (row.length > 9 && row[9]) ? row[9] : ((row.length > 10 && row[10]) ? row[10] : '');
+      const rawBrandInColL = (row.length > 11 && row[11]) ? String(row[11]).trim() : ''; // Column L (index 11)
+      const rawModelInColM = (row.length > 12 && row[12]) ? String(row[12]).trim() : ''; // Column M (index 12)
+      const rawModelInColN = (row.length > 13 && row[13]) ? String(row[13]).trim() : ''; // Column N (index 13)
+
+      if (rawSku !== null && rawSku !== undefined && rawSku !== '') {
+        let sku = String(rawSku).trim();
+        // Remove "LAP-" prefix (case-insensitive) for all SKUs
+        sku = sku.replace(/^LAP-/i, '').trim();
+        if (sku) {
+          if (!skuList.includes(sku)) {
+            skuList.push(sku);
+          }
+          skuImageMap[sku] = formatImageUrl(rawImgUrl);
+          skuBrandMap[sku] = rawBrandInColL;
+
+          // Intelligently set model from Column N & Column M
+          let combinedModel = '';
+          if (rawModelInColN && rawModelInColM) {
+            if (rawModelInColM.toLowerCase().includes(rawModelInColN.toLowerCase())) {
+              combinedModel = rawModelInColM;
+            } else if (rawModelInColN.toLowerCase().includes(rawModelInColM.toLowerCase())) {
+              combinedModel = rawModelInColN;
+            } else {
+              combinedModel = rawModelInColM + ' ' + rawModelInColN;
+            }
+          } else {
+            combinedModel = rawModelInColN || rawModelInColM;
+          }
+
+          skuModelMap[sku] = combinedModel;
+
+          // Match Brand in Column L with Column E brand logo (exact or substring)
+          const normBrandL = rawBrandInColL.toLowerCase();
+          let matchedBrandLogo = brandLogoMap[normBrandL] || brandLogoMap[rawBrandInColL] || '';
+          if (!matchedBrandLogo) {
+            for (const bKey in brandLogoMap) {
+              if (normBrandL.includes(bKey) || bKey.includes(normBrandL)) {
+                matchedBrandLogo = brandLogoMap[bKey];
+                break;
+              }
+            }
+          }
+          skuBrandImageMap[sku] = matchedBrandLogo;
+
+          // Extract SKU-level features and benefits if columns were detected in Pictures sheet
+          if (skuFeatureColIndices.length > 0) {
+            const rowFeats = [];
+            const rowBenefits = [];
+            for (let fc = 0; fc < skuFeatureColIndices.length; fc++) {
+              const colIdx = skuFeatureColIndices[fc];
+              const fVal = (row.length > colIdx && row[colIdx]) ? String(row[colIdx]).trim() : '';
+              if (fVal) {
+                rowFeats.push(fVal);
+                let bVal = '';
+                if (skuBenefitColIndices.length > fc) {
+                  const bColIdx = skuBenefitColIndices[fc];
+                  bVal = (row.length > bColIdx && row[bColIdx]) ? String(row[bColIdx]).trim() : '';
+                }
+                rowBenefits.push(bVal);
+              }
+            }
+            if (rowFeats.length > 0) {
+              skuFeaturesMap[sku] = rowFeats;
+              if (rowBenefits.some(b => b)) {
+                skuBenefitsMap[sku] = rowBenefits;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Fetch Apps from 'DV' sheet (Column A row 11 onwards, and image URLs in Column C)
+  const dvApps = getApplicationsFromDV(ss);
+  const appsList = [];
+  const appsBenefitMap = {};
+  const appsLogoMap = {};
+  const appsDataList = dvApps;
+
+  dvApps.forEach(function(app) {
+    if (app && app.name) {
+      appsList.push(app.name);
+      if (app.icon) {
+        appsLogoMap[app.name] = app.icon;
+      }
+    }
+  });
+
+  // Fallback to 'Applications' sheet ONLY if DV sheet was empty or not found
+  if (appsList.length === 0) {
+    const appsSheet = ss ? ss.getSheetByName('Applications') : null;
+    const appsData = appsSheet ? appsSheet.getDataRange().getValues() : [];
+    for (let i = 1; i < appsData.length; i++) {
+      const row = appsData[i];
+      if (row && row.length > 0) {
+        const rawApp = row[0]; // Column A (index 0)
+        const rawBenefit = row[1]; // Column B (index 1)
+        const rawLogo = (row.length > 2) ? row[2] : ''; // Column C (index 2)
+        if (rawApp !== null && rawApp !== undefined && rawApp !== '') {
+          const appName = String(rawApp).trim();
+          if (appName) {
+            if (!appsList.includes(appName)) {
+              appsList.push(appName);
+            }
+            appsBenefitMap[appName] = rawBenefit ? String(rawBenefit).trim() : '';
+            if (rawLogo) {
+              appsLogoMap[appName] = formatAppIconUrl(rawLogo) || formatImageUrl(rawLogo);
+            }
+            appsDataList.push({
+              id: 'app_' + appName.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+              name: appName,
+              icon: appsLogoMap[appName] || ''
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // 3. Fetch Features and Benefits strictly from 'Features' sheet (Column A = Feature, Column B = Benefit)
+  const allSheets = ss.getSheets();
+  const allSheetNames = [];
+  let featuresSheet = null;
+
+  // Pass 1: Look for exact or case-insensitive match for 'features' or 'feature'
+  for (let s = 0; s < allSheets.length; s++) {
+    const rawName = allSheets[s].getName();
+    allSheetNames.push(rawName);
+    const cleanName = rawName.replace(/[\u200B-\u200D\uFEFF\u00A0\r\n\t]/g, '').trim().toLowerCase();
+    if (!featuresSheet && (cleanName === 'features' || cleanName === 'feature' || cleanName === 'features list' || cleanName === 'key features')) {
+      featuresSheet = allSheets[s];
+    }
+  }
+
+  // Pass 2: Look for sheet containing 'feature' in name
+  if (!featuresSheet) {
+    for (let s = 0; s < allSheets.length; s++) {
+      const cleanName = allSheets[s].getName().replace(/[\u200B-\u200D\uFEFF\u00A0\r\n\t]/g, '').trim().toLowerCase();
+      if (cleanName.includes('feature')) {
+        featuresSheet = allSheets[s];
+        break;
+      }
+    }
+  }
+
+  // Pass 3: Look for sheet containing 'uksp'
+  if (!featuresSheet) {
+    for (let s = 0; s < allSheets.length; s++) {
+      const cleanName = allSheets[s].getName().replace(/[\u200B-\u200D\uFEFF\u00A0\r\n\t]/g, '').trim().toLowerCase();
+      if (cleanName.includes('uksp')) {
+        featuresSheet = allSheets[s];
+        break;
+      }
+    }
+  }
+
+  const featuresList = [];
+  const featureBenefitMap = {};
+  const featureIconMap = {};
+
+  if (featuresSheet) {
+    let displayVals = [];
+    let rawVals = [];
+    try {
+      displayVals = featuresSheet.getDataRange().getDisplayValues();
+    } catch (e) {}
+    try {
+      rawVals = featuresSheet.getDataRange().getValues();
+    } catch (e) {}
+
+    const maxRows = Math.max(displayVals.length, rawVals.length);
+
+    // Header keywords to ignore on first row
+    const headerKeywords = [
+      'feature', 'key feature', 'features', 'key features', 'uksp', 'uksp feature', 'uksp features',
+      'dropdown', 'dropdown value', 'dropdown values', 'specification', 'specifications',
+      'column a', 'col a', 'name', 'item'
+    ];
+
+    for (let r = 0; r < maxRows; r++) {
+      const dispRow = displayVals[r] || [];
+      const rawRow = rawVals[r] || [];
+
+      // Column A (index 0) is strictly the Feature Value
+      const cellA = (dispRow.length > 0 && dispRow[0] !== undefined && dispRow[0] !== null) ? String(dispRow[0]).trim() :
+                    ((rawRow.length > 0 && rawRow[0] !== undefined && rawRow[0] !== null) ? String(rawRow[0]).trim() : '');
+
+      // Column B (index 1) is strictly the Benefit / Specification Detail
+      const cellB = (dispRow.length > 1 && dispRow[1] !== undefined && dispRow[1] !== null) ? String(dispRow[1]).trim() :
+                    ((rawRow.length > 1 && rawRow[1] !== undefined && rawRow[1] !== null) ? String(rawRow[1]).trim() : '');
+
+      // Column C (index 2) is optional Icon
+      const cellC = (dispRow.length > 2 && dispRow[2] !== undefined && dispRow[2] !== null) ? String(dispRow[2]).trim() :
+                    ((rawRow.length > 2 && rawRow[2] !== undefined && rawRow[2] !== null) ? String(rawRow[2]).trim() : '');
+
+      if (cellA) {
+        const lowerA = cellA.toLowerCase();
+
+        // Skip row 0 if it is a table header
+        if (r === 0 && (headerKeywords.includes(lowerA) || lowerA.startsWith('feature') || lowerA.startsWith('uksp'))) {
+          continue;
+        }
+        if (headerKeywords.includes(lowerA) || lowerA === 'features' || lowerA === 'feature') {
+          continue;
+        }
+
+        if (!featuresList.includes(cellA)) {
+          featuresList.push(cellA);
+        }
+
+        if (cellB) {
+          featureBenefitMap[cellA] = cellB;
+          featureBenefitMap[lowerA] = cellB;
+        }
+
+        if (cellC) {
+          featureIconMap[cellA] = cellC;
+        }
+      }
+    }
+  }
+
+  // Pre-generate Base64 for Brand Logos (cached in CacheService so fast on warm runs)
+  const brandLogoBase64Map = {};
+  for (const bKey in brandLogoMap) {
+    const rawLogo = brandLogoMap[bKey];
+    if (rawLogo && !brandLogoBase64Map[bKey]) {
+      try {
+        const b64 = getImageBase64(rawLogo);
+        if (b64) brandLogoBase64Map[bKey] = b64;
+      } catch (e) {}
+    }
+  }
+
+  // Update skuBrandImageMap with Base64 when available, fallback to direct URL
+  for (const sku in skuBrandImageMap) {
+    const rawBrand = skuBrandMap[sku] || '';
+    const normBrand = rawBrand.toLowerCase().trim();
+    if (brandLogoBase64Map[normBrand]) {
+      skuBrandImageMap[sku] = brandLogoBase64Map[normBrand];
+    } else {
+      for (const bKey in brandLogoBase64Map) {
+        if (normBrand.includes(bKey) || bKey.includes(normBrand)) {
+          skuBrandImageMap[sku] = brandLogoBase64Map[bKey];
+          break;
+        }
+      }
+    }
+  }
+
+  // Optimize app icons: assign base64 if already data: or in cache, otherwise pass direct image URL.
+  // This avoids blocking the web app boot with 40 serial UrlFetchApp HTTP requests.
+  const appsIconBase64Map = {};
+  appsDataList.forEach(function(app) {
+    if (app && app.icon) {
+      const iconStr = String(app.icon).trim();
+      if (iconStr.startsWith('data:')) {
+        appsIconBase64Map[app.name] = iconStr;
+        app.iconBase64 = iconStr;
+      } else {
+        try {
+          const hash = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, iconStr);
+          const cKey = 'b64_' + hash.slice(0, 8).map(function(b) { return (b < 0 ? b + 256 : b).toString(16); }).join('');
+          if (cache) {
+            const cachedB64 = cache.get(cKey);
+            if (cachedB64) {
+              appsIconBase64Map[app.name] = cachedB64;
+              app.iconBase64 = cachedB64;
+            }
+          }
+        } catch (eAppC) {}
+      }
+    }
+  });
+
+  const specsMap = getSpecsSheetData(ss);
+  const criteriaSegmentData = getCriteriaSegmentData(skuImageMap, skuBrandMap, skuModelMap, skuFeaturesMap, specsMap);
+  const locationsList = (criteriaSegmentData && criteriaSegmentData.locations && criteriaSegmentData.locations.length > 0)
+    ? criteriaSegmentData.locations
+    : getLocationsFromCriteriaSheet();
+  const ukspPerSkuData = getUkspPerSkuData(ss);
+  const appUkspData = getApplicationUkspSheetsData(ss);
+
+  const resultData = {
+    appLogoUrl: appLogoUrl || websiteLogoUrl,
+    tabLogoUrl: tabLogoUrl,
+    tabLogoBase64: tabLogoBase64,
+    rawTabLogo: rawTabLogo,
+    websiteLogoUrl: websiteLogoUrl,
+    headerLogoUrl: headerLogoUrl,
+    headerLogoBase64: headerLogoBase64,
+    skuList: skuList,
+    skuImageMap: skuImageMap,
+    skuBrandImageMap: skuBrandImageMap,
+    skuBrandMap: skuBrandMap,
+    skuModelMap: skuModelMap,
+    skuFeaturesMap: skuFeaturesMap,
+    skuBenefitsMap: skuBenefitsMap,
+    brandLogoMap: brandLogoMap,
+    brandLogoBase64Map: brandLogoBase64Map,
+    appsList: appsList,
+    appsBenefitMap: appsBenefitMap,
+    appsLogoMap: appsLogoMap,
+    appsIconBase64Map: appsIconBase64Map,
+    appsDataList: appsDataList,
+    featuresList: featuresList,
+    featureBenefitMap: featureBenefitMap,
+    featureIconMap: featureIconMap,
+    locationsList: locationsList,
+    specsMap: specsMap,
+    criteriaSegmentData: criteriaSegmentData,
+    ukspPerSkuData: ukspPerSkuData,
+    appUkspData: appUkspData,
+    sheetStatus: {
+      featuresSheetName: featuresSheet ? featuresSheet.getName() : 'None',
+      featuresCount: featuresList.length,
+      skuCount: skuList.length,
+      skuFeaturesCount: Object.keys(skuFeaturesMap).length,
+      specsCount: Object.keys(specsMap).length,
+      allSheetNames: allSheetNames
+    }
+  };
+
+  // Cache result for 30 minutes in 90KB segments
+  if (cache) {
+    try {
+      const jsonStr = JSON.stringify(resultData);
+      const CHUNK_SZ = 90000;
+      const totalChunks = Math.ceil(jsonStr.length / CHUNK_SZ);
+      cache.put(CACHE_PREFIX + 'count', String(totalChunks), 1800);
+      for (let i = 0; i < totalChunks; i++) {
+        cache.put(CACHE_PREFIX + 'c_' + i, jsonStr.substr(i * CHUNK_SZ, CHUNK_SZ), 1800);
+      }
+    } catch (saveErr) {
+      console.warn('CacheService write notice:', saveErr);
+    }
+  }
+
+  return resultData;
+}
+
+/**
+ * Direct function to retrieve applications specifically from the DV sheet.
+ * Reads Column A starting at row 11 onwards for Application Names, and Column C for Image URLs.
+ */
+function getApplicationsFromDV() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.getActive();
+    if (!ss) return [];
+
+    // 1. Locate the 'DV' sheet (case-insensitive, trimmed, whitespace & zero-width stripped)
+    let dvSheet = ss.getSheetByName('DV');
+    if (!dvSheet) {
+      const sheets = ss.getSheets();
+      // First pass: exact match (case-insensitive)
+      for (let s = 0; s < sheets.length; s++) {
+        const cleanName = sheets[s].getName().replace(/[\u200B-\u200D\uFEFF\u00A0\r\n\t]/g, '').trim().toUpperCase();
+        if (cleanName === 'DV') {
+          dvSheet = sheets[s];
+          break;
+        }
+      }
+      // Second pass: starts with or contains 'DV' (e.g. 'DV_Apps', 'DV Table')
+      if (!dvSheet) {
+        for (let s = 0; s < sheets.length; s++) {
+          const cleanName = sheets[s].getName().replace(/[\u200B-\u200D\uFEFF\u00A0\r\n\t]/g, '').trim().toUpperCase();
+          if (cleanName.startsWith('DV') || cleanName.includes('DV')) {
+            dvSheet = sheets[s];
+            break;
+          }
+        }
+      }
+      // Third pass: contains 'VALIDATION'
+      if (!dvSheet) {
+        for (let s = 0; s < sheets.length; s++) {
+          const cleanName = sheets[s].getName().toUpperCase();
+          if (cleanName.includes('DATA VALIDATION') || cleanName.includes('VALIDATION')) {
+            dvSheet = sheets[s];
+            break;
+          }
+        }
+      }
+    }
+
+    if (!dvSheet) {
+      console.warn('DV sheet not found in spreadsheet.');
+      return [];
+    }
+
+    const lastRow = Math.max(dvSheet.getLastRow(), dvSheet.getMaxRows());
+    if (lastRow < 11) return [];
+
+    // Read from Row 11 down to lastRow, across 3 columns (Col A = 1, Col B = 2, Col C = 3)
+    const numRows = Math.min(lastRow - 10, 500);
+    const range = dvSheet.getRange(11, 1, numRows, 3);
+    const displayVals = range.getDisplayValues();
+    const values = range.getValues();
+    const formulas = range.getFormulas();
+    const list = [];
+    const seenNames = {};
+
+    for (let r = 0; r < values.length; r++) {
+      // Col A (index 0): Application name
+      const rawName = (displayVals[r] && displayVals[r][0] !== '') ? displayVals[r][0] : values[r][0];
+      if (rawName !== null && rawName !== undefined && String(rawName).trim() !== '') {
+        const appName = String(rawName).trim();
+        const normKey = appName.toLowerCase();
+        if (seenNames[normKey]) continue;
+        seenNames[normKey] = true;
+
+        // Col B (index 1): Application Hierarchy level (e.g. 1, 2, 3, 4, 5...) or Tier Label ('ENTRY-LEVEL', etc.)
+        let appHierarchy = 1;
+        let appTierLabel = 'ENTRY-LEVEL';
+        const rawB = (displayVals[r] && displayVals[r][1] !== '') ? displayVals[r][1] : values[r][1];
+        if (rawB !== null && rawB !== undefined && String(rawB).trim() !== '') {
+          const strB = String(rawB).trim().toUpperCase();
+          if (strB.includes('ENTRY')) {
+            appHierarchy = 1;
+            appTierLabel = 'ENTRY-LEVEL';
+          } else if (strB.includes('PROD')) {
+            appHierarchy = 2;
+            appTierLabel = 'PRODUCTIVITY';
+          } else if (strB.includes('CREAT')) {
+            appHierarchy = 3;
+            appTierLabel = 'CREATORS';
+          } else if (strB.includes('CASUAL')) {
+            appHierarchy = 4;
+            appTierLabel = 'CASUAL GAMERS';
+          } else if (strB.includes('AAA') || strB.includes('HARDCORE')) {
+            appHierarchy = 5;
+            appTierLabel = 'AAA GAMERS';
+          } else {
+            const numB = parseInt(strB.replace(/[^\d]/g, ''), 10);
+            if (!isNaN(numB) && numB > 0 && numB <= 5) {
+              appHierarchy = numB;
+              const tierNames = { 1: 'ENTRY-LEVEL', 2: 'PRODUCTIVITY', 3: 'CREATORS', 4: 'CASUAL GAMERS', 5: 'AAA GAMERS' };
+              appTierLabel = tierNames[numB] || 'ENTRY-LEVEL';
+            }
+          }
+        }
+
+        // Col C (index 2): Image URL or =IMAGE("...") formula
+        let rawUrl = '';
+        if (formulas[r] && formulas[r][2]) {
+          const formStr = String(formulas[r][2]).trim();
+          const matchImg = formStr.match(/=IMAGE\s*\(\s*["']([^"']+)["']/i);
+          if (matchImg && matchImg[1]) {
+            rawUrl = matchImg[1].trim();
+          } else {
+            const matchHttp = formStr.match(/https?:\/\/[^\s"'<>\)]+/i);
+            if (matchHttp && matchHttp[0]) {
+              rawUrl = matchHttp[0].trim();
+            } else {
+              rawUrl = formStr;
+            }
+          }
+        }
+        if (!rawUrl && displayVals[r] && displayVals[r][2]) {
+          rawUrl = String(displayVals[r][2]).trim();
+        }
+        if (!rawUrl && values[r] && values[r][2]) {
+          rawUrl = String(values[r][2]).trim();
+        }
+
+        // Column fallback guard: if Col C is a number and Col B was an image/URL
+        if (appHierarchy === 1 && rawUrl && /^\d+$/.test(rawUrl)) {
+          const numC = parseInt(rawUrl, 10);
+          if (!isNaN(numC) && numC > 0 && numC <= 5) {
+            appHierarchy = numC;
+            const tierNames = { 1: 'ENTRY-LEVEL', 2: 'PRODUCTIVITY', 3: 'CREATORS', 4: 'CASUAL GAMERS', 5: 'AAA GAMERS' };
+            appTierLabel = tierNames[numC] || 'ENTRY-LEVEL';
+            rawUrl = String(rawB || '');
+          }
+        }
+
+        const iconUrl = formatAppIconUrl(rawUrl);
+        list.push({
+          id: 'app_' + appName.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+          name: appName,
+          hierarchy: appHierarchy,
+          tierLabel: appTierLabel,
+          tierName: appTierLabel,
+          icon: iconUrl || ''
+        });
+      }
+    }
+    return list;
+  } catch (err) {
+    console.error('Error in getApplicationsFromDV:', err);
+    return [];
+  }
+}
+
+/**
+ * Normalizes an application logo image URL or Google Drive link into a direct web-accessible URL.
+ * Uses the shared extractDriveFileId_ matcher (wider than the old inline
+ * regex) so link formats like "open?id=...", "uc?export=view&id=...", or a
+ * bare pasted ID all resolve correctly instead of silently falling through
+ * as a raw, non-image URL that renders blank.
+ */
+function formatAppIconUrl(raw) {
+  if (!raw) return '';
+  const str = String(raw).trim();
+  if (!str) return '';
+  if (str.startsWith('data:image/')) return str;
+
+  const fileId = extractDriveFileId_(str);
+  if (fileId) {
+    ensureDriveFilePublic_(fileId);
+    return 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w200';
+  }
+
+  if (str.startsWith('http://') || str.startsWith('https://')) {
+    return str;
+  }
+
+  return '';
+}
+
+/**
+ * Locates the criteria sheet dynamically across various possible names or structural features.
+ */
+function findCriteriaSheet(ss) {
+  if (!ss) return null;
+  // 1. Direct name check
+  let sheet = ss.getSheetByName('Criteria Segment-Application');
+  if (sheet) return sheet;
+
+  const sheets = ss.getSheets();
+  // 2. Case-insensitive exact check
+  for (let s = 0; s < sheets.length; s++) {
+    const cleanName = sheets[s].getName().replace(/[\u200B-\u200D\uFEFF\u00A0\r\n\t]/g, '').trim().toUpperCase();
+    if (cleanName === 'CRITERIA SEGMENT-APPLICATION' || cleanName === 'CRITERIA SEGMENT - APPLICATION' || cleanName === 'CRITERIA SEGMENT - APPLICATIONS' || cleanName === 'CRITERIA SEGMENT-APPLICATIONS') {
+      return sheets[s];
+    }
+  }
+
+  // 3. Name containing criteria and segment/application
+  for (let s = 0; s < sheets.length; s++) {
+    const cleanName = sheets[s].getName().toUpperCase();
+    if (cleanName.includes('CRITERIA') && (cleanName.includes('SEGMENT') || cleanName.includes('APPLICATION'))) {
+      return sheets[s];
+    }
+  }
+
+  // 4. Name containing criteria or segment
+  for (let s = 0; s < sheets.length; s++) {
+    const cleanName = sheets[s].getName().toUpperCase();
+    if (cleanName.includes('CRITERIA') || cleanName.includes('SEGMENT')) {
+      return sheets[s];
+    }
+  }
+
+  // 5. Structural check: find sheet with at least 5 columns where row 1 has multiple location headers (E1:AY1)
+  for (let s = 0; s < sheets.length; s++) {
+    try {
+      const sh = sheets[s];
+      if (sh.getLastColumn() >= 5) {
+        const sampleRow = sh.getRange(1, 5, 1, Math.min(sh.getLastColumn() - 4, 46)).getValues()[0] || [];
+        const filled = sampleRow.filter(v => v !== '' && v !== null && v !== undefined);
+        if (filled.length >= 3) {
+          return sh;
+        }
+      }
+    } catch (e) {}
+  }
+
+  return null;
+}
+
+/**
+ * Finds the SPECS sheet containing laptop specifications.
+ * Checks for names 'SPECS', 'Specs', or containing 'SPEC'.
+ */
+function findSpecsSheet(ss) {
+  if (!ss) return null;
+  let sheet = ss.getSheetByName('SPECS');
+  if (sheet) return sheet;
+  sheet = ss.getSheetByName('Specs');
+  if (sheet) return sheet;
+  sheet = ss.getSheetByName('specs');
+  if (sheet) return sheet;
+
+  const sheets = ss.getSheets();
+  for (let s = 0; s < sheets.length; s++) {
+    const cleanName = sheets[s].getName().replace(/[\u200B-\u200D\uFEFF\u00A0\r\n\t]/g, '').trim().toUpperCase();
+    if (cleanName === 'SPECS' || cleanName === 'SPEC' || cleanName.includes('SPECS') || cleanName.includes('SPECIFICATION')) {
+      return sheets[s];
+    }
+  }
+
+  // Structural header check (ITEM DESCRIPTION, CPU, GRAPHICS, PRICE)
+  for (let s = 0; s < sheets.length; s++) {
+    try {
+      const sh = sheets[s];
+      if (sh.getLastColumn() >= 6) {
+        const topRow = sh.getRange(1, 1, 1, Math.min(sh.getLastColumn(), 15)).getValues()[0] || [];
+        const topStr = topRow.map(c => String(c || '').toLowerCase()).join(' ');
+        if ((topStr.includes('item') || topStr.includes('description')) && (topStr.includes('cpu') || topStr.includes('graphics') || topStr.includes('price'))) {
+          return sh;
+        }
+      }
+    } catch (e) {}
+  }
+
+  return null;
+}
+
+/**
+ * Columns beyond PRICE on the SPECS sheet (immediately after column L) hold the
+ * manual comparative rankings: CPU HIERARCHY, GRAPHICS HIERARCHY, STORAGE,
+ * MEMORY, RESOLUTION — one column each, in that order. 1 = highest / best.
+ * These are used ONLY to decide color coding in the Generated Result and are
+ * NEVER shown as spec text.
+ */
+var SPEC_RANK_KEYS = ['cpu', 'gpu', 'storage', 'ram', 'display'];
+
+/**
+ * Reads the 5 rank columns that sit immediately after rankBaseIdx (0-based)
+ * for a given row. Returns {} for any rank that is blank or non-numeric.
+ */
+function readSpecRanksFromRow_(dispRow, valRow, rankBaseIdx) {
+  const ranks = {};
+  SPEC_RANK_KEYS.forEach(function(key, i) {
+    const idx = rankBaseIdx + i;
+    const raw = (dispRow[idx] !== undefined && dispRow[idx] !== '') ? dispRow[idx] : valRow[idx];
+    if (raw === undefined || raw === null || String(raw).trim() === '') return;
+    const n = parseInt(String(raw).replace(/[^\d]/g, ''), 10);
+    if (!isNaN(n) && n > 0) ranks[key] = n;
+  });
+  return ranks;
+}
+
+/**
+ * Reads laptop specifications and images from the SPECS sheet.
+ * Headers from Column A to L:
+ * A: ITEM DESCRIPTION
+ * B: Image URL
+ * C: Model Code
+ * D: BRAND
+ * E: MODEL
+ * F: CPU
+ * G: GRAPHICS
+ * H: STORAGE
+ * I: MEMORY
+ * J: RESOLUTION
+ * K: PANEL SIZE
+ * L: PRICE
+ *
+ * Columns M to Q (immediately after PRICE) hold the manual comparative RANKS
+ * (CPU HIERARCHY, GRAPHICS HIERARCHY, STORAGE, MEMORY, RESOLUTION — 1 = best).
+ * These are read separately into specRanks and are never mixed into the
+ * visible spec text.
+ *
+ * Extracts and maps clean images, titles, specifications, ranks, and prices.
+ */
+function getSpecsSheetData(ss) {
+  try {
+    if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.getActive();
+    if (!ss) return {};
+
+    const specsSheet = findSpecsSheet(ss);
+    if (!specsSheet) {
+      console.warn('SPECS sheet not found in spreadsheet.');
+      return {};
+    }
+
+    const data = specsSheet.getDataRange().getValues();
+    const displayData = specsSheet.getDataRange().getDisplayValues();
+    if (!data || data.length < 2) return {};
+
+    // Standard header column mapping (A to L)
+    let colMap = {
+      itemDesc: 0,   // A
+      imageUrl: 1,   // B
+      modelCode: 2,  // C
+      brand: 3,      // D
+      model: 4,      // E
+      cpu: 5,        // F
+      graphics: 6,   // G
+      storage: 7,    // H
+      memory: 8,     // I
+      resolution: 9, // J
+      panelSize: 10, // K
+      price: 11      // L
+    };
+
+    // Dynamically detect header positions from row 0 if columns shifted.
+    // IMPORTANT: only scan columns A..L (index 0..11) here. Columns beyond
+    // PRICE hold the manual rank columns (e.g. "CPU HIERARCHY", "GRAPHICS
+    // HIERARCHY", "STORAGE", "MEMORY", "RESOLUTION") whose headers also
+    // contain words like "cpu" / "graphic" / "storage" / "memory" /
+    // "resolution" — scanning them here would silently overwrite colMap.cpu,
+    // colMap.graphics, etc. with the RANK column instead of the spec-text
+    // column, which is what previously caused "Processor: 16" to appear in
+    // the Generated Result instead of the actual CPU name.
+    const fullHeaderRow = (displayData[0] || data[0] || []).map(h => String(h || '').toLowerCase().trim());
+    const headerRow = fullHeaderRow.slice(0, 12); // A..L only
+    headerRow.forEach((h, idx) => {
+      if (h.includes('item') || (h.includes('desc') && !h.includes('model'))) colMap.itemDesc = idx;
+      else if (h.includes('image') || h.includes('img') || h.includes('photo') || h.includes('picture')) colMap.imageUrl = idx;
+      else if (h.includes('model code') || h.includes('code')) colMap.modelCode = idx;
+      else if (h === 'brand' || h.includes('brand')) colMap.brand = idx;
+      else if (h === 'model' || (h.includes('model') && !h.includes('code'))) colMap.model = idx;
+      else if (h.includes('cpu') || h.includes('processor')) colMap.cpu = idx;
+      else if (h.includes('graphic') || h.includes('gpu') || h.includes('vga')) colMap.graphics = idx;
+      else if (h.includes('storage') || h.includes('ssd') || h.includes('hdd') || h.includes('rom')) colMap.storage = idx;
+      else if (h.includes('memory') || h.includes('ram')) colMap.memory = idx;
+      else if (h.includes('resolution') || h.includes('res')) colMap.resolution = idx;
+      else if (h.includes('panel') || h.includes('display') || h.includes('screen') || h.includes('size')) colMap.panelSize = idx;
+      else if (h.includes('price') || h.includes('srp') || h.includes('amount') || h.includes('cost')) colMap.price = idx;
+    });
+
+    // The 5 rank columns (CPU HIERARCHY, GRAPHICS HIERARCHY, STORAGE, MEMORY,
+    // RESOLUTION) sit immediately after PRICE, in that fixed order.
+    const rankBaseIdx = colMap.price + 1;
+
+    const specsMap = {};
+
+    for (let r = 1; r < data.length; r++) {
+      const row = data[r] || [];
+      const dispRow = displayData[r] || [];
+
+      const rawItemDesc = (dispRow[colMap.itemDesc] && String(dispRow[colMap.itemDesc]).trim() !== '')
+        ? String(dispRow[colMap.itemDesc]).trim()
+        : String(row[colMap.itemDesc] || '').trim();
+
+      if (!rawItemDesc) continue;
+
+      const rawImg = (dispRow[colMap.imageUrl] && String(dispRow[colMap.imageUrl]).trim() !== '')
+        ? String(dispRow[colMap.imageUrl]).trim()
+        : String(row[colMap.imageUrl] || '').trim();
+
+      const modelCode = (dispRow[colMap.modelCode] || row[colMap.modelCode] || '').toString().trim();
+      const brand = (dispRow[colMap.brand] || row[colMap.brand] || '').toString().trim();
+      const model = (dispRow[colMap.model] || row[colMap.model] || '').toString().trim();
+      const cpu = (dispRow[colMap.cpu] || row[colMap.cpu] || '').toString().trim();
+      const graphics = (dispRow[colMap.graphics] || row[colMap.graphics] || '').toString().trim();
+      const storage = (dispRow[colMap.storage] || row[colMap.storage] || '').toString().trim();
+      const memory = (dispRow[colMap.memory] || row[colMap.memory] || '').toString().trim();
+      const resolution = (dispRow[colMap.resolution] || row[colMap.resolution] || '').toString().trim();
+      const panelSize = (dispRow[colMap.panelSize] || row[colMap.panelSize] || '').toString().trim();
+
+      const rawPrice = (dispRow[colMap.price] !== undefined && dispRow[colMap.price] !== '')
+        ? dispRow[colMap.price]
+        : row[colMap.price];
+      let price = '';
+      if (typeof rawPrice === 'number' && !isNaN(rawPrice)) {
+        price = rawPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      } else if (rawPrice) {
+        price = String(rawPrice).trim().replace(/^[₱pP\s]+/, '');
+      }
+
+      // Manual comparative ranks from columns M..Q (never shown as spec text)
+      const specRanks = readSpecRanksFromRow_(dispRow, row, rankBaseIdx);
+
+      // Title assembly: Brand + Model
+      let title = '';
+      if (brand && model) {
+        title = model.toLowerCase().includes(brand.toLowerCase()) ? model : (brand + ' ' + model);
+      } else {
+        title = model || brand || rawItemDesc;
+      }
+
+      // Structured specs bullets matching dashboard layout
+      const bullets = [];
+      if (cpu) bullets.push('Processor: ' + cpu);
+      if (graphics) bullets.push('Graphics: ' + graphics);
+      if (storage) bullets.push('Storage: ' + storage);
+      if (memory) bullets.push('Memory: ' + memory);
+      if (resolution && panelSize) {
+        bullets.push('Display: ' + panelSize + ' (' + resolution + ')');
+      } else if (panelSize) {
+        bullets.push('Panel size: ' + panelSize);
+      } else if (resolution) {
+        bullets.push('Resolution: ' + resolution);
+      }
+
+      const cleanSku = rawItemDesc.replace(/^LAP-/i, '').trim();
+
+      // Format image link (handles Google Drive URLs, thumbnails, web links)
+      let formattedImg = '';
+      if (rawImg) {
+        if (rawImg.startsWith('data:image/')) {
+          formattedImg = rawImg;
+        } else {
+          const fileId = extractDriveFileId_(rawImg);
+          if (fileId) {
+            ensureDriveFilePublic_(fileId);
+            formattedImg = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w1000';
+          } else {
+            formattedImg = rawImg;
+          }
+        }
+      }
+
+      const specObj = {
+        itemDesc: rawItemDesc,
+        cleanSku: cleanSku,
+        image: formattedImg,
+        modelCode: modelCode,
+        brand: brand,
+        model: model,
+        title: title,
+        cpu: cpu,
+        graphics: graphics,
+        storage: storage,
+        memory: memory,
+        resolution: resolution,
+        panelSize: panelSize,
+        price: price,
+        specs: bullets,
+        specRanks: specRanks
+      };
+
+      // Index under multiple variations for reliable matching with Criteria sheet
+      specsMap[cleanSku.toLowerCase()] = specObj;
+      specsMap[rawItemDesc.toLowerCase()] = specObj;
+      if (modelCode) {
+        specsMap[modelCode.toLowerCase()] = specObj;
+      }
+    }
+
+    return specsMap;
+  } catch (err) {
+    console.error('Error reading SPECS sheet:', err);
+    return {};
+  }
+}
+
+/**
+ * Retrieves location names from the "Criteria Segment-Application" sheet from cells E1 to AY1.
+ */
+function getLocationsFromCriteriaSheet() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.getActive();
+    if (!ss) return [];
+
+    const sheet = findCriteriaSheet(ss);
+    if (!sheet) {
+      console.warn('Criteria Segment-Application sheet not found.');
+      return [];
+    }
+
+    // Inspect Row 1 and Row 2 for branch locations across columns E to AY
+    const maxCols = Math.min(sheet.getLastColumn(), 55);
+    if (maxCols < 5) return [];
+
+    const range = sheet.getRange(1, 5, Math.min(sheet.getLastRow(), 2), maxCols - 4);
+    const displayValues = range.getDisplayValues();
+    const values = range.getValues();
+
+    // Pick the row with the most location names
+    let bestRowIdx = 0;
+    let maxFound = 0;
+    for (let r = 0; r < values.length; r++) {
+      let count = 0;
+      for (let c = 0; c < values[r].length; c++) {
+        const v = String((displayValues[r] && displayValues[r][c] !== '') ? displayValues[r][c] : values[r][c] || '').trim();
+        if (v && v.length >= 2 && v.length <= 35 && !/^\d+$/.test(v)) count++;
+      }
+      if (count > maxFound) {
+        maxFound = count;
+        bestRowIdx = r;
+      }
+    }
+
+    const locations = [];
+    const seen = {};
+    const rowVals = values[bestRowIdx] || [];
+    const rowDisp = displayValues[bestRowIdx] || [];
+
+    for (let i = 0; i < rowVals.length; i++) {
+      const rawVal = (rowDisp[i] && String(rowDisp[i]).trim() !== '') ? rowDisp[i] : rowVals[i];
+      if (rawVal !== null && rawVal !== undefined) {
+        const loc = String(rawVal).trim();
+        if (loc !== '' && !/^\d+$/.test(loc) && !seen[loc.toLowerCase()]) {
+          seen[loc.toLowerCase()] = true;
+          locations.push(loc);
+        }
+      }
+    }
+
+    return locations;
+  } catch (err) {
+    console.error('Error in getLocationsFromCriteriaSheet:', err);
+    return [];
+  }
+}
+
+/**
+ * Parses numeric hierarchy (1 to 5) from raw value.
+ * Handles numbers, strings like "H5", "Hierarchy 5", "Segment 5", and Roman numerals (I..V).
+ */
+function parseHierarchyValue(raw) {
+  if (raw === null || raw === undefined) return 0;
+  if (typeof raw === 'number' && raw >= 1 && raw <= 5) return Math.round(raw);
+  const str = String(raw).trim().toUpperCase();
+  if (!str) return 0;
+
+  // Exact Roman numerals
+  if (str === 'V') return 5;
+  if (str === 'IV') return 4;
+  if (str === 'III') return 3;
+  if (str === 'II') return 2;
+  if (str === 'I') return 1;
+
+  // Direct digits
+  const num = parseInt(str.replace(/[^\d]/g, ''), 10);
+  if (!isNaN(num) && num >= 1 && num <= 5) return num;
+
+  return 0;
+}
+
+/**
+ * Parses numeric tag (3 = Exceed, 2 = Meet, 1 = Budget) from raw value.
+ */
+function parseTagValue(raw) {
+  if (raw === null || raw === undefined) return 0;
+  if (typeof raw === 'number' && [1, 2, 3].includes(raw)) return raw;
+  const str = String(raw).trim().toLowerCase();
+  if (!str) return 0;
+
+  if (str.includes('3') || str.includes('exceed') || str.includes('top')) return 3;
+  if (str.includes('2') || str.includes('meet') || str.includes('standard')) return 2;
+  if (str.includes('1') || str.includes('budget') || str.includes('entry')) return 1;
+
+  const num = parseInt(str.replace(/[^\d]/g, ''), 10);
+  if (!isNaN(num) && [1, 2, 3].includes(num)) return num;
+
+  return 0;
+}
+
+/**
+ * Retrieves and maps laptop data from the "Criteria Segment-Application" sheet.
+ * - Column A: Item Description (Laptop SKU)
+ * - Hierarchy: Filter level (1 to 5)
+ * - TAG: 3 = Exceed, 2 = Meet, 1 = Budget
+ * - E1:AY1: Branch Locations
+ *
+ * Cross-references with SPECS sheet data (specsMap) and Pictures sheet data (skuImageMap, skuBrandMap, skuModelMap, skuFeaturesMap)
+ * to return fully-populated laptop recommendation objects.
+ */
+function getCriteriaSegmentData(skuImageMap, skuBrandMap, skuModelMap, skuFeaturesMap, specsMap) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.getActive();
+    if (!ss) return { laptops: [], appHierarchyMap: {}, locations: [] };
+
+    const sheet = findCriteriaSheet(ss);
+    if (!sheet) {
+      console.warn('Criteria Segment-Application sheet not found.');
+      return { laptops: [], appHierarchyMap: {}, locations: [] };
+    }
+
+    const dataRange = sheet.getDataRange();
+    const values = dataRange.getValues();
+    const displayVals = dataRange.getDisplayValues();
+    if (values.length < 2) return { laptops: [], appHierarchyMap: {}, locations: [] };
+
+    // 1. Identify which row has branch locations in columns E to AY (index 4 to 50)
+    let locationRowIdx = 0;
+    let maxLocationHeaders = 0;
+    for (let r = 0; r < Math.min(values.length, 3); r++) {
+      const rowArr = displayVals[r] || values[r] || [];
+      let lCount = 0;
+      for (let c = 4; c < Math.min(rowArr.length, 52); c++) {
+        const v = String(rowArr[c] || '').trim();
+        if (v && v.length >= 2 && v.length <= 35 && !/^\d+$/.test(v)) lCount++;
+      }
+      if (lCount > maxLocationHeaders) {
+        maxLocationHeaders = lCount;
+        locationRowIdx = r;
+      }
+    }
+
+    // Extract Locations and their column indices
+    const locations = [];
+    const locationColIndices = [];
+    const seenLocs = {};
+    const locRow = displayVals[locationRowIdx] || values[locationRowIdx] || [];
+    for (let c = 4; c < Math.min(locRow.length, 55); c++) {
+      const lVal = String(locRow[c] || '').trim();
+      if (lVal && !/^\d+$/.test(lVal)) {
+        if (!seenLocs[lVal.toLowerCase()]) {
+          seenLocs[lVal.toLowerCase()] = true;
+          locations.push(lVal);
+        }
+        locationColIndices.push({ name: lVal, colIdx: c });
+      }
+    }
+
+    // 2. Identify header row for Col A to D
+    let skuColIdx = 0;       // Col A
+    let hierarchyColIdx = 2; // Default Col C
+    let tagColIdx = 3;       // Default Col D
+    let priceColIdx = -1;
+    let headerRowIdx = 0;
+    let foundExplicitHeaders = false;
+
+    for (let r = 0; r < Math.min(values.length, 4); r++) {
+      const rArr = displayVals[r] || values[r] || [];
+      let hasH = false;
+      let hasT = false;
+      for (let c = 0; c < Math.min(rArr.length, 6); c++) {
+        const txt = String(rArr[c] || '').toLowerCase().trim();
+        if (txt.includes('item') || txt.includes('description') || txt.includes('sku') || txt.includes('model') || txt.includes('laptop')) {
+          skuColIdx = c;
+          foundExplicitHeaders = true;
+        } else if (txt.includes('hierarchy')) {
+          hierarchyColIdx = c;
+          hasH = true;
+          foundExplicitHeaders = true;
+        } else if (txt.includes('segment') && !hasH) {
+          hierarchyColIdx = c;
+          foundExplicitHeaders = true;
+        } else if (txt.includes('tag') || txt.includes('tier')) {
+          tagColIdx = c;
+          hasT = true;
+          foundExplicitHeaders = true;
+        } else if (txt.includes('price') || txt.includes('srp') || txt.includes('amount') || txt.includes('cost')) {
+          priceColIdx = c;
+        }
+      }
+      if (foundExplicitHeaders) {
+        headerRowIdx = r;
+        break;
+      }
+    }
+
+    // 3. Data-driven validation of columns if headers were ambiguous
+    if (!foundExplicitHeaders) {
+      // Sample rows to detect which column has 1..5 (Hierarchy) and which has 1..3 (Tag)
+      const sampleLimit = Math.min(values.length, 25);
+      const colScores = { 1: { hCount: 0, tCount: 0 }, 2: { hCount: 0, tCount: 0 }, 3: { hCount: 0, tCount: 0 } };
+      for (let r = 1; r < sampleLimit; r++) {
+        for (const c of [1, 2, 3]) {
+          const val = (displayVals[r] && displayVals[r][c]) ? displayVals[r][c] : (values[r] ? values[r][c] : null);
+          const h = parseHierarchyValue(val);
+          const t = parseTagValue(val);
+          if (h >= 1 && h <= 5) colScores[c].hCount++;
+          if (t >= 1 && t <= 3) colScores[c].tCount++;
+        }
+      }
+
+      // If Col 1 has high hierarchy scores and Col 2 has high tag scores
+      if (colScores[1].hCount > colScores[2].hCount && colScores[2].tCount > 0) {
+        hierarchyColIdx = 1;
+        tagColIdx = 2;
+      } else if (colScores[2].hCount > 0 && colScores[3].tCount > 0) {
+        hierarchyColIdx = 2;
+        tagColIdx = 3;
+      }
+    }
+
+    const dataStartRow = Math.max(headerRowIdx, locationRowIdx) + 1;
+    const laptops = [];
+    const appHierarchyMap = {};
+    const seenLaptops = {};
+
+    skuImageMap = skuImageMap || {};
+    skuBrandMap = skuBrandMap || {};
+    skuModelMap = skuModelMap || {};
+    skuFeaturesMap = skuFeaturesMap || {};
+
+    for (let r = dataStartRow; r < values.length; r++) {
+      const dispRow = displayVals[r] || [];
+      const valRow = values[r] || [];
+
+      const rawA = (dispRow[skuColIdx] && dispRow[skuColIdx] !== '') ? dispRow[skuColIdx] : valRow[skuColIdx];
+      if (!rawA || String(rawA).trim() === '') continue;
+      const itemDesc = String(rawA).trim();
+
+      // Skip table header repeats
+      const lowerDesc = itemDesc.toLowerCase();
+      if (lowerDesc.includes('item description') || lowerDesc.startsWith('sku') || lowerDesc === 'laptop') continue;
+
+      // Extract hierarchy
+      let hierarchy = 0;
+      const rawH = (dispRow[hierarchyColIdx] && dispRow[hierarchyColIdx] !== '') ? dispRow[hierarchyColIdx] : valRow[hierarchyColIdx];
+      hierarchy = parseHierarchyValue(rawH);
+
+      // Check alternate hierarchy columns if still 0
+      if (hierarchy === 0) {
+        for (const altC of [1, 2, 3]) {
+          if (altC !== hierarchyColIdx && altC !== tagColIdx) {
+            const hTest = parseHierarchyValue(dispRow[altC] || valRow[altC]);
+            if (hTest > 0) {
+              hierarchy = hTest;
+              break;
+            }
+          }
+        }
+      }
+
+      // Extract TAG (3 = Exceed, 2 = Meet, 1 = Budget)
+      let tag = 0;
+      const rawTag = (dispRow[tagColIdx] && dispRow[tagColIdx] !== '') ? dispRow[tagColIdx] : valRow[tagColIdx];
+      tag = parseTagValue(rawTag);
+
+      // Check alternate tag columns if still 0
+      if (tag === 0) {
+        for (const altT of [2, 3, 4]) {
+          if (altT !== hierarchyColIdx && altT !== tagColIdx) {
+            const tTest = parseTagValue(dispRow[altT] || valRow[altT]);
+            if (tTest > 0) {
+              tag = tTest;
+              break;
+            }
+          }
+        }
+      }
+
+      // Default tag to Meet (2) if not specified so laptop is never dropped
+      if (tag === 0) tag = 2;
+
+      // Default hierarchy to 3 if unparsed so laptop is preserved in catalog
+      if (hierarchy === 0) hierarchy = 3;
+
+      const cleanSku = itemDesc.replace(/^LAP-/i, '').trim();
+      const uniqueKey = cleanSku.toLowerCase() + '_h' + hierarchy + '_t' + tag;
+      if (seenLaptops[uniqueKey]) continue;
+      seenLaptops[uniqueKey] = true;
+
+      // 1. Lookup metadata: check SPECS sheet first (Columns A to L), then fallback to Pictures sheet
+      const specObj = specsMap ? (specsMap[cleanSku.toLowerCase()] || specsMap[itemDesc.toLowerCase()] || specsMap[cleanSku]) : null;
+
+      let img = (specObj && specObj.image) ? specObj.image : (skuImageMap[cleanSku] || skuImageMap[itemDesc] || '');
+      let brand = (specObj && specObj.brand) ? specObj.brand : (skuBrandMap[cleanSku] || skuBrandMap[itemDesc] || '');
+      let title = (specObj && specObj.title) ? specObj.title : (skuModelMap[cleanSku] || skuModelMap[itemDesc] || '');
+      let specs = (specObj && specObj.specs && specObj.specs.length > 0) ? specObj.specs : (skuFeaturesMap[cleanSku] || skuFeaturesMap[itemDesc] || null);
+      let price = (specObj && specObj.price) ? specObj.price : '';
+      let modelCode = (specObj && specObj.modelCode) ? specObj.modelCode : '';
+      let specRanks = (specObj && specObj.specRanks) ? specObj.specRanks : {};
+
+      // Derive title if still missing
+      if (!title) {
+        title = deriveModelTitleFromSku(cleanSku);
+      }
+
+      // Derive specs if still missing
+      if (!specs || !Array.isArray(specs) || specs.length === 0) {
+        specs = parseSpecsFromSkuString(itemDesc);
+      }
+
+      // Price lookup if present in sheet; keep blank if not provided
+      if (!price) {
+        if (priceColIdx !== -1) {
+          const rawPrice = (dispRow[priceColIdx] && dispRow[priceColIdx] !== '') ? dispRow[priceColIdx] : valRow[priceColIdx];
+          if (rawPrice) price = String(rawPrice).trim();
+        }
+      }
+      if (!price) {
+        price = '';
+      }
+
+      // Read stock values across all branch locations (E1:AY1)
+      const stocksByLocation = {};
+      for (let i = 0; i < locationColIndices.length; i++) {
+        const locInfo = locationColIndices[i];
+        const rawStock = (dispRow[locInfo.colIdx] !== undefined && dispRow[locInfo.colIdx] !== '')
+          ? dispRow[locInfo.colIdx]
+          : valRow[locInfo.colIdx];
+        let qty = 0;
+        if (rawStock !== null && rawStock !== undefined && String(rawStock).trim() !== '') {
+          const parsed = parseInt(String(rawStock).replace(/[^\d]/g, ''), 10);
+          if (!isNaN(parsed) && parsed >= 0) qty = parsed;
+        }
+        stocksByLocation[locInfo.name] = qty;
+      }
+
+      // Total Stock: "just add from a to ay" (Column 0 to 50, skipping text description column)
+      let totalStock = 0;
+      const colAyIdx = 50;
+      const maxColIdx = Math.min(valRow.length - 1, colAyIdx);
+
+      for (let c = 0; c <= maxColIdx; c++) {
+        // Skip SKU column (Col A) which contains text
+        if (c === skuColIdx) continue;
+
+        const cellVal = valRow[c];
+        const dispVal = dispRow[c];
+        let num = 0;
+
+        if (typeof cellVal === 'number' && !isNaN(cellVal) && cellVal > 0) {
+          num = Math.round(cellVal);
+        } else {
+          const str = String((dispVal !== undefined && dispVal !== '') ? dispVal : (cellVal || '')).trim();
+          if (/^\d+$/.test(str)) {
+            const parsed = parseInt(str, 10);
+            if (!isNaN(parsed) && parsed > 0) {
+              num = parsed;
+            }
+          }
+        }
+        if (num > 0) {
+          totalStock += num;
+        }
+      }
+
+      laptops.push({
+        sku: itemDesc,
+        cleanSku: cleanSku,
+        modelCode: modelCode,
+        title: title,
+        brand: brand,
+        hierarchy: hierarchy,
+        tag: tag, // 3 = Exceed, 2 = Meet, 1 = Budget
+        price: price,
+        image: img,
+        specs: specs,
+        specRanks: specRanks,
+        rawSpecs: specObj || null,
+        stocksByLocation: stocksByLocation,
+        totalStock: totalStock
+      });
+    }
+
+    return {
+      laptops: laptops,
+      appHierarchyMap: appHierarchyMap,
+      locations: locations
+    };
+  } catch (err) {
+    console.error('Error in getCriteriaSegmentData:', err);
+    return { laptops: [], appHierarchyMap: {}, locations: [] };
+  }
+}
+
+/**
+ * Derives a clean model title from SKU string if not present in Pictures sheet.
+ */
+function deriveModelTitleFromSku(sku) {
+  if (!sku) return 'Laptop Model';
+  const clean = sku.replace(/^LAP-/i, '').trim();
+  const parts = clean.split(/\s+/);
+  if (parts.length >= 3) {
+    return parts.slice(0, 3).join(' ');
+  }
+  return clean;
+}
+
+/**
+ * Parses technical specifications (Processor, Graphics, RAM, SSD, Screen) from a SKU string.
+ */
+function parseSpecsFromSkuString(skuStr) {
+  const specs = [];
+  const str = String(skuStr || '');
+
+  // Processor detection
+  const cpuMatch = str.match(/(?:R\d-\d{4,}[A-Z]*|RYZEN\s*\d\s*\d{4,}[A-Z]*|CORE\s*(?:ULTRA\s*)?\d\s*\d{3,}[A-Z]*|I[3579]-\d{4,}[A-Z]*|CELERON\s*[A-Z0-9]+|ATHLON\s*[A-Z0-9]+)/i);
+  if (cpuMatch) {
+    let cpu = cpuMatch[0].toUpperCase();
+    if (cpu.startsWith('R') && !cpu.startsWith('RYZEN')) cpu = 'AMD Ryzen ' + cpu.slice(1);
+    if (cpu.startsWith('I-') || cpu.startsWith('I3') || cpu.startsWith('I5') || cpu.startsWith('I7') || cpu.startsWith('I9')) cpu = 'Intel ' + cpu;
+    specs.push('Processor: ' + cpu);
+  }
+
+  // GPU detection
+  const gpuMatch = str.match(/(?:RTX\s*\d{4}(?:\s*TI)?(?:\s*\/\s*\d+GB)?|GTX\s*\d{4}(?:\s*TI)?|RADEON(?:\s*RX\s*\d{4}[A-Z]*)?|INTEL\s*ARC|IRIS\s*XE|UHD\s*GRAPHICS)/i);
+  if (gpuMatch) {
+    specs.push('Graphics: ' + gpuMatch[0].toUpperCase());
+  } else {
+    specs.push('Graphics: Integrated Graphics');
+  }
+
+  // RAM detection
+  const ramMatch = str.match(/(?:(\d{1,2}GB)\s*(?:DDR[45])?)/i);
+  if (ramMatch) {
+    specs.push('Memory: ' + ramMatch[0].toUpperCase());
+  }
+
+  // SSD/Storage detection
+  const ssdMatch = str.match(/(?:(\d+(?:GB|TB))\s*(?:SSD|NVME|PCIE)?)/i);
+  if (ssdMatch && !ssdMatch[0].toLowerCase().includes('win')) {
+    specs.push('Storage: ' + ssdMatch[0].toUpperCase() + ' SSD');
+  }
+
+  // Display size / resolution
+  const displayMatch = str.match(/(?:(1[3-7](?:\.\d)?["']?|OLED|FHD|QHD|WQXGA|2\.8K))/i);
+  if (displayMatch) {
+    specs.push('Display: ' + displayMatch[0].toUpperCase());
+  }
+
+  if (specs.length === 0) {
+    specs.push('Detailed specifications available upon branch inquiry');
+  }
+
+  return specs;
+}
+
+/**
+ * Computes realistic standard retail pricing based on Tag (3 = Exceed, 2 = Meet, 1 = Budget) and Hierarchy.
+ */
+function deriveEstimatedPrice(tag, hierarchy, sku) {
+  return '';
+}
+
+// ============================================================
+// ==================== START OF SALESKIT CODE ====================
+// ============================================================
+
+/**
+ * Loads UKSP data from the 'UKSP' sheet.
+ * Maps SKUs from B1:DQ1 (Row 1) and features on A3:A (Row 3+),
+ * returning the feature values that match each SKU.
+ */
+function getUkspPerSkuData(ss) {
+  try {
+    ss = ss || SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.getActive();
+    if (!ss) return { features: [], skus: [] };
+
+    // 1. Try exact 'UKSP' first (as named in user sheet), then 'UKSP PER SKU'
+    let sheet = ss.getSheetByName('UKSP');
+    if (!sheet) {
+      sheet = ss.getSheetByName('UKSP PER SKU');
+    }
+    if (!sheet) {
+      const sheets = ss.getSheets();
+      for (let s = 0; s < sheets.length; s++) {
+        const name = sheets[s].getName().trim().toUpperCase();
+        if (name === 'UKSP') {
+          sheet = sheets[s];
+          break;
+        }
+      }
+      if (!sheet) {
+        for (let s = 0; s < sheets.length; s++) {
+          const name = sheets[s].getName().trim().toUpperCase();
+          if (name.includes('UKSP')) {
+            sheet = sheets[s];
+            break;
+          }
+        }
+      }
+    }
+    if (!sheet) return { features: [], skus: [] };
+
+    const displayVals = sheet.getDataRange().getDisplayValues();
+    if (displayVals.length < 3) return { features: [], skus: [] };
+
+    // Row 0 (A1..DQ1): Row 1 in sheet has SKUs located in B1 to DQ1 (index 1 to 120)
+    // Row 1 (A2..DQ2): Row 2 in sheet has Model names
+    // Row 2+ (A3..): Column A (index 0) starting from A3 has Feature names
+    const skuRow = displayVals[0];
+    const modelRow = displayVals[1] || [];
+
+    // Map features from A3 to A14 (row index 2 to 13, rows 3 to 14 in sheet)
+    const features = [];
+    const maxFeatRow = Math.min(displayVals.length, 14);
+    for (let r = 2; r < maxFeatRow; r++) {
+      const featName = String(displayVals[r][0] || '').trim();
+      if (featName && !features.includes(featName)) {
+        features.push(featName);
+      }
+    }
+
+    // Map SKUs from B1 to DQ1 (columns 1 to 120/121) and their A3:A14 features
+    const skus = [];
+    const maxCol = Math.min(skuRow.length, 122); // Col DQ is column 121 (index 120)
+    for (let c = 1; c < maxCol; c++) {
+      const sku = String(skuRow[c] || '').trim();
+      if (!sku) continue;
+      const model = String(modelRow[c] || '').trim();
+      const featDict = {};
+      for (let r = 2; r < maxFeatRow; r++) {
+        const featName = String(displayVals[r][0] || '').trim();
+        if (featName) {
+          featDict[featName] = String(displayVals[r][c] || '').trim();
+        }
+      }
+      skus.push({
+        sku: sku,
+        model: model,
+        colIndex: c,
+        features: featDict
+      });
+    }
+
+    return { features: features, skus: skus };
+  } catch (err) {
+    console.error('Error in getUkspPerSkuData:', err);
+    return { features: [], skus: [] };
+  }
+}
+
+function getUkspSheetData() {
+  return getUkspPerSkuData();
+}
+
+/**
+ * Loads UKSP data for applications across the 5 tiered sheets:
+ * 1 = 'ENTRY-LEVEL'
+ * 2 = 'PRODUCTIVITY'
+ * 3 = 'CREATORS'
+ * 4 = 'CASUAL GAMERS'
+ * 5 = 'AAA GAMERS'
+ *
+ * In each sheet:
+ * - SKUs are at B1:DQ1 (Row 1, columns B to DQ / index 1 to 121)
+ * - Applications are at A3:A (Column A, row 3 downwards)
+ * - Intersecting cells contain the UKSP value of the application for that SKU.
+ */
+function getApplicationUkspSheetsData(ss) {
+  try {
+    ss = ss || SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.getActive();
+    if (!ss) return { tierMap: { 1: {}, 2: {}, 3: {}, 4: {}, 5: {} }, appToTier: {}, appSkuMap: {} };
+
+    const tierConfigs = [
+      { label: 1, name: 'ENTRY-LEVEL', aliases: ['ENTRY-LEVEL', 'ENTRY LEVEL', 'ENTRYLEVEL', 'ENTRY'] },
+      { label: 2, name: 'PRODUCTIVITY', aliases: ['PRODUCTIVITY', 'PROD'] },
+      { label: 3, name: 'CREATORS', aliases: ['CREATORS', 'CREATOR', 'CONTENT CREATORS'] },
+      { label: 4, name: 'CASUAL GAMERS', aliases: ['CASUAL GAMERS', 'CASUAL GAMER', 'CASUAL-GAMERS', 'CASUALGAMERS', 'CASUAL'] },
+      { label: 5, name: 'AAA GAMERS', aliases: ['AAA GAMERS', 'AAA GAMER', 'AAA-GAMERS', 'AAAGAMERS', 'AAA'] }
+    ];
+
+    const sheets = ss.getSheets();
+    const result = {
+      tierMap: { 1: {}, 2: {}, 3: {}, 4: {}, 5: {} },
+      appToTier: {},
+      appSkuMap: {}
+    };
+
+    tierConfigs.forEach(function(tier) {
+      let sheet = null;
+      for (let s = 0; s < sheets.length; s++) {
+        const sRaw = sheets[s].getName().trim();
+        const sUpper = sRaw.toUpperCase();
+        const sNorm = sUpper.replace(/[\-_]/g, ' ').replace(/\s+/g, ' ').trim();
+        const sAlpha = sUpper.replace(/[^A-Z0-9]/g, '');
+        for (let a = 0; a < tier.aliases.length; a++) {
+          const alias = tier.aliases[a].toUpperCase();
+          const normAlias = alias.replace(/[\-_]/g, ' ').replace(/\s+/g, ' ').trim();
+          const aliasAlpha = alias.replace(/[^A-Z0-9]/g, '');
+          if (sUpper === alias || sNorm === normAlias || sAlpha === aliasAlpha || sNorm.includes(normAlias) || sAlpha.includes(aliasAlpha)) {
+            sheet = sheets[s];
+            break;
+          }
+        }
+        if (sheet) break;
+      }
+
+      if (!sheet) {
+        console.warn('Tier sheet not found for label ' + tier.label + ' (' + tier.name + ')');
+        return;
+      }
+
+      const displayVals = sheet.getDataRange().getDisplayValues();
+      if (!displayVals || displayVals.length < 3) return;
+
+      // Row 1 (index 0): SKUs from B1 to DQ1 (col B = index 1, col DQ = index 120)
+      const skuRow = displayVals[0];
+      const skuList = [];
+      for (let c = 1; c < skuRow.length; c++) {
+        const rawSku = String(skuRow[c] || '').trim();
+        if (rawSku) {
+          const cleanSku = rawSku.replace(/^lap[-_\s]*/i, '').trim();
+          skuList.push({ colIndex: c, rawSku: rawSku, cleanSku: cleanSku });
+        }
+      }
+
+      // Column A (index 0): Applications starting at row 3 (index 2 onwards: A3, A4, ...)
+      for (let r = 2; r < displayVals.length; r++) {
+        const appName = String(displayVals[r][0] || '').trim();
+        if (!appName) continue;
+
+        const normApp = appName.toLowerCase();
+        result.appToTier[normApp] = tier.label;
+
+        if (!result.tierMap[tier.label][appName]) {
+          result.tierMap[tier.label][appName] = {};
+        }
+        if (!result.tierMap[tier.label][normApp]) {
+          result.tierMap[tier.label][normApp] = {};
+        }
+        if (!result.appSkuMap[normApp]) {
+          result.appSkuMap[normApp] = {};
+        }
+
+        for (let i = 0; i < skuList.length; i++) {
+          const c = skuList[i].colIndex;
+          const rawSku = skuList[i].rawSku;
+          const cleanSku = skuList[i].cleanSku;
+          const ukspVal = String(displayVals[r][c] || '').trim();
+
+          if (ukspVal) {
+            // Store under exact appName and normApp
+            result.tierMap[tier.label][appName][rawSku] = ukspVal;
+            result.tierMap[tier.label][appName][rawSku.toLowerCase()] = ukspVal;
+            result.tierMap[tier.label][normApp][rawSku] = ukspVal;
+            result.tierMap[tier.label][normApp][rawSku.toLowerCase()] = ukspVal;
+
+            if (cleanSku && cleanSku !== rawSku) {
+              result.tierMap[tier.label][appName][cleanSku] = ukspVal;
+              result.tierMap[tier.label][appName][cleanSku.toLowerCase()] = ukspVal;
+              result.tierMap[tier.label][normApp][cleanSku] = ukspVal;
+              result.tierMap[tier.label][normApp][cleanSku.toLowerCase()] = ukspVal;
+            }
+
+            result.appSkuMap[normApp][rawSku.toLowerCase()] = ukspVal;
+            if (cleanSku) {
+              result.appSkuMap[normApp][cleanSku.toLowerCase()] = ukspVal;
+            }
+          }
+        }
+      }
+    });
+
+    return result;
+  } catch (err) {
+    console.error('Error in getApplicationUkspSheetsData:', err);
+    return { tierMap: { 1: {}, 2: {}, 3: {}, 4: {}, 5: {} }, appToTier: {}, appSkuMap: {} };
+  }
+}
+
+function getApplicationUkspData() {
+  return getApplicationUkspSheetsData();
+}
+
+// ============================================================
+// ===================== END OF SALESKIT CODE =====================
+// ============================================================
