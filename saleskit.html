@@ -301,12 +301,12 @@
       }
 
       /* Fills the window down to the bottom edge (height set by fitCustomerProfilingPanel), with roomier fields. */
+      /* Never scrolls inside: grows taller than the window when its contents need the room. */
       .reco-layout .customer-profiling-sidebar {
-        height: var(--profiling-panel-height, auto);
-        min-height: 600px;
+        min-height: var(--profiling-panel-height, 600px);
         padding: 14px 12px;
         gap: 10px;
-        overflow-y: auto;
+        overflow: visible;
       }
 
       .reco-layout .sidebar-heading-title { font-size: 1rem; }
