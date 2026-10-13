@@ -5,7 +5,7 @@ const path = require('node:path');
 const { ImageCache } = require('./image-cache');
 const { createSnapshotCache } = require('./snapshot-cache');
 const { getConfig } = require('./app-config');
-const { startAutoUpdates } = require('./updater');
+const { startAutoUpdates, getUpdateStatus, installUpdateNow } = require('./updater');
 
 // SalesKit is a client: it loads its data from the SalesKit Server, which does the Google Sheets sync.
 
@@ -155,6 +155,9 @@ ipcMain.handle('application:set-icon', async (event, imageUrl) => {
   return true;
 });
 ipcMain.handle('database:sync', () => performRemoteSync());
+ipcMain.handle('app:version', () => app.getVersion());
+ipcMain.handle('update:status', () => getUpdateStatus());
+ipcMain.handle('update:install', () => installUpdateNow());
 
 const BANNER_IMAGE_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/svg+xml': 'svg', 'image/avif': 'avif' };
 
@@ -221,7 +224,9 @@ app.whenReady().then(() => {
 
   Menu.setApplicationMenu(null);
   createWindow();
-  startAutoUpdates();
+  startAutoUpdates((status) => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update:status', status);
+  });
   startDataChangeChecks();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

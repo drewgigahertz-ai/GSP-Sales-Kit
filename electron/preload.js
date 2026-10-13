@@ -11,6 +11,14 @@ contextBridge.exposeInMainWorld('saleskit', {
     return () => ipcRenderer.removeListener('sync:progress', listener);
   },
   saveBanner: (url, suggestedName) => ipcRenderer.invoke('banner:save', url, suggestedName),
+  getAppVersion: () => ipcRenderer.invoke('app:version'),
+  getUpdateStatus: () => ipcRenderer.invoke('update:status'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  onUpdateStatus: (callback) => {
+    const listener = (_event, status) => callback(status);
+    ipcRenderer.on('update:status', listener);
+    return () => ipcRenderer.removeListener('update:status', listener);
+  },
   onDataChanged: (callback) => {
     const listener = () => callback();
     ipcRenderer.on('data:changed', listener);

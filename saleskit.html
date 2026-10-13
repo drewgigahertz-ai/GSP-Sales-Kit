@@ -220,6 +220,73 @@
       padding: 24px 32px 48px 32px;
     }
 
+    /* Update notice (bottom-left, so it never covers the notifications on the right). */
+    .update-card {
+      position: fixed;
+      left: 20px;
+      bottom: 20px;
+      z-index: 2100;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: min(400px, calc(100vw - 40px));
+      padding: 12px 14px;
+      border: 1px solid #c7d2fe;
+      border-left: 4px solid #0012b3;
+      border-radius: 12px;
+      background: #ffffff;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+      font-family: 'Plus Jakarta Sans', 'Segoe UI', Arial, sans-serif;
+    }
+
+    .update-card[hidden] {
+      display: none;
+    }
+
+    .update-card-icon {
+      display: grid;
+      flex: 0 0 auto;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: #e8ecff;
+      color: #0012b3;
+      font-size: 1.15rem;
+    }
+
+    .update-card-title {
+      color: #0f172a;
+      font-size: 0.86rem;
+      font-weight: 800;
+    }
+
+    .update-card-text {
+      color: #64748b;
+      font-size: 0.74rem;
+    }
+
+    .update-card-actions {
+      display: flex;
+      flex: 0 0 auto;
+      gap: 6px;
+      margin-left: auto;
+    }
+
+    .update-card-progress {
+      height: 4px;
+      margin-top: 6px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #e2e8f0;
+    }
+
+    .update-card-progress > div {
+      height: 100%;
+      background: #0012b3;
+      transition: width 0.3s ease;
+    }
+
     /* Customer Profiling keeps a fixed size; it no longer stretches with the generated results beside it. */
     @media (min-width: 992px) {
       .reco-layout {
@@ -2267,7 +2334,7 @@
         </div>
         <div>
           <div class="dashboard-title">Gigahertz Sales Tools</div>
-          <div class="dashboard-subtitle">All-in-one view</div>
+          <div class="dashboard-subtitle">All-in-one view<span id="appVersionLabel"></span></div>
         </div>
       </div>
         <div class="btn-group btn-group-sm" role="group" aria-label="Recommendation mode">
@@ -8516,6 +8583,65 @@
       if (!window.saleskit || typeof window.saleskit.syncData !== 'function') return;
       refreshAllData({ silent: true, automatic: true });
     });
+
+    // ---------- App updates ----------
+    // SalesKit downloads updates in the background; this card says when one is ready and offers to install it now.
+    let dismissedUpdateVersion = null;
+
+    function renderUpdateCard(status) {
+      let card = document.getElementById('updateCard');
+      if (!status || status.state === 'idle' || (status.state === 'ready' && status.version === dismissedUpdateVersion)) {
+        if (card) card.hidden = true;
+        return;
+      }
+      if (!card) {
+        card = document.createElement('div');
+        card.id = 'updateCard';
+        card.className = 'update-card';
+        card.setAttribute('role', 'status');
+        document.body.appendChild(card);
+      }
+      card.hidden = false;
+      const version = escapeHtml(status.version || '');
+      if (status.state === 'downloading') {
+        card.innerHTML = `
+          <div class="update-card-icon"><i class="bi bi-cloud-arrow-down"></i></div>
+          <div class="flex-grow-1">
+            <div class="update-card-title">Downloading SalesKit ${version}…</div>
+            <div class="update-card-text">You can keep working. ${status.percent || 0}% done</div>
+            <div class="update-card-progress"><div style="width: ${status.percent || 0}%"></div></div>
+          </div>`;
+        return;
+      }
+      card.innerHTML = `
+        <div class="update-card-icon"><i class="bi bi-arrow-up-circle"></i></div>
+        <div class="flex-grow-1">
+          <div class="update-card-title">SalesKit ${version} is ready</div>
+          <div class="update-card-text">Update now, or it installs when you close SalesKit.</div>
+        </div>
+        <div class="update-card-actions">
+          <button type="button" class="btn btn-sm btn-light" id="updateLaterBtn">Later</button>
+          <button type="button" class="btn btn-sm btn-primary fw-semibold" id="updateNowBtn"><i class="bi bi-arrow-repeat me-1"></i>Update</button>
+        </div>`;
+      document.getElementById('updateLaterBtn').addEventListener('click', () => {
+        dismissedUpdateVersion = status.version;
+        card.hidden = true;
+      });
+      document.getElementById('updateNowBtn').addEventListener('click', (event) => {
+        event.currentTarget.disabled = true;
+        event.currentTarget.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Updating…';
+        window.saleskit.installUpdate();
+      });
+    }
+
+    if (window.saleskit && typeof window.saleskit.onUpdateStatus === 'function') {
+      window.saleskit.onUpdateStatus(renderUpdateCard);
+      window.saleskit.getUpdateStatus().then(renderUpdateCard).catch(() => {});
+      window.saleskit.getAppVersion().then((version) => {
+        const label = document.getElementById('appVersionLabel');
+        if (label && version) label.textContent = ` · v${version}`;
+      }).catch(() => {});
+    }
 
     // Customer Profiling reaches the bottom of the window, whatever the size of the results beside it.
     function fitCustomerProfilingPanel() {
