@@ -23,28 +23,90 @@ function headerText(request, name) {
   return String(request.headers[name] || '').replace(/[^\x20-\x7e]/g, '').trim().slice(0, 80);
 }
 
-function createLocalApi({ database, token = '', onRequest = null, getDataVersion = () => null }) {
+function readJsonBody(request, limit = 10 * 1024) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    request.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > limit) {
+        reject(new Error('Request is too large.'));
+        request.destroy();
+      } else {
+        chunks.push(chunk);
+      }
+    });
+    request.on('end', () => {
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'));
+      } catch {
+        reject(new Error('Request is not valid JSON.'));
+      }
+    });
+    request.on('error', reject);
+  });
+}
+
+// token: the shared app key every SalesKit sends (keeps scanners out).
+// accounts (optional): { login(username, password, address), logout(key), userForSession(key), allowWithoutLogin() }
+//   When given, data routes also need a signed-in user, sent as the X-SalesKit-Session header.
+function createLocalApi({ database, token = '', onRequest = null, getDataVersion = () => null, accounts = null }) {
   return http.createServer(async (request, response) => {
+    const url = new URL(request.url, 'http://localhost');
+    const address = request.socket.remoteAddress || '';
+    let user = null;
+    let denied = null; // 'token' (wrong app key) or 'login' (not signed in)
     if (onRequest) {
       response.on('finish', () => onRequest({
         method: request.method,
-        path: new URL(request.url, 'http://localhost').pathname,
+        path: url.pathname,
         status: response.statusCode,
-        address: request.socket.remoteAddress || '',
+        address,
+        user,
+        denied,
         client: {
           name: headerText(request, 'x-saleskit-client'),
           user: headerText(request, 'x-saleskit-user'),
-          version: headerText(request, 'x-saleskit-version')
+          version: headerText(request, 'x-saleskit-version'),
+          make: headerText(request, 'x-saleskit-make'),
+          model: headerText(request, 'x-saleskit-model')
         }
       }));
     }
     if (!authorized(request, token)) {
+      denied = 'token';
       sendJson(response, 401, { error: 'Unauthorized.' });
       return;
     }
 
-    const url = new URL(request.url, 'http://localhost');
     try {
+      if (accounts && request.method === 'POST' && url.pathname === '/api/login') {
+        const { username, password } = await readJsonBody(request);
+        try {
+          const result = accounts.login(username, password, address.replace(/^::ffff:/, ''));
+          user = result.user;
+          const { username: name, displayName, branch } = result.user;
+          sendJson(response, 200, { sessionKey: result.sessionKey, user: { username: name, displayName, branch } });
+        } catch (error) {
+          sendJson(response, error.code === 'locked' ? 429 : 401, { error: error.message, code: error.code || 'invalid' });
+        }
+        return;
+      }
+      if (accounts && request.method === 'POST' && url.pathname === '/api/logout') {
+        accounts.logout(request.headers['x-saleskit-session']);
+        sendJson(response, 200, { ok: true });
+        return;
+      }
+
+      if (accounts) {
+        user = accounts.userForSession(request.headers['x-saleskit-session']);
+        if (!user && !accounts.allowWithoutLogin()) {
+          denied = 'login';
+          sendJson(response, 401, { error: 'Please log in.', code: 'login_required' });
+          return;
+        }
+      }
+
       if (request.method === 'GET' && url.pathname === '/api/status') {
         const status = database.getStatus();
         sendJson(response, 200, { connected: status.connected, tableCount: status.tableCount });

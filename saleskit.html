@@ -220,6 +220,37 @@
       padding: 24px 32px 48px 32px;
     }
 
+    /* Signed-in user in the header: name, branch and a sign-out link. */
+    .signed-in-user {
+      margin-left: 10px;
+      padding-left: 10px;
+      border-left: 1px solid rgba(255, 255, 255, 0.35);
+    }
+
+    .signed-in-user .user-branch {
+      margin-left: 6px;
+      padding: 1px 7px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.18);
+      font-weight: 700;
+    }
+
+    .signed-in-user button {
+      margin-left: 8px;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: inherit;
+      font: inherit;
+      text-decoration: underline;
+      cursor: pointer;
+      opacity: 0.85;
+    }
+
+    .signed-in-user button:hover {
+      opacity: 1;
+    }
+
     /* Update notice (bottom-left, so it never covers the notifications on the right). */
     .update-card {
       position: fixed;
@@ -2334,7 +2365,7 @@
         </div>
         <div>
           <div class="dashboard-title">Gigahertz Sales Tools</div>
-          <div class="dashboard-subtitle">All-in-one view<span id="appVersionLabel"></span></div>
+          <div class="dashboard-subtitle">All-in-one view<span id="appVersionLabel"></span><span class="signed-in-user" id="signedInUser" hidden></span></div>
         </div>
       </div>
         <div class="btn-group btn-group-sm" role="group" aria-label="Recommendation mode">
@@ -8637,6 +8668,30 @@
     if (window.saleskit && typeof window.saleskit.onUpdateStatus === 'function') {
       window.saleskit.onUpdateStatus(renderUpdateCard);
       window.saleskit.getUpdateStatus().then(renderUpdateCard).catch(() => {});
+      // Who is signed in (from the SalesKit login), with a sign-out link.
+      if (typeof window.saleskit.getCurrentUser === 'function') {
+        window.saleskit.getCurrentUser().then((user) => {
+          const element = document.getElementById('signedInUser');
+          if (!element) return;
+          element.replaceChildren();
+          if (!user) {
+            element.textContent = 'Offline mode';
+            element.hidden = false;
+            return;
+          }
+          const name = document.createElement('span');
+          name.textContent = user.displayName;
+          const branch = document.createElement('span');
+          branch.className = 'user-branch';
+          branch.textContent = user.branch;
+          const signOut = document.createElement('button');
+          signOut.type = 'button';
+          signOut.textContent = 'Sign out';
+          signOut.addEventListener('click', () => window.saleskit.logout());
+          element.append(name, branch, signOut);
+          element.hidden = false;
+        }).catch(() => {});
+      }
       window.saleskit.getAppVersion().then((version) => {
         const label = document.getElementById('appVersionLabel');
         if (label && version) label.textContent = ` · v${version}`;

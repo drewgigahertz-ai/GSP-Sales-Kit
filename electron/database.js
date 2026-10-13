@@ -626,6 +626,15 @@ function mapCachedImageUrls(data, resolveImageUrl) {
   return data;
 }
 
+// Branch codes (BR column of RECO TABLE), for assigning users to a branch.
+function listBranches() {
+  if (!connection || !listTables().some(({ name }) => name === 'reco_table')) return [];
+  return connection.prepare(`SELECT DISTINCT TRIM(${quoteIdentifier('BR')}) AS branch FROM reco_table`).all()
+    .map(({ branch }) => String(branch || '').toUpperCase())
+    .filter(Boolean)
+    .sort();
+}
+
 // Copies the open database to `destination` while it stays in use.
 async function backupDatabase(destination) {
   if (!connection) throw new Error('Open a database before backing it up.');
@@ -647,6 +656,7 @@ module.exports = {
   getInitialData,
   getStatus,
   getTableData,
+  listBranches,
   listTables,
   mapCachedImageUrls,
   openDatabase,

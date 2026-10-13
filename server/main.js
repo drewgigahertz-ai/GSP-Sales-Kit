@@ -9,6 +9,7 @@ const { DEFAULT_SPREADSHEET_ID, fetchSpreadsheetData } = require('../electron/sh
 const { createLocalApi } = require('../electron/local-api');
 const { createDeviceRegistry } = require('./devices');
 const { createBackupStore } = require('./backups');
+const { createUserStore } = require('./users');
 const { version: APP_VERSION } = require('../package.json');
 
 const APP_NAME = 'GigaHertz SalesKit Server';
@@ -39,6 +40,7 @@ let quitting = false;
 let trayHintShown = false;
 let devices;
 let backups;
+let users;
 let devicesPushTimer = null;
 let headerLogo = '';
 const logs = [];
@@ -76,7 +78,8 @@ function loadSettings() {
     autoStart: saved?.autoStart !== false,
     lastSync: saved?.lastSync || null,
     dataVersion: Number(saved?.dataVersion) || 1,
-    dataUpdatedAt: saved?.dataUpdatedAt || null
+    dataUpdatedAt: saved?.dataUpdatedAt || null,
+    allowWithoutLogin: saved?.allowWithoutLogin !== false
   };
   if (!saved) writeSettings(loaded);
   return loaded;
@@ -135,7 +138,10 @@ function getState() {
     dataVersion: settings.dataVersion,
     dataUpdatedAt: settings.dataUpdatedAt,
     backups: backups ? backups.list() : [],
-    onlineDevices: devices ? devices.list().filter((device) => device.online).length : 0
+    onlineDevices: devices ? devices.list().filter((device) => device.online).length : 0,
+    rejectedCount: devices ? devices.rejectedList().length : 0,
+    userCount: users ? users.list().length : 0,
+    allowWithoutLogin: settings.allowWithoutLogin
   };
 }
 
@@ -209,15 +215,33 @@ async function startApi() {
     database,
     token: settings.token,
     getDataVersion: () => settings.dataVersion,
+    accounts: {
+      login: (username, password, address) => users.login(username, password, address),
+      logout: (key) => users.logout(key),
+      userForSession: (key) => users.userForSession(key),
+      allowWithoutLogin: () => settings.allowWithoutLogin
+    },
     onRequest: (request) => {
-      const { method, path: pathname, status, address, client } = request;
+      const { method, path: pathname, status, address, client, user, denied } = request;
       const ip = address.replace(/^::ffff:/, '');
-      const who = client.name ? `${client.name} (${ip})` : ip;
+      const who = user
+        ? `${user.displayName} (${user.branch}) on ${client.name || ip}`
+        : client.name ? `${client.name} (${ip})` : ip;
       if (devices.record({ ...request, dataVersion: settings.dataVersion })) log('info', `New device: ${who}`);
       pushDevices();
-      if (status === 401) log('warning', `Rejected ${who}: wrong or missing token`);
+      if (pathname === '/api/login') {
+        if (status === 200) log('success', `${who} signed in`);
+        else if (status === 429) log('warning', `Login locked for 15 minutes on ${client.name || ip} (too many wrong passwords)`);
+        else if (denied !== 'token') log('warning', `Failed login on ${client.name || ip}`);
+      }
+      if (denied === 'token') log('warning', `Rejected ${who}: wrong or missing token`);
+      else if (denied === 'login') {
+        if (pathname !== '/api/version') log('warning', `${who} needs to log in (older SalesKit or signed out)`);
+      }
       // Clients poll /api/version every few minutes; keep those out of the activity log.
-      else if (pathname !== '/api/version') log(status < 400 ? 'request' : 'error', `${who} ${method} ${pathname} → ${status}`);
+      else if (pathname !== '/api/version' && pathname !== '/api/login') {
+        log(status < 400 ? 'request' : 'error', `${who} ${method} ${pathname} → ${status}`);
+      }
     }
   });
   server.on('error', (error) => {
@@ -475,6 +499,12 @@ ipcMain.handle('server:update-settings', async (_event, changes = {}) => {
     settings.port = port;
   }
   if (changes.autoStart !== undefined) settings.autoStart = Boolean(changes.autoStart);
+  if (changes.allowWithoutLogin !== undefined) {
+    settings.allowWithoutLogin = Boolean(changes.allowWithoutLogin);
+    log('warning', settings.allowWithoutLogin
+      ? 'SalesKit without login is allowed again (older versions can connect).'
+      : 'Login is now required for every SalesKit laptop.');
+  }
   writeSettings();
 
   if (settings.port !== previous.port) {
@@ -512,6 +542,49 @@ ipcMain.handle('server:copy-client-config', (_event, address) => {
 ipcMain.handle('server:table-data', (_event, tableName, options = {}) => database.getTableData(tableName, options));
 
 ipcMain.handle('server:get-devices', () => devices.list());
+ipcMain.handle('server:get-rejected', () => devices.rejectedList());
+ipcMain.handle('server:clear-rejected', () => {
+  devices.clearRejected();
+  pushState();
+  return [];
+});
+
+// ---------- Users ----------
+
+function userAction(action) {
+  const result = action();
+  pushState();
+  return result === undefined ? users.list() : result;
+}
+
+ipcMain.handle('server:get-users', () => users.list());
+ipcMain.handle('server:get-branches', () => database.listBranches());
+ipcMain.handle('server:create-user', (_event, details) => userAction(() => {
+  const user = users.create(details || {});
+  log('success', `User added: ${user.displayName} (${user.username}, ${user.branch})`);
+  return users.list();
+}));
+ipcMain.handle('server:update-user', (_event, username, changes) => userAction(() => {
+  const user = users.update(username, changes || {});
+  if (changes && changes.disabled !== undefined) log('warning', `User ${user.username} ${user.disabled ? 'disabled and signed out' : 'enabled'}`);
+  return users.list();
+}));
+ipcMain.handle('server:set-user-password', (_event, username, password) => userAction(() => {
+  users.setPassword(username, password);
+  log('info', `Password changed for ${username}; their SalesKit asks them to log in again`);
+  return users.list();
+}));
+ipcMain.handle('server:sign-out-user', (_event, username) => userAction(() => {
+  users.signOut(String(username));
+  log('info', `${username} was signed out`);
+  return users.list();
+}));
+ipcMain.handle('server:remove-user', (_event, username) => userAction(() => {
+  users.remove(username);
+  log('warning', `User removed: ${username}`);
+  return users.list();
+}));
+
 ipcMain.handle('server:forget-device', (_event, key) => {
   devices.forget(String(key));
   return devices.list();
@@ -565,6 +638,7 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     settings = loadSettings();
     devices = createDeviceRegistry(path.join(app.getPath('userData'), 'devices.json'));
+    users = createUserStore(app.getPath('userData'));
     Menu.setApplicationMenu(null);
     createWindow();
     createTray();

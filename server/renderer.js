@@ -157,6 +157,7 @@ function renderSettings() {
   interval.value = String(state.syncIntervalMinutes);
   $('port').value = state.port;
   $('autoStart').checked = state.autoStart;
+  $('allowWithoutLogin').checked = state.allowWithoutLogin;
 }
 
 function renderData() {
@@ -242,6 +243,7 @@ function showView(view) {
   $('main').classList.toggle('is-data', view === 'data');
   if (view === 'data' && !sheet.table && state && state.database.tables.length) openSheet(state.database.tables[0].name);
   if (view === 'devices') loadDevices();
+  if (view === 'users') loadUsers();
 }
 
 document.querySelectorAll('.nav-tab').forEach((tab) => tab.addEventListener('click', () => showView(tab.dataset.view)));
@@ -389,11 +391,10 @@ $('sheetReload').addEventListener('click', () => loadSheet());
 function renderDevices(list) {
   $('devOnline').textContent = list.filter((device) => device.online && device.authorized).length;
   $('devTotal').textContent = list.length;
-  $('devRejected').textContent = list.filter((device) => !device.authorized).length;
   const rows = $('deviceRows');
   rows.replaceChildren();
   if (!list.length) {
-    rows.innerHTML = '<tr><td colspan="10" class="empty text-center py-4">No SalesKit laptop has connected yet.</td></tr>';
+    rows.innerHTML = '<tr><td colspan="11" class="empty text-center py-4">No SalesKit laptop has connected yet.</td></tr>';
     return;
   }
   list.forEach((device) => {
@@ -404,14 +405,22 @@ function renderDevices(list) {
       cell.className = className;
       return cell;
     };
-    const [status, label] = !device.authorized ? ['rejected', 'Wrong token'] : device.online ? ['online', 'Online'] : ['offline', 'Offline'];
+    const [status, label] = !device.authorized ? ['rejected', 'Wrong key']
+      : device.needsLogin ? ['offline', 'Not signed in']
+        : device.online ? ['online', 'Online'] : ['offline', 'Offline'];
     const badge = document.createElement('span');
     badge.className = `state-badge state-${status}`;
     badge.textContent = label;
     tr.insertCell().appendChild(badge);
-    addCell(device.name || 'Unknown (older SalesKit)', 'device-name');
-    addCell(device.user);
-    addCell(device.address);
+
+    const account = device.account;
+    const userCell = addCell(account ? account.displayName : device.user ? `(${device.user})` : '', account ? 'device-name' : 'muted-small');
+    userCell.title = account ? `Signed in as ${account.username}` : 'Not signed in. Shows the Windows user, if known.';
+    addCell(account ? account.branch : '', account ? 'fw-semibold' : '');
+    const laptop = [device.make, device.model].filter(Boolean).join(' · ');
+    addCell(laptop);
+    addCell(device.name || 'Unknown (SalesKit 1.0.1 or older)', device.name ? '' : 'muted-small');
+    addCell(device.address, 'muted-small');
     addCell(device.version ? `v${device.version}` : '');
     const refresh = tr.insertCell();
     if (device.lastRefresh) {
@@ -427,7 +436,6 @@ function renderDevices(list) {
       refresh.textContent = '—';
     }
     addCell(timeAgo(device.lastSeen)).title = formatTime(device.lastSeen, true);
-    addCell(formatTime(device.firstSeen, true), 'muted-small');
     addCell(device.requests.toLocaleString(), 'muted-small');
     const forget = document.createElement('button');
     forget.className = 'btn btn-sm btn-light btn-icon';
@@ -440,14 +448,167 @@ function renderDevices(list) {
   });
 }
 
-async function loadDevices() {
-  const list = await run(null, api.getDevices);
-  if (list) renderDevices(list);
+function renderRejected(list) {
+  $('devRejected').textContent = list.length;
+  const rows = $('rejectedRows');
+  rows.replaceChildren();
+  if (!list.length) {
+    rows.innerHTML = '<tr><td colspan="5" class="empty text-center py-4">No refused connections.</td></tr>';
+    return;
+  }
+  list.forEach((entry) => {
+    const tr = rows.insertRow();
+    [entry.address, entry.requests.toLocaleString(), timeAgo(entry.lastSeen), formatTime(entry.firstSeen, true), entry.lastPath || '']
+      .forEach((value, index) => {
+        const cell = tr.insertCell();
+        cell.textContent = value;
+        if (index > 0) cell.className = 'muted-small';
+      });
+  });
 }
+
+async function loadDevices() {
+  const [list, rejected] = await Promise.all([run(null, api.getDevices), run(null, api.getRejected)]);
+  if (list) renderDevices(list);
+  if (rejected) renderRejected(rejected);
+}
+
+$('clearRejected').addEventListener('click', (event) => run(event.currentTarget, api.clearRejected).then((next) => next && renderRejected(next)));
 
 api.onDevices((list) => { if (currentView === 'devices') renderDevices(list); });
 // Online/offline depends on time passing, so refresh the list while it is shown.
 setInterval(() => { if (currentView === 'devices') loadDevices(); }, 30 * 1000);
+
+// ---------- Users ----------
+
+function renderUsers(list) {
+  const active = list.filter((user) => !user.disabled).length;
+  $('userSummary').textContent = `${list.length} user${list.length === 1 ? '' : 's'} · ${active} active`;
+  const rows = $('userRows');
+  rows.replaceChildren();
+  if (!list.length) {
+    rows.innerHTML = '<tr><td colspan="7" class="empty text-center py-4">No users yet. Add the first one above.</td></tr>';
+    return;
+  }
+  list.forEach((user) => {
+    const tr = rows.insertRow();
+    const badge = document.createElement('span');
+    badge.className = `state-badge ${user.disabled ? 'state-rejected' : 'state-online'}`;
+    badge.textContent = user.disabled ? 'Disabled' : 'Active';
+    tr.insertCell().appendChild(badge);
+    const addCell = (value, className = '') => {
+      const cell = tr.insertCell();
+      cell.textContent = value || '—';
+      cell.className = className;
+      return cell;
+    };
+    addCell(user.displayName, 'device-name');
+    addCell(user.username, 'muted-small');
+    const branch = addCell(user.branch, 'fw-semibold');
+    branch.title = 'Click to change the branch';
+    branch.style.cursor = 'pointer';
+    branch.addEventListener('click', () => editBranch(user, branch));
+    const recent = user.lastLogin && Date.now() - new Date(user.lastLogin).getTime() < 24 * 60 * 60 * 1000;
+    addCell(user.lastLogin ? `${formatTime(user.lastLogin, true)}${recent ? ` (${timeAgo(user.lastLogin)})` : ''}` : 'Never', 'muted-small');
+    addCell(user.activeSessions ? `Yes (${user.activeSessions})` : 'No', user.activeSessions ? 'text-success fw-semibold' : 'muted-small');
+
+    const actions = tr.insertCell();
+    const box = document.createElement('div');
+    box.className = 'user-actions';
+    const button = (html, className, title, handler) => {
+      const element = document.createElement('button');
+      element.className = `btn btn-sm ${className} btn-icon`;
+      element.innerHTML = html;
+      element.title = title;
+      element.addEventListener('click', () => handler(element));
+      box.appendChild(element);
+    };
+    button('<i class="bi bi-key"></i> Password', 'btn-light', 'Set a new password', () => askPassword(user));
+    if (user.activeSessions) {
+      button('<i class="bi bi-box-arrow-right"></i>', 'btn-light', 'Sign out now', (element) =>
+        run(element, () => api.signOutUser(user.username), `${user.displayName} signed out`).then((next) => next && renderUsers(next)));
+    }
+    button(user.disabled ? '<i class="bi bi-person-check"></i> Enable' : '<i class="bi bi-person-slash"></i> Disable',
+      user.disabled ? 'btn-outline-success' : 'btn-outline-secondary',
+      user.disabled ? 'Allow this user to log in again' : 'Block this user and sign them out',
+      (element) => run(element, () => api.updateUser(user.username, { disabled: !user.disabled }),
+        user.disabled ? 'User enabled' : 'User disabled').then((next) => next && renderUsers(next)));
+    button('<i class="bi bi-trash3"></i>', 'btn-outline-danger', 'Delete this user', (element) => {
+      if (!confirm(`Delete ${user.displayName} (${user.username})? They will no longer be able to log in.`)) return;
+      run(element, () => api.removeUser(user.username), 'User deleted').then((next) => next && renderUsers(next));
+    });
+    actions.appendChild(box);
+  });
+}
+
+async function loadUsers() {
+  const [list, branches] = await Promise.all([run(null, api.getUsers), run(null, api.getBranches)]);
+  if (list) renderUsers(list);
+  if (branches) {
+    $('branchOptions').replaceChildren(...branches.map((branch) => new Option(branch, branch)));
+  }
+}
+
+// Inline branch editor: the cell becomes a small text field with the branch list.
+function editBranch(user, cell) {
+  if (cell.querySelector('input')) return;
+  const input = document.createElement('input');
+  input.className = 'form-control form-control-sm';
+  input.style.width = '110px';
+  input.value = user.branch;
+  input.setAttribute('list', 'branchOptions');
+  cell.replaceChildren(input);
+  input.focus();
+  input.select();
+  let done = false;
+  const finish = (save) => {
+    if (done) return;
+    done = true;
+    const value = input.value.trim().toUpperCase();
+    if (!save || !value || value === user.branch) {
+      cell.textContent = user.branch;
+      return;
+    }
+    run(null, () => api.updateUser(user.username, { branch: value }), `Branch set to ${value}`).then((next) => (next ? renderUsers(next) : (cell.textContent = user.branch)));
+  };
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') finish(true);
+    if (event.key === 'Escape') finish(false);
+  });
+  input.addEventListener('blur', () => finish(true));
+}
+
+let passwordUser = null;
+function askPassword(user) {
+  passwordUser = user;
+  $('passwordDialogFor').textContent = `For ${user.displayName} (${user.username}). They will be asked to log in again.`;
+  $('passwordInput').value = '';
+  $('passwordDialog').showModal();
+  $('passwordInput').focus();
+}
+$('passwordCancel').addEventListener('click', () => $('passwordDialog').close());
+$('passwordForm').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const user = passwordUser;
+  run(event.submitter, () => api.setUserPassword(user.username, $('passwordInput').value), 'Password changed').then((next) => {
+    if (!next) return;
+    $('passwordDialog').close();
+    renderUsers(next);
+  });
+});
+
+$('addUserForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const next = await run(event.submitter, () => api.createUser({
+    username: $('newUsername').value,
+    displayName: $('newDisplayName').value,
+    branch: $('newBranch').value,
+    password: $('newPassword').value
+  }), 'User added');
+  if (!next) return;
+  event.target.reset();
+  renderUsers(next);
+});
 
 // ---------- Backups ----------
 
@@ -506,7 +667,8 @@ $('settingsForm').addEventListener('submit', async (event) => {
     spreadsheetId: $('spreadsheetId').value,
     syncIntervalMinutes: Number($('syncInterval').value),
     port: Number($('port').value),
-    autoStart: $('autoStart').checked
+    autoStart: $('autoStart').checked,
+    allowWithoutLogin: $('allowWithoutLogin').checked
   }), 'Settings saved');
   if (next) {
     settingsDirty = false;

@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: saleskit-image:">
+  <title>GigaHertz SalesKit — Sign in</title>
+  <link href="../node_modules/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="../node_modules/@fontsource/plus-jakarta-sans/500.css" rel="stylesheet">
+  <link href="../node_modules/@fontsource/plus-jakarta-sans/700.css" rel="stylesheet">
+  <link href="../node_modules/@fontsource/plus-jakarta-sans/800.css" rel="stylesheet">
+  <style>
+    :root {
+      --brand: #0012b3;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #dbe3ee;
+      --bad: #dc2626;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 52px 20px 20px;
+      background:
+        radial-gradient(ellipse 60% 50% at 15% 0%, rgba(31, 79, 255, 0.12), transparent 70%),
+        radial-gradient(ellipse 50% 50% at 100% 100%, rgba(0, 18, 179, 0.1), transparent 70%),
+        #f1f5fb;
+      color: var(--ink);
+      font-family: 'Plus Jakarta Sans', 'Segoe UI', Arial, sans-serif;
+    }
+
+    /* The window has no title bar; this strip lets users drag it. */
+    .drag-strip {
+      position: fixed;
+      inset: 0 0 auto 0;
+      height: 36px;
+      -webkit-app-region: drag;
+    }
+
+    .login-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+      width: min(860px, 100%);
+      min-height: 460px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: #fff;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+    }
+
+    .brand-side {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 36px;
+      background: linear-gradient(150deg, #000a6b 0%, var(--brand) 55%, #1f4fff 100%);
+      color: #fff;
+    }
+
+    .brand-logo {
+      display: block;
+      width: auto;
+      max-width: 100%;
+      height: 54px;
+      object-fit: contain;
+      object-position: left;
+    }
+
+    .brand-name {
+      font-size: 1.6rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-title {
+      margin: 0 0 8px;
+      font-size: 1.9rem;
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-text {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.78);
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    .brand-version {
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 0.78rem;
+    }
+
+    .form-side {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 40px 44px;
+    }
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: 1.5rem;
+      font-weight: 800;
+    }
+
+    .subtitle {
+      margin: 0 0 26px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      color: #334155;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .field {
+      position: relative;
+      margin-bottom: 16px;
+    }
+
+    .field i.lead {
+      position: absolute;
+      top: 50%;
+      left: 14px;
+      color: #94a3b8;
+      transform: translateY(-50%);
+    }
+
+    input {
+      width: 100%;
+      height: 46px;
+      padding: 0 44px 0 40px;
+      border: 1px solid #cbd5e1;
+      border-radius: 11px;
+      background: #f8fafc;
+      color: var(--ink);
+      font: inherit;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+    }
+
+    input:focus {
+      border-color: var(--brand);
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(0, 18, 179, 0.1);
+    }
+
+    .toggle-password {
+      position: absolute;
+      top: 50%;
+      right: 8px;
+      padding: 6px 8px;
+      border: 0;
+      background: transparent;
+      color: #64748b;
+      cursor: pointer;
+      transform: translateY(-50%);
+    }
+
+    .message {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      margin-bottom: 16px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 0.84rem;
+      line-height: 1.4;
+    }
+
+    .message.is-error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .message.is-info {
+      background: #e8ecff;
+      color: #1e3a8a;
+    }
+
+    .message[hidden],
+    .offline[hidden] {
+      display: none;
+    }
+
+    .submit {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      height: 48px;
+      border: 0;
+      border-radius: 11px;
+      background: var(--brand);
+      color: #fff;
+      font: inherit;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .submit:hover {
+      background: #000c80;
+    }
+
+    .submit:disabled {
+      background: #94a3b8;
+      cursor: default;
+    }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .offline {
+      margin-top: 14px;
+      text-align: center;
+    }
+
+    .offline button {
+      border: 0;
+      background: none;
+      color: var(--brand);
+      font: inherit;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .help {
+      margin-top: 22px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      text-align: center;
+    }
+
+    @media (max-width: 760px) {
+      .login-card {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .brand-side {
+        gap: 18px;
+        padding: 26px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="drag-strip"></div>
+
+  <main class="login-card">
+    <section class="brand-side">
+      <div>
+        <img class="brand-logo" id="brandLogo" alt="GigaHertz" hidden>
+        <div class="brand-name" id="brandName">GigaHertz</div>
+      </div>
+      <div>
+        <h2 class="brand-title">Sales Tools</h2>
+        <p class="brand-text">Laptop recommendations, comparisons and stock for every branch — all in one place.</p>
+      </div>
+      <div class="brand-version" id="version"></div>
+    </section>
+
+    <section class="form-side">
+      <h1>Sign in</h1>
+      <p class="subtitle">Use the account your administrator gave you.</p>
+
+      <div class="message" id="message" role="alert" hidden><i class="bi" id="messageIcon"></i><span id="messageText"></span></div>
+
+      <form id="loginForm" autocomplete="on">
+        <label for="username">Username</label>
+        <div class="field">
+          <i class="bi bi-person lead"></i>
+          <input id="username" name="username" autocomplete="username" spellcheck="false" autocapitalize="off" required>
+        </div>
+
+        <label for="password">Password</label>
+        <div class="field">
+          <i class="bi bi-lock lead"></i>
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+          <button class="toggle-password" type="button" id="togglePassword" aria-label="Show password"><i class="bi bi-eye"></i></button>
+        </div>
+
+        <button class="submit" type="submit" id="submit"><i class="bi bi-box-arrow-in-right"></i> Sign in</button>
+      </form>
+
+      <div class="offline" id="offline" hidden>
+        <button type="button" id="continueOffline"><i class="bi bi-cloud-slash"></i> Continue offline with the last saved data</button>
+      </div>
+
+      <p class="help">Forgot your password? Ask your SalesKit administrator to reset it.</p>
+    </section>
+  </main>
+
+  <script src="login.js"></script>
+</body>
+</html>

@@ -699,6 +699,24 @@
     .data-tag.is-current { color: var(--ok); }
     .data-tag.is-old { color: var(--warn); }
 
+    .password-dialog {
+      width: min(380px, calc(100vw - 32px));
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+    }
+
+    .password-dialog::backdrop {
+      background: rgba(15, 23, 42, 0.35);
+    }
+
+    .user-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 6px;
+    }
+
     .device-name {
       font-weight: 700;
     }
@@ -729,6 +747,7 @@
       <button class="nav-tab active" data-view="overview" role="tab"><i class="bi bi-speedometer2"></i> Overview</button>
       <button class="nav-tab" data-view="data" role="tab"><i class="bi bi-table"></i> Data</button>
       <button class="nav-tab" data-view="devices" role="tab"><i class="bi bi-laptop"></i> Devices <span class="nav-badge" id="onlineBadge" hidden>0</span></button>
+      <button class="nav-tab" data-view="users" role="tab"><i class="bi bi-people"></i> Users</button>
       <button class="nav-tab" data-view="backups" role="tab"><i class="bi bi-archive"></i> Backups</button>
     </nav>
     <div class="status-pill" id="statusPill"><span class="status-dot"></span><span id="statusText">Starting…</span></div>
@@ -767,7 +786,7 @@
       <div class="summary-row">
         <div class="summary-tile"><div class="label">Online now</div><div class="summary-value text-success" id="devOnline">0</div></div>
         <div class="summary-tile"><div class="label">Known devices</div><div class="summary-value" id="devTotal">0</div></div>
-        <div class="summary-tile"><div class="label">Rejected (wrong token)</div><div class="summary-value text-danger" id="devRejected">0</div></div>
+        <div class="summary-tile"><div class="label">Refused (not SalesKit)</div><div class="summary-value text-danger" id="devRejected">0</div></div>
       </div>
       <section class="panel">
         <div class="panel-head">
@@ -777,13 +796,76 @@
         <div class="table-responsive">
           <table class="list-table">
             <thead>
-              <tr><th>Status</th><th>Computer</th><th>Windows user</th><th>IP address</th><th>SalesKit</th><th>Last refresh</th><th>Last seen</th><th>First seen</th><th>Requests</th><th></th></tr>
+              <tr><th>Status</th><th>User</th><th>Location</th><th>Laptop</th><th>Computer</th><th>IP address</th><th>SalesKit</th><th>Last refresh</th><th>Last seen</th><th>Requests</th><th></th></tr>
             </thead>
             <tbody id="deviceRows"></tbody>
           </table>
         </div>
       </section>
-      <p class="muted-small mt-3"><i class="bi bi-info-circle"></i> Laptops on SalesKit 1.0.0 show only their IP address; computer name, user and version appear once they update.</p>
+      <p class="muted-small mt-3"><i class="bi bi-info-circle"></i> User and location come from the SalesKit login (1.0.5 and newer). Laptop brand and model are read from Windows.</p>
+
+      <section class="panel mt-3">
+        <div class="panel-head">
+          <h2 class="panel-title"><i class="bi bi-shield-x"></i> Refused connections</h2>
+          <div class="d-flex align-items-center gap-2">
+            <span class="muted-small">Internet scanners and other programs without the SalesKit key. They received no data.</span>
+            <button class="btn btn-sm btn-light btn-icon" id="clearRejected"><i class="bi bi-trash3"></i> Clear list</button>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="list-table">
+            <thead><tr><th>IP address</th><th>Attempts</th><th>Last tried</th><th>First seen</th><th>Last request</th></tr></thead>
+            <tbody id="rejectedRows"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <!-- USERS -->
+    <section class="view" id="view-users" hidden>
+      <section class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title"><i class="bi bi-person-plus"></i> Add a user</h2>
+          <span class="muted-small">Users log in to SalesKit each time they open it. Their branch is fixed by you.</span>
+        </div>
+        <div class="panel-body">
+          <form id="addUserForm" class="row g-3 align-items-end" autocomplete="off">
+            <div class="col-md-3">
+              <label class="label" for="newUsername">Username</label>
+              <input class="form-control form-control-sm" id="newUsername" placeholder="e.g. maria.santos" required pattern="[A-Za-z0-9._-]{3,32}" spellcheck="false">
+            </div>
+            <div class="col-md-3">
+              <label class="label" for="newDisplayName">Full name</label>
+              <input class="form-control form-control-sm" id="newDisplayName" placeholder="e.g. Maria Santos">
+            </div>
+            <div class="col-md-2">
+              <label class="label" for="newBranch">Branch</label>
+              <input class="form-control form-control-sm" id="newBranch" list="branchOptions" placeholder="e.g. ALB" required spellcheck="false">
+              <datalist id="branchOptions"></datalist>
+            </div>
+            <div class="col-md-2">
+              <label class="label" for="newPassword">Password</label>
+              <input class="form-control form-control-sm" id="newPassword" type="password" minlength="8" required autocomplete="new-password">
+            </div>
+            <div class="col-md-2">
+              <button class="btn btn-sm btn-brand btn-icon w-100" type="submit"><i class="bi bi-plus-lg"></i> Add user</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="panel mt-3">
+        <div class="panel-head">
+          <h2 class="panel-title"><i class="bi bi-people"></i> Users</h2>
+          <span class="muted-small" id="userSummary"></span>
+        </div>
+        <div class="table-responsive">
+          <table class="list-table">
+            <thead><tr><th>Status</th><th>Name</th><th>Username</th><th>Branch</th><th>Last login</th><th>Signed in now</th><th></th></tr></thead>
+            <tbody id="userRows"></tbody>
+          </table>
+        </div>
+      </section>
     </section>
 
     <!-- BACKUPS -->
@@ -892,6 +974,13 @@
               <label class="label" for="port">Port</label>
               <input class="form-control form-control-sm" id="port" type="number" min="1024" max="65535" required>
             </div>
+            <div class="col-12">
+              <div class="form-check form-switch m-0">
+                <input class="form-check-input" type="checkbox" role="switch" id="allowWithoutLogin">
+                <label class="form-check-label" for="allowWithoutLogin">Allow SalesKit 1.0.4 and older without login</label>
+              </div>
+              <div class="form-text mt-0">Turn off once every laptop runs 1.0.5 or newer. Then every user must log in.</div>
+            </div>
             <div class="col-12 d-flex align-items-center justify-content-between gap-3">
               <div class="form-check form-switch m-0">
                 <input class="form-check-input" type="checkbox" role="switch" id="autoStart">
@@ -930,6 +1019,18 @@
     </div>
     </section>
   </main>
+
+  <dialog class="password-dialog" id="passwordDialog">
+    <form method="dialog" id="passwordForm">
+      <h3 class="panel-title mb-1"><i class="bi bi-key"></i> New password</h3>
+      <p class="muted-small mb-3" id="passwordDialogFor"></p>
+      <input class="form-control form-control-sm" id="passwordInput" type="password" minlength="8" required autocomplete="new-password" placeholder="At least 8 characters">
+      <div class="d-flex justify-content-end gap-2 mt-3">
+        <button class="btn btn-sm btn-light" type="button" id="passwordCancel">Cancel</button>
+        <button class="btn btn-sm btn-brand btn-icon" type="submit"><i class="bi bi-check2"></i> Save password</button>
+      </div>
+    </form>
+  </dialog>
 
   <div class="toast-msg" id="toast"></div>
   <script src="renderer.js"></script>

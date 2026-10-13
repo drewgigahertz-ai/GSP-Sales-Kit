@@ -6,6 +6,7 @@ const { ImageCache } = require('./image-cache');
 const { createSnapshotCache } = require('./snapshot-cache');
 const { getConfig } = require('./app-config');
 const { startAutoUpdates, getUpdateStatus, installUpdateNow } = require('./updater');
+const { getDeviceInfo } = require('./device-info');
 
 // SalesKit is a client: it loads its data from the SalesKit Server, which does the Google Sheets sync.
 
@@ -35,11 +36,18 @@ const CLIENT_HEADERS = {
 let workingServerUrl = '';
 let loadedDataVersion = null;
 
-async function requestServer(pathname, { timeoutMs = 8000 } = {}) {
+// Signed-in user for this run of SalesKit ({ key, user }). Never saved: users log in every time SalesKit opens.
+let session = null;
+let onLoginPage = true;
+
+async function requestServer(pathname, { timeoutMs = 8000, method = 'GET', body } = {}) {
   const { serverUrls, serverToken } = getConfig();
   if (!serverUrls.length) throw new Error('SalesKit has no server address. Add it to electron/embedded-config.json and rebuild.');
-  const headers = { Accept: 'application/json', ...CLIENT_HEADERS };
+  const device = await getDeviceInfo();
+  const headers = { Accept: 'application/json', ...CLIENT_HEADERS, 'X-SalesKit-Make': device.make, 'X-SalesKit-Model': device.model };
   if (serverToken) headers.Authorization = `Bearer ${serverToken}`;
+  if (session) headers['X-SalesKit-Session'] = session.key;
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
   const ordered = workingServerUrl && serverUrls.includes(workingServerUrl)
     ? [workingServerUrl, ...serverUrls.filter((url) => url !== workingServerUrl)]
     : serverUrls;
@@ -48,7 +56,12 @@ async function requestServer(pathname, { timeoutMs = 8000 } = {}) {
   for (const serverUrl of ordered) {
     let response;
     try {
-      response = await fetch(`${serverUrl}${pathname}`, { headers, signal: AbortSignal.timeout(timeoutMs) });
+      response = await fetch(`${serverUrl}${pathname}`, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs)
+      });
     } catch (error) {
       // Unreachable at this address; try the next one.
       networkError = error;
@@ -56,10 +69,14 @@ async function requestServer(pathname, { timeoutMs = 8000 } = {}) {
     }
     workingServerUrl = serverUrl;
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.error || `SalesKit Server returned HTTP ${response.status}.`);
+    if (!response.ok) {
+      // The session ended (server restarted, password changed, or signed out by the administrator).
+      if (result.code === 'login_required' && pathname !== '/api/login' && !onLoginPage) showLogin('Please log in again.');
+      throw Object.assign(new Error(result.error || `SalesKit Server returned HTTP ${response.status}.`), { code: result.code, status: response.status });
+    }
     return result;
   }
-  throw new Error(`SalesKit Server is not reachable (${ordered.join(', ')}): ${networkError.message}`);
+  throw Object.assign(new Error(`SalesKit Server is not reachable (${ordered.join(', ')}): ${networkError.message}`), { code: 'unreachable' });
 }
 
 async function getRemoteSnapshot() {
@@ -70,6 +87,7 @@ async function getRemoteSnapshot() {
     if (snapshotCache) snapshotCache.save(data);
     return { data, offline: false };
   } catch (error) {
+    if (error.code === 'login_required') throw error;
     const data = snapshotCache && snapshotCache.load();
     if (!data) throw error;
     console.warn('Using the last saved SalesKit data while the server is unavailable:', error.message);
@@ -119,6 +137,7 @@ const DATA_CHECK_INTERVAL_MS = 2 * 60 * 1000;
 
 function startDataChangeChecks() {
   setInterval(async () => {
+    if (!session) return;
     try {
       const { dataVersion } = await requestServer('/api/version');
       if (loadedDataVersion !== null && dataVersion !== null && dataVersion !== loadedDataVersion &&
@@ -128,6 +147,66 @@ function startDataChangeChecks() {
     } catch {}
   }, DATA_CHECK_INTERVAL_MS);
 }
+
+// ---------- Login ----------
+
+let loginMessage = '';
+
+function showLogin(message = '') {
+  session = null;
+  loadedDataVersion = null;
+  loginMessage = message;
+  onLoginPage = true;
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.loadFile(path.join(__dirname, 'login.html'));
+}
+
+function showSalesKit() {
+  onLoginPage = false;
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.loadFile(path.join(__dirname, '..', 'saleskit.html'), { query: { page: 'saleskit' } });
+  }
+}
+
+ipcMain.handle('auth:info', async () => {
+  const message = loginMessage;
+  loginMessage = '';
+  const saved = snapshotCache && snapshotCache.load();
+  // The GigaHertz header logo from the last saved data, if its image is in the local cache.
+  const logo = saved && saved.headerLogoUrl ? await imageCache.resolve(saved.headerLogoUrl) : '';
+  return {
+    version: app.getVersion(),
+    message,
+    offlineAvailable: Boolean(saved),
+    logo: String(logo || '').startsWith('saleskit-image://') ? logo : ''
+  };
+});
+
+// Returns { ok: true, user } or { ok: false, error, unreachable }.
+ipcMain.handle('auth:login', async (_event, username, password) => {
+  try {
+    const result = await requestServer('/api/login', { method: 'POST', body: { username: String(username || ''), password: String(password || '') } });
+    session = { key: result.sessionKey, user: result.user };
+    showSalesKit();
+    return { ok: true, user: result.user };
+  } catch (error) {
+    return { ok: false, error: error.code === 'unreachable' ? 'The SalesKit server cannot be reached. Check your internet connection.' : error.message, unreachable: error.code === 'unreachable' };
+  }
+});
+
+// Only offered while the server cannot be reached: SalesKit opens with the last saved data.
+ipcMain.handle('auth:offline', () => {
+  if (!snapshotCache || !snapshotCache.load()) return false;
+  showSalesKit();
+  return true;
+});
+
+ipcMain.handle('auth:user', () => (session ? session.user : null));
+
+ipcMain.handle('auth:logout', async () => {
+  if (session) await requestServer('/api/logout', { method: 'POST', body: {} }).catch(() => {});
+  showLogin('You signed out.');
+  return true;
+});
 
 ipcMain.handle('database:status', () => requestServer('/api/status'));
 ipcMain.handle('database:initial-data', async () => imageCache.mapPayload((await getRemoteSnapshot()).data));
@@ -214,7 +293,7 @@ function createWindow() {
   mainWindow.webContents.on('will-navigate', (event, url) => {
     if (!url.startsWith('file://')) event.preventDefault();
   });
-  mainWindow.loadFile(path.join(__dirname, '..', 'saleskit.html'), { query: { page: 'saleskit' } });
+  mainWindow.loadFile(path.join(__dirname, 'login.html'));
 }
 
 app.whenReady().then(() => {
@@ -223,6 +302,7 @@ app.whenReady().then(() => {
   protocol.handle('saleskit-image', ({ url }) => imageCache.serve(url));
 
   Menu.setApplicationMenu(null);
+  getDeviceInfo();
   createWindow();
   startAutoUpdates((status) => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update:status', status);

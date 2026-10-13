@@ -11,6 +11,11 @@ contextBridge.exposeInMainWorld('saleskit', {
     return () => ipcRenderer.removeListener('sync:progress', listener);
   },
   saveBanner: (url, suggestedName) => ipcRenderer.invoke('banner:save', url, suggestedName),
+  getLoginInfo: () => ipcRenderer.invoke('auth:info'),
+  login: (username, password) => ipcRenderer.invoke('auth:login', username, password),
+  continueOffline: () => ipcRenderer.invoke('auth:offline'),
+  getCurrentUser: () => ipcRenderer.invoke('auth:user'),
+  logout: () => ipcRenderer.invoke('auth:logout'),
   getAppVersion: () => ipcRenderer.invoke('app:version'),
   getUpdateStatus: () => ipcRenderer.invoke('update:status'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
