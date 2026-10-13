@@ -18,8 +18,26 @@ function authorized(request, token) {
   return expectedBuffer.length === suppliedBuffer.length && crypto.timingSafeEqual(expectedBuffer, suppliedBuffer);
 }
 
-function createLocalApi({ database, token = '' }) {
+// Client-supplied identity headers are only used for display, so keep them short and printable.
+function headerText(request, name) {
+  return String(request.headers[name] || '').replace(/[^\x20-\x7e]/g, '').trim().slice(0, 80);
+}
+
+function createLocalApi({ database, token = '', onRequest = null, getDataVersion = () => null }) {
   return http.createServer(async (request, response) => {
+    if (onRequest) {
+      response.on('finish', () => onRequest({
+        method: request.method,
+        path: new URL(request.url, 'http://localhost').pathname,
+        status: response.statusCode,
+        address: request.socket.remoteAddress || '',
+        client: {
+          name: headerText(request, 'x-saleskit-client'),
+          user: headerText(request, 'x-saleskit-user'),
+          version: headerText(request, 'x-saleskit-version')
+        }
+      }));
+    }
     if (!authorized(request, token)) {
       sendJson(response, 401, { error: 'Unauthorized.' });
       return;
@@ -30,6 +48,8 @@ function createLocalApi({ database, token = '' }) {
       if (request.method === 'GET' && url.pathname === '/api/status') {
         const status = database.getStatus();
         sendJson(response, 200, { connected: status.connected, tableCount: status.tableCount });
+      } else if (request.method === 'GET' && url.pathname === '/api/version') {
+        sendJson(response, 200, { dataVersion: getDataVersion() });
       } else if (request.method === 'GET' && url.pathname === '/api/initial-data') {
         sendJson(response, 200, database.getInitialData());
       } else if (request.method === 'GET' && url.pathname === '/api/tables') {

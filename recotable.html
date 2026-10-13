@@ -66,7 +66,7 @@ function doGet(e) {
     if (!output) {
       output = HtmlService.createHtmlOutput(
         '<div style="font-family:sans-serif;padding:32px;max-width:700px;margin:40px auto;border:1.5px solid #cbd5e1;border-radius:12px;background:#f8fafc;">' +
-        '<h2 style="color:#0012b3;margin-top:0;">GigaHertz Online Sales Dashboard</h2>' +
+        '<h2 style="color:#0012b3;margin-top:0;">Gigahertz Sales Tools</h2>' +
         '<h3 style="color:#b91c1c;">Template File Not Found</h3>' +
         '<p>Google Apps Script could not find an HTML file in this project. Please make sure you have added an HTML file in your Apps Script project editor (e.g. <code>saleskit.html</code> or <code>recotable.html</code> or <code>index.html</code>).</p>' +
         '<details style="margin-top:16px;background:#ffffff;padding:12px;border:1px solid #e2e8f0;border-radius:8px;">' +
@@ -78,7 +78,7 @@ function doGet(e) {
     }
 
     output
-      .setTitle('GigaHertz Online Sales Dashboard')
+      .setTitle('Gigahertz Sales Tools')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 

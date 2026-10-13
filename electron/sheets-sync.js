@@ -2,10 +2,16 @@ const SHEETS = [
   'SPECS',
   'Criteria Segment-Application',
   'DV TRANSPOSED',
+  'APPLICATION DESCRIPTION',
   'UKSP TRANSPOSED',
   'UKSP Banner',
-  'RECO TABLE'
+  'RECO TABLE',
+  'LOGO'
 ];
+// Sheets whose first header cell is left blank in the spreadsheet.
+const FIRST_COLUMN_HEADERS = {
+  'APPLICATION DESCRIPTION': 'SKU'
+};
 const DEFAULT_SPREADSHEET_ID = '1qACk3I6yMwmIYauQFlcM3yryRcyIrx3bLYqmJZ2wVFE';
 
 function collectionName(sheetName) {
@@ -14,6 +20,10 @@ function collectionName(sheetName) {
 
 function normalizeSheetValues(sheetName, values = []) {
   if (!values.length) return { collection: collectionName(sheetName), columns: [], rows: [] };
+  const firstColumnHeader = FIRST_COLUMN_HEADERS[sheetName];
+  if (firstColumnHeader && !String(values[0][0] ?? '').trim()) {
+    values = [[firstColumnHeader, ...values[0].slice(1)], ...values.slice(1)];
+  }
 
   const columns = [...new Set(values[0].map((value) => String(value ?? '').trim()).filter(Boolean))];
   const headerIndexes = columns.map((column) => values[0].findIndex((value) => String(value ?? '').trim() === column));
@@ -48,6 +58,33 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
   for (let index = 0; index < SHEETS.length; index++) {
     const sheetName = SHEETS[index];
     const quotedName = `'${sheetName.replace(/'/g, "''")}'`;
+    if (sheetName === 'LOGO') {
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `${quotedName}!A2:B2`,
+        valueRenderOption: 'FORMULA',
+        dateTimeRenderOption: 'FORMATTED_STRING'
+      });
+      const [applicationLogo = '', headerLogo = ''] = response.data.values?.[0] || [];
+      const resolveImageFormula = (value) => {
+        const formula = String(value || '').trim();
+        const match = formula.match(/^=(?:IMAGE|HYPERLINK)\s*\(\s*"([^"]+)"/i);
+        return match ? match[1] : formula;
+      };
+      result[collectionName(sheetName)] = {
+        collection: collectionName(sheetName),
+        columns: ['application_logo', 'header_logo'],
+        rows: [{
+          id: 'logo',
+          data: {
+            application_logo: resolveImageFormula(applicationLogo),
+            header_logo: resolveImageFormula(headerLogo)
+          }
+        }]
+      };
+      onProgress({ phase: 'sheets', completed: index + 1, total: SHEETS.length, sheet: sheetName });
+      continue;
+    }
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: `${quotedName}!A:ZZ`,

@@ -4,9 +4,10 @@
   <base target="_top">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GigaHertz Online Sales Dashboard</title>
+  <title>Gigahertz Sales Tools</title>
+  <link id="applicationFavicon" rel="icon">
   <meta name="description" content="Online sales and laptop recommendation tool for GigaHertz, matching applications and features with Exceed, Meet, and Budget recommendations.">
-  <meta property="og:title" content="GigaHertz Online Sales Dashboard">
+  <meta property="og:title" content="Gigahertz Sales Tools">
   <meta property="og:description" content="Online sales and laptop recommendation tool for GigaHertz, matching applications and features with Exceed, Meet, and Budget recommendations.">
   <link href="./node_modules/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="./node_modules/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
@@ -43,6 +44,78 @@
       /* Stronger, clearly visible grid lines for the generated result */
       --ghz-grid: #7d8ca3;
       --ghz-grid-soft: #b6c2d3;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      scrollbar-color: #9fb0c9 transparent;
+    }
+
+    /* Slim, rounded scrollbars that match the GigaHertz palette */
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background-color: #b6c2d3;
+      border: 3px solid transparent;
+      border-radius: 999px;
+      background-clip: padding-box;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background-color: #0012b3;
+    }
+
+    ::-webkit-scrollbar-thumb:active {
+      background-color: #000c7a;
+    }
+
+    ::-webkit-scrollbar-corner {
+      background: transparent;
+    }
+
+    .scroll-top-btn {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 1050;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      border: 0;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #001bb5 0%, #000c7a 100%);
+      color: #fff;
+      font-size: 1.1rem;
+      box-shadow: 0 6px 18px rgba(0, 18, 179, 0.3);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(12px);
+      transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+    }
+
+    .scroll-top-btn.is-visible {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+
+    .scroll-top-btn:hover {
+      box-shadow: 0 8px 22px rgba(0, 18, 179, 0.42);
+    }
+
+    .banner-download-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
 
     body {
@@ -147,6 +220,55 @@
       padding: 24px 32px 48px 32px;
     }
 
+    /* Customer Profiling keeps a fixed size; it no longer stretches with the generated results beside it. */
+    @media (min-width: 992px) {
+      .reco-layout {
+        flex-wrap: nowrap;
+        align-items: flex-start;
+      }
+
+      .reco-layout > .reco-sidebar-col {
+        flex: 0 0 340px;
+        width: 340px;
+        max-width: 340px;
+      }
+
+      /* Fills the window down to the bottom edge (height set by fitCustomerProfilingPanel), with roomier fields. */
+      .reco-layout .customer-profiling-sidebar {
+        height: var(--profiling-panel-height, auto);
+        min-height: 600px;
+        padding: 14px 12px;
+        gap: 10px;
+        overflow-y: auto;
+      }
+
+      .reco-layout .sidebar-heading-title { font-size: 1rem; }
+      .reco-layout .sidebar-heading-subtitle { font-size: 0.68rem; }
+      .reco-layout .sidebar-heading .bi { font-size: 1.1rem !important; }
+      .reco-layout .filter-card-sidebar { padding: 8px 10px; border-radius: 9px; }
+      .reco-layout .customer-profiling-sidebar .filter-label { font-size: 0.66rem; margin-bottom: 4px; }
+      .reco-layout .customer-profiling-sidebar .filter-label i { font-size: 0.68rem; }
+      .reco-layout .customer-profiling-sidebar .filter-select-input {
+        min-height: 30px;
+        padding: 5px 24px 5px 9px;
+        font-size: 0.78rem;
+        border-radius: 6px;
+      }
+      .reco-layout .customer-profiling-sidebar .filter-select-chevron { font-size: 0.68rem; }
+      .reco-layout .customer-profiling-sidebar .badge { font-size: 0.62rem !important; padding: 2px 6px !important; }
+      .reco-layout .customer-profiling-sidebar .form-check-label { font-size: 0.72rem; }
+
+      /* Any space left over goes above the background toggle, keeping it at the bottom of the panel. */
+      .reco-layout .customer-profiling-sidebar > .form-check.form-switch:last-child { margin-top: auto !important; }
+
+      .reco-layout > .reco-results-col {
+        flex: 1 1 0;
+        width: auto;
+        max-width: none;
+        min-width: 0;
+      }
+    }
+
     /* Customer Profiling Sidebar */
     .customer-profiling-sidebar {
       background: #ffffff;
@@ -157,7 +279,6 @@
       display: flex;
       flex-direction: column;
       gap: 5px;
-      height: 100%;
     }
 
     .sidebar-heading {
@@ -1400,12 +1521,49 @@
     }
 
     .saleskit-feature-clickable {
+      position: relative;
       cursor: pointer;
       border-color: #bfdbfe;
     }
 
+    .saleskit-feature-banner-preview {
+      position: absolute;
+      z-index: 20;
+      top: calc(100% + 8px);
+      left: 50%;
+      width: min(280px, calc(100vw - 32px));
+      padding: 6px;
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.22);
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, -4px);
+      transition: opacity 0.15s ease, transform 0.15s ease;
+      visibility: hidden;
+    }
+
+    .saleskit-feature-banner-preview img {
+      display: block;
+      width: 100%;
+      max-height: 180px;
+      border-radius: 6px;
+      object-fit: contain;
+    }
+
+    .saleskit-feature-clickable:hover .saleskit-feature-banner-preview,
+    .saleskit-feature-clickable:focus-visible .saleskit-feature-banner-preview,
+    .saleskit-presentation-view-banner:hover .saleskit-feature-banner-preview,
+    .saleskit-presentation-view-banner:focus-visible .saleskit-feature-banner-preview {
+      opacity: 1;
+      transform: translate(-50%, 0);
+      visibility: visible;
+    }
+
     .saleskit-feature-clickable:hover,
     .saleskit-feature-clickable:focus-visible {
+      z-index: 10;
       border-color: #0012b3;
       box-shadow: 0 0 0 3px rgba(0, 18, 179, 0.12);
       outline: none;
@@ -1614,13 +1772,24 @@
       min-height: 100%;
     }
 
+    /* Leftover screen height goes to the laptop images instead of a blank strip under the card. */
+    .saleskit-presentation-whole .reco-columns-grid {
+      flex: 1 1 auto;
+    }
+
     .saleskit-presentation-whole .reco-img-wrapper {
-      height: clamp(220px, 30vh, 300px);
+      flex: 1 1 auto;
+      height: auto;
+      min-height: clamp(220px, 30vh, 300px);
       padding: 8px 12px;
     }
 
     .saleskit-presentation-whole .reco-laptop-img {
-      max-height: clamp(180px, 27vh, 260px);
+      position: absolute;
+      inset: 8px 12px;
+      width: calc(100% - 24px);
+      height: calc(100% - 16px);
+      max-height: none;
       object-fit: contain;
     }
 
@@ -1629,6 +1798,7 @@
     }
 
     .saleskit-presentation-whole .reco-specs-box {
+      flex-grow: 0;
       padding: 4px 12px 8px;
     }
 
@@ -1668,6 +1838,7 @@
     }
 
     .saleskit-presentation-view-banner {
+      position: relative;
       margin-top: 12px;
       padding: 8px 14px;
       border: 1px solid #93c5fd;
@@ -1677,6 +1848,23 @@
       font: inherit;
       font-size: clamp(0.75rem, 1.2vw, 1rem);
       font-weight: 800;
+    }
+
+    /* Keep every "View banner" button on the same line: text centered above, button pinned to the bottom. */
+    .saleskit-presentation-row .saleskit-metric-cell:has(> .saleskit-presentation-view-banner) > :first-child,
+    .saleskit-presentation-row .saleskit-metric-cell > .saleskit-presentation-view-banner {
+      margin-top: auto;
+    }
+
+    .saleskit-presentation-view-banner .saleskit-feature-banner-preview {
+      top: auto;
+      bottom: calc(100% + 8px);
+      width: min(300px, 30vw);
+    }
+
+    .saleskit-presentation-view-banner:hover,
+    .saleskit-presentation-view-banner:focus-visible {
+      z-index: 30;
     }
 
     .saleskit-presentation-banner-viewer {
@@ -1712,6 +1900,12 @@
       right: 16px;
     }
 
+    .saleskit-presentation-banner-viewer-download {
+      position: absolute;
+      top: 16px;
+      right: 170px;
+    }
+
     .saleskit-presentation-banner-tabs {
       display: flex;
       flex: 0 0 auto;
@@ -1722,6 +1916,18 @@
       padding: 0 0 10px;
       position: relative;
       z-index: 3;
+    }
+
+    .saleskit-presentation.is-banner-open .saleskit-presentation-banner-tabs {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 300px;
+      padding: 0;
+    }
+
+    .saleskit-presentation.is-banner-open .saleskit-presentation-banner-viewer {
+      padding-top: 64px;
     }
 
     .saleskit-presentation-banner-tabs[hidden] {
@@ -1823,6 +2029,15 @@
 
     .saleskit-presentation-row .saleskit-feature-empty {
       font-size: clamp(0.9rem, 1.6vw, 1.3rem);
+    }
+
+    .saleskit-presentation-row .saleskit-feature-banner-preview {
+      width: min(300px, 30vw);
+      padding: 8px;
+    }
+
+    .saleskit-presentation-row .saleskit-feature-banner-preview img {
+      max-height: 190px;
     }
 
     .saleskit-presentation-nav {
@@ -1962,9 +2177,86 @@
         padding-right: 0;
       }
     }
+
+    /* Custom desktop title bar (Electron hides the native one) */
+    .app-titlebar {
+      display: none;
+    }
+
+    /* In the desktop app the page scrolls below the title bar, so the
+       scrollbar never runs under the window controls. */
+    html.is-desktop-app {
+      /* Match the window-controls overlay height exactly, whatever Windows reports */
+      --app-titlebar-height: env(titlebar-area-height, 36px);
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .is-desktop-app body {
+      box-sizing: border-box;
+      height: 100%;
+      margin-top: 0;
+      border-top: var(--app-titlebar-height) solid transparent;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+    }
+
+    .is-desktop-app .app-titlebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 2500;
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      height: var(--app-titlebar-height);
+      padding: 0 calc(100vw - env(titlebar-area-width, 100vw) + 12px) 0 16px;
+      /* Gradient ends on the window-controls colour exactly where the controls begin */
+      background: linear-gradient(90deg, #f3f4f7 0%, #e2e5ea 45%, #d5d9e0 env(titlebar-area-width, 100%));
+      color: #334155;
+      font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      user-select: none;
+      -webkit-app-region: drag;
+    }
+
+    .app-titlebar-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      background: #001bb5;
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 800;
+    }
+
+    .app-titlebar-logo {
+      width: 20px;
+      height: 20px;
+      object-fit: contain;
+    }
+
+    .is-desktop-app .saleskit-presentation:not(:fullscreen) {
+      top: var(--app-titlebar-height);
+    }
   </style>
 </head>
 <body>
+  <script>
+    if (window.saleskit) document.documentElement.classList.add('is-desktop-app');
+  </script>
+  <div class="app-titlebar">
+    <img class="app-titlebar-logo" id="appTitlebarLogo" alt="" hidden onload="this.hidden = false; document.getElementById('appTitlebarMark').hidden = true;" onerror="this.hidden = true; document.getElementById('appTitlebarMark').hidden = false;">
+    <span class="app-titlebar-mark" id="appTitlebarMark">G</span>
+    <span>Gigahertz Sales Tools</span>
+  </div>
 
   <!-- Header Bar -->
   <div class="header-bar">
@@ -1974,7 +2266,7 @@
           <img id="headerLogoImg" alt="GigaHertz" style="display:none;" referrerpolicy="no-referrer" onerror="handleHeaderLogoError()">
         </div>
         <div>
-          <div class="dashboard-title">GigaHertz Online Sales Dashboard</div>
+          <div class="dashboard-title">Gigahertz Sales Tools</div>
           <div class="dashboard-subtitle">All-in-one view</div>
         </div>
       </div>
@@ -1997,10 +2289,10 @@
     <!-- VIEW: RECO TABLE -->
     <div id="viewRecoTable" class="view-section active">
 
-      <div class="row g-4">
+      <div class="row g-4 reco-layout">
 
         <!-- SIDEBAR: Customer Profiling -->
-        <div class="col-12 col-lg-3 col-xl-3">
+        <div class="col-12 col-lg-3 col-xl-3 reco-sidebar-col">
           <div class="customer-profiling-sidebar">
             <div class="sidebar-heading">
               <i class="bi bi-person-lines-fill text-primary fs-4"></i>
@@ -2060,15 +2352,15 @@
               </div>
             </div>
 
-            <!-- FEATURES (UKSP SHEET A3:A14) - Kept in Sales Kit view -->
+            <!-- FEATURES (UKSP TRANSPOSED columns) - Kept in Sales Kit view -->
             <div class="filter-card filter-card-sidebar" id="featuresFilterCard" style="display: none;">
               <div class="filter-label d-flex justify-content-between align-items-center flex-wrap" style="gap: 4px;">
-                <span><i class="bi bi-cpu"></i> FEATURES <span class="text-muted fw-normal" style="font-size: 0.6rem; font-weight: 500; text-transform: none; letter-spacing: 0;">(UKSP A3:A14)</span></span>
+                <span><i class="bi bi-cpu"></i> FEATURES <span class="text-muted fw-normal" style="font-size: 0.6rem; font-weight: 500; text-transform: none; letter-spacing: 0;">(UKSP)</span></span>
                 <span id="featuresCountBadge" class="badge bg-light text-primary border px-2 py-0.5" style="font-size: 0.6rem; font-weight: 700;">All</span>
               </div>
               <div class="filter-select-wrapper" id="featuresDropdownWrapper">
                 <div class="filter-select-input" id="featuresDisplayInput" onclick="toggleFeaturesMenu()">
-                  <span id="featuresDisplayText" class="text-truncate">All Features (A3:A14)</span>
+                  <span id="featuresDisplayText" class="text-truncate">All Features</span>
                 </div>
                 <i class="bi bi-chevron-down filter-select-chevron"></i>
 
@@ -2076,7 +2368,7 @@
                   <div class="p-2 border-bottom">
                     <div class="input-group input-group-sm">
                       <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
-                      <input type="text" id="featuresSearchInput" class="form-control border-start-0" placeholder="Search features (A3:A14)..." oninput="filterFeaturesMenu(this.value)">
+                      <input type="text" id="featuresSearchInput" class="form-control border-start-0" placeholder="Search features..." oninput="filterFeaturesMenu(this.value)">
                     </div>
                   </div>
                   <div class="d-flex justify-content-between align-items-center px-3 py-1 border-bottom bg-light">
@@ -2235,7 +2527,7 @@
         </div>
 
         <!-- MAIN COLUMN -->
-        <div class="col-12 col-lg-9 col-xl-9">
+        <div class="col-12 col-lg-9 col-xl-9 reco-results-col">
 
           <!-- RECO TABLE SECTION -->
           <div id="recoTableSection">
@@ -2468,7 +2760,7 @@
                   <div class="p-2 border-bottom">
                     <div class="input-group input-group-sm">
                       <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
-                      <input type="text" id="salesKitFeaturesSearchInput" class="form-control border-start-0" placeholder="Search features (A3:A14)..." oninput="filterSalesKitFeaturesMenu(this.value)">
+                      <input type="text" id="salesKitFeaturesSearchInput" class="form-control border-start-0" placeholder="Search features..." oninput="filterSalesKitFeaturesMenu(this.value)">
                     </div>
                   </div>
                   <div class="d-flex justify-content-between align-items-center px-3 py-1.5 border-bottom bg-light">
@@ -2562,6 +2854,9 @@
               <div class="saleskit-presentation-banner-viewer" id="salesKitPresentationBannerViewer" aria-hidden="true">
                 <button type="button" class="btn btn-light rounded-pill saleskit-presentation-banner-viewer-close" onclick="closeSalesKitPresentationBanner()" aria-label="Close banner">
                   <i class="bi bi-x-lg"></i> Close banner
+                </button>
+                <button type="button" class="btn btn-primary rounded-pill banner-download-btn saleskit-presentation-banner-viewer-download" id="salesKitPresentationBannerDownload" aria-label="Download banner">
+                  <i class="bi bi-download"></i> Download
                 </button>
                 <img id="salesKitPresentationBannerImage" src="" alt="">
                 <div class="saleskit-presentation-banner-error" id="salesKitPresentationBannerError" hidden>The banner image could not be loaded.</div>
@@ -2830,7 +3125,7 @@
     }
 
     // ============================================================
-    // HEADER BAR LOGO (Pictures sheet cell R2). No default icon —
+    // HEADER BAR LOGO (LOGO sheet cell B2). No default icon —
     // shows only the sheet's logo. Prefers the pre-converted base64
     // (bypasses any client-side hotlink/CORS blocking entirely); if
     // that wasn't available from the server, retries the conversion
@@ -2855,7 +3150,10 @@
         return;
       }
 
-      if (!rawUrl) return;
+      if (!rawUrl) {
+        img.removeAttribute('src');
+        return;
+      }
 
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         google.script.run
@@ -2871,6 +3169,23 @@
       } else {
         img.src = rawUrl;
         img.style.display = '';
+      }
+    }
+
+    function applyApplicationLogo() {
+      const data = window.SERVER_INITIAL_DATA;
+      if (!data) return;
+      const logoUrl = data.applicationLogoUrl || data.appLogoUrl || '';
+      const sourceUrl = data.applicationLogoSourceUrl || logoUrl;
+      const favicon = document.getElementById('applicationFavicon');
+      if (favicon && logoUrl) favicon.href = logoUrl;
+      const titlebarLogo = document.getElementById('appTitlebarLogo');
+      if (titlebarLogo && logoUrl) titlebarLogo.src = logoUrl;
+
+      if (sourceUrl && window.saleskit && typeof window.saleskit.setApplicationIcon === 'function') {
+        window.saleskit.setApplicationIcon(sourceUrl).catch(error => {
+          console.warn('Could not apply the application logo to the window icon:', error.message);
+        });
       }
     }
 
@@ -3513,36 +3828,55 @@
       };
     }
 
+    // SMT: every laptop with stock at the selected location appears in all three dropdowns.
+    // Each tier's recommended laptop (matching TAG and target market in RECO TABLE) is listed first and selected by default.
     function buildSmtProductCatalog(targetHierarchy) {
-      const targetMarket = getSmtTargetMarket(targetHierarchy);
+      const targetMarket = getSmtTargetMarket(targetHierarchy).toLowerCase();
       const rows = Array.isArray(window.RECO_TABLE_DATA) ? window.RECO_TABLE_DATA : [];
       const branch = String(selectedLocation || '').trim().toUpperCase();
       const hasBranch = branch && branch !== 'IF APPLICABLE';
-      const marketKey = targetMarket.toLowerCase();
-      const filteredRows = rows.filter(row => {
-        const rowMarket = String(row['TARGET MARKET'] || '').trim().toLowerCase();
+
+      // One entry per laptop. A laptop can be listed under several target markets for the same branch,
+      // so branch stock is taken once per branch, not added up per row.
+      const laptops = new Map();
+      rows.forEach((row, index) => {
         const rowBranch = String(row.BR || '').trim().toUpperCase();
-        return rowMarket === marketKey && (!hasBranch || rowBranch === branch);
+        if (hasBranch && rowBranch !== branch) return;
+        const sku = String(row['ITEM DESCRIPTION'] || '').trim();
+        if (!sku) return;
+        const key = normalizeSmtSku(sku);
+        const entry = laptops.get(key) || { row, order: index, branchStock: {}, otherStock: 0, recommendedTags: new Set() };
+        entry.branchStock[rowBranch] = Math.max(entry.branchStock[rowBranch] || 0, Number(row['BR STOCK']) || 0);
+        entry.otherStock = Math.max(entry.otherStock, (Number(row['HO STOCK']) || 0) + (Number(row['OA STOCK']) || 0));
+        if (String(row['TARGET MARKET'] || '').trim().toLowerCase() === targetMarket) {
+          entry.recommendedTags.add(String(row.TAG || '').trim().toUpperCase());
+        }
+        laptops.set(key, entry);
       });
 
-      const stockForSort = row => hasBranch
-        ? Number(row['BR STOCK']) || 0
-        : (Number(row['BR STOCK']) || 0) + (Number(row['HO STOCK']) || 0) + (Number(row['OA STOCK']) || 0);
-      filteredRows.sort((a, b) => stockForSort(b) - stockForSort(a) || (Number(a.order_index) || 0) - (Number(b.order_index) || 0));
+      const inStock = [...laptops.values()]
+        .map(entry => {
+          const branchTotal = Object.values(entry.branchStock).reduce((sum, value) => sum + value, 0);
+          return { ...entry, stock: hasBranch ? branchTotal : branchTotal + entry.otherStock };
+        })
+        .filter(entry => entry.stock > 0);
 
       const tierTags = { exceed: 'EXCEED', meet: 'MEET', budget: 'BUDGET' };
       Object.entries(tierTags).forEach(([tier, tag]) => {
-        const candidates = filteredRows
-          .filter(row => String(row.TAG || '').trim().toUpperCase() === tag)
-          .map(row => getSmtProductFromRow(row, tier))
+        productCatalog[tier] = inStock
+          .map(entry => ({ entry, recommended: entry.recommendedTags.has(tag) }))
+          .sort((a, b) => (b.recommended - a.recommended) || (b.entry.stock - a.entry.stock) || (a.entry.order - b.entry.order))
+          .map(({ entry, recommended }) => {
+            const product = getSmtProductFromRow(entry.row, tier);
+            // A copy, so the RECO TABLE stock shown here does not change the shared laptop data.
+            return product && {
+              ...product,
+              stocksByLocation: hasBranch ? { [selectedLocation]: entry.stock } : product.stocksByLocation,
+              totalStock: entry.stock,
+              smtRecommended: recommended
+            };
+          })
           .filter(Boolean);
-        const seen = new Set();
-        productCatalog[tier] = candidates.filter(product => {
-          const key = normalizeSmtSku(product.sku);
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        });
       });
     }
 
@@ -4018,6 +4352,7 @@
 
       switchView(normKey);
       saveAppStateToStorage();
+      requestAnimationFrame(fitCustomerProfilingPanel);
 
       try {
         if (window.history && window.history.pushState) {
@@ -4105,6 +4440,7 @@
       }
 
       applyHeaderLogo();
+      applyApplicationLogo();
       buildAppsCheckboxes();
       buildLocationDropdown();
       populateFeaturesDropdown();
@@ -4237,6 +4573,12 @@
       });
     }
 
+    // Reco Table app choices carry over to the Sales Kit page; Sales Kit changes never flow back.
+    function copyRecoAppsToSalesKit() {
+      selectedSalesKitAppIds = [...selectedAppIds];
+      buildSalesKitAppsCheckboxes();
+    }
+
     // Customer Profiling toggle
     function handleAppToggle(appId) {
       if (selectedAppIds.includes(appId)) {
@@ -4245,6 +4587,7 @@
         selectedAppIds.push(appId);
       }
       buildSidebarAppsCheckboxes();
+      copyRecoAppsToSalesKit();
       renderGoodForIcons();
       filterLaptopsByHierarchyAndPopulateDropdowns();
       try { renderSalesKitMatrix(); } catch(e) {}
@@ -4254,6 +4597,7 @@
     function selectAllRecoApps() {
       selectedAppIds = APP_DATABASE.map(a => a.id);
       buildSidebarAppsCheckboxes();
+      copyRecoAppsToSalesKit();
       renderGoodForIcons();
       filterLaptopsByHierarchyAndPopulateDropdowns();
       try { renderSalesKitMatrix(); } catch(e) {}
@@ -4263,6 +4607,7 @@
     function clearAllRecoApps() {
       selectedAppIds = [];
       buildSidebarAppsCheckboxes();
+      copyRecoAppsToSalesKit();
       renderGoodForIcons();
       filterLaptopsByHierarchyAndPopulateDropdowns();
       try { renderSalesKitMatrix(); } catch(e) {}
@@ -4543,7 +4888,7 @@
     }
 
     // ============================================================
-    // FEATURES DROPDOWN & UKSP MATCHING (SHEET 'UKSP' A3:A14, B1:EQ1)
+    // FEATURES DROPDOWN & UKSP MATCHING (SHEET 'UKSP TRANSPOSED' columns)
     // ============================================================
     let selectedProfilingFeature = 'ALL';
 
@@ -4646,6 +4991,9 @@
       if (lower.includes('gpu') || lower.includes('graphics') || lower.includes('rtx') || lower.includes('geforce') || lower.includes('radeon')) {
         return 'bi-gpu-card';
       }
+      if (lower.includes('cooling') || lower.includes('fan') || lower.includes('thermal')) {
+        return 'bi-fan';
+      }
       return 'bi-cpu';
     }
 
@@ -4653,12 +5001,21 @@
     // FEATURES MULTIPLE-SELECT DROPDOWN & UKSP MATCHING
     // ============================================================
     let selectedFeatures = [...UKSP_DEFAULT_FEATURES_A3_A14]; // Default: all features selected
+    let knownFeatures = [...UKSP_DEFAULT_FEATURES_A3_A14];
 
     function getActiveFeaturesList() {
-      let rawFeatures = (window.UKSP_PER_SKU_DATA && window.UKSP_PER_SKU_DATA.features && window.UKSP_PER_SKU_DATA.features.length > 0)
+      return (window.UKSP_PER_SKU_DATA && window.UKSP_PER_SKU_DATA.features && window.UKSP_PER_SKU_DATA.features.length > 0)
         ? window.UKSP_PER_SKU_DATA.features
         : UKSP_DEFAULT_FEATURES_A3_A14;
-      return rawFeatures.slice(0, 12);
+    }
+
+    // Follow the UKSP TRANSPOSED columns: tick newly added features, drop removed ones,
+    // and keep any feature the user unticked unticked.
+    function syncSelectedFeaturesWithSheet() {
+      const activeFeatures = getActiveFeaturesList();
+      const addedFeatures = activeFeatures.filter(f => !knownFeatures.includes(f));
+      selectedFeatures = activeFeatures.filter(f => selectedFeatures.includes(f) || addedFeatures.includes(f));
+      knownFeatures = [...activeFeatures];
     }
 
     function toggleSalesKitFeaturesMenu(event) {
@@ -4697,6 +5054,7 @@
       if (containerSidebar) containerSidebar.innerHTML = '';
       if (containerSalesKit) containerSalesKit.innerHTML = '';
 
+      syncSelectedFeaturesWithSheet();
       const features = getActiveFeaturesList();
 
       features.forEach((feat, index) => {
@@ -4780,7 +5138,7 @@
         if (count === 0) {
           displayEl.textContent = 'None selected (Click to choose)';
         } else if (count === allFeatures.length) {
-          displayEl.textContent = 'All Features (A3:A14)';
+          displayEl.textContent = 'All Features';
         } else if (count <= 2) {
           displayEl.textContent = selectedFeatures.join(', ');
         } else {
@@ -5255,12 +5613,15 @@
           div.style.gap = '3px';
 
           const stock = getLaptopStock(prod, selectedLocation);
+          const isSmt = selectedRecommendationMode === 'SMT';
+          const isHighlighted = isSmt ? Boolean(prod.smtRecommended) : isTop;
+          const highlightLabel = isSmt ? (prod.smtRecommended ? '★ Recommended' : '') : (isTop ? '★ Highest Stock' : '');
           const stockBadge = isBranch
-            ? `<span class="badge ${isTop ? 'bg-success' : 'bg-success-subtle text-success border border-success-subtle'} rounded-pill px-2 py-0.5" style="font-size: 0.68rem; font-weight: 700; white-space: nowrap;">
-                <i class="bi bi-box-seam me-1"></i>${stock} in stock ${isTop ? '★ Highest Stock' : ''}
+            ? `<span class="badge ${isHighlighted ? 'bg-success' : 'bg-success-subtle text-success border border-success-subtle'} rounded-pill px-2 py-0.5" style="font-size: 0.68rem; font-weight: 700; white-space: nowrap;">
+                <i class="bi bi-box-seam me-1"></i>${stock} in stock ${highlightLabel}
                </span>`
-            : `<span class="badge ${isTop ? 'bg-primary' : 'bg-light text-muted border'} rounded-pill px-2 py-0.5" style="font-size: 0.68rem; font-weight: 700; white-space: nowrap;">
-                ${stock} total ${isTop ? '★ Highest Stock' : ''}
+            : `<span class="badge ${isHighlighted ? 'bg-primary' : 'bg-light text-muted border'} rounded-pill px-2 py-0.5" style="font-size: 0.68rem; font-weight: 700; white-space: nowrap;">
+                ${stock} total ${highlightLabel}
                </span>`;
 
           div.innerHTML = `
@@ -6206,14 +6567,27 @@
       return featureKey ? String(laptop.features[featureKey] || '').trim() : '';
     }
 
+    function createFeatureBannerPreview(url) {
+      const preview = document.createElement('span');
+      preview.className = 'saleskit-feature-banner-preview';
+      preview.setAttribute('aria-hidden', 'true');
+      const previewImage = document.createElement('img');
+      previewImage.src = url;
+      previewImage.alt = '';
+      previewImage.loading = 'lazy';
+      preview.appendChild(previewImage);
+      return preview;
+    }
+
     function renderSalesKitFeatureBannerTabs() {
       const tabsElement = document.getElementById('salesKitFeatureBannerTabs');
       const panelElement = document.getElementById('salesKitFeatureBannerPanel');
       const tableWrapper = document.getElementById('salesKitTableWrapper');
       if (!tabsElement || !panelElement || !tableWrapper) return;
 
-      const activeTab = salesKitFeatureBannerTabs.find(tab => tab.id === activeSalesKitFeatureBannerTabId);
-      const showTabs = currentSalesKitSubTab === 'features' && salesKitFeatureBannerTabs.length > 0;
+      const visibleTabs = currentSalesKitSubTab === 'features' ? salesKitFeatureBannerTabs : [];
+      const activeTab = visibleTabs.find(tab => tab.id === activeSalesKitFeatureBannerTabId);
+      const showTabs = visibleTabs.length > 0;
       tabsElement.style.display = showTabs ? 'flex' : 'none';
       panelElement.style.display = showTabs && activeTab ? 'block' : 'none';
       tableWrapper.style.display = showTabs && activeTab ? 'none' : '';
@@ -6226,7 +6600,7 @@
 
       if (!showTabs) return;
 
-      salesKitFeatureBannerTabs.forEach(tab => {
+      visibleTabs.forEach(tab => {
         const tabElement = document.createElement('div');
         tabElement.className = `saleskit-feature-banner-tab${tab.id === activeSalesKitFeatureBannerTabId ? ' active' : ''}`;
         tabElement.setAttribute('role', 'presentation');
@@ -6246,7 +6620,7 @@
         const closeButton = document.createElement('button');
         closeButton.className = 'saleskit-feature-banner-tab-close';
         closeButton.type = 'button';
-        closeButton.setAttribute('aria-label', `Close ${tab.model} ${tab.feature} banner`);
+        closeButton.setAttribute('aria-label', `Close ${selectButton.textContent}`);
         closeButton.innerHTML = '&times;';
         closeButton.addEventListener('click', () => closeSalesKitFeatureBannerTab(tab.id));
 
@@ -6254,9 +6628,16 @@
         tabsElement.appendChild(tabElement);
       });
 
+      if (!activeTab) return;
+
+      const header = document.createElement('div');
+      header.className = 'd-flex align-items-center justify-content-between gap-3 mb-3';
       const title = document.createElement('h5');
-      title.className = 'fw-bold text-primary text-center mb-3';
+      title.className = 'fw-bold text-primary mb-0';
       title.textContent = `${activeTab.model} - ${activeTab.feature}`;
+      const downloadButton = createBannerDownloadButton();
+      downloadButton.addEventListener('click', () => downloadBannerImage(activeTab.image, `${activeTab.model} - ${activeTab.feature}`, downloadButton));
+      header.append(title, downloadButton);
       const image = document.createElement('img');
       image.src = activeTab.image;
       image.alt = `${activeTab.model} ${activeTab.feature} banner`;
@@ -6268,8 +6649,47 @@
       image.addEventListener('error', () => {
         image.hidden = true;
         error.hidden = false;
+        downloadButton.disabled = true;
       }, { once: true });
-      panelElement.append(title, image, error);
+      panelElement.append(header, image, error);
+    }
+
+    function createBannerDownloadButton() {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn btn-primary btn-sm rounded-pill px-3 banner-download-btn';
+      button.innerHTML = '<i class="bi bi-download"></i> Download banner';
+      return button;
+    }
+
+    async function downloadBannerImage(url, name, button) {
+      if (!url) return;
+      const originalHtml = button ? button.innerHTML : '';
+      if (button) {
+        button.disabled = true;
+        button.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
+      }
+      try {
+        if (window.saleskit && typeof window.saleskit.saveBanner === 'function') {
+          const result = await window.saleskit.saveBanner(url, name);
+          if (result && !result.canceled) showAppNotification('Banner saved.', 'success', 3000);
+        } else {
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = name;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+        }
+      } catch (error) {
+        console.error('Banner download failed:', error);
+        showAppNotification('The banner could not be downloaded.', 'error', 4000);
+      } finally {
+        if (button) {
+          button.disabled = false;
+          button.innerHTML = originalHtml;
+        }
+      }
     }
 
     function openSalesKitFeatureBannerTab(laptop, feature, image) {
@@ -6336,14 +6756,16 @@
           slideRow.classList.add('saleskit-row');
           slideRow.querySelectorAll('.saleskit-feature-clickable').forEach(cell => {
             cell.querySelectorAll('.small.text-primary.fw-semibold').forEach(hint => hint.remove());
+            cell.querySelectorAll('.saleskit-feature-banner-preview').forEach(preview => preview.remove());
             cell.classList.remove('saleskit-feature-clickable');
             cell.removeAttribute('role');
             cell.removeAttribute('tabindex');
             cell.removeAttribute('title');
           });
+          const rowTitle = row.querySelector('.saleskit-app-name').textContent.trim();
           return {
             type: 'saleskit',
-            title: row.querySelector('.saleskit-app-name').textContent.trim(),
+            title: rowTitle,
             row: slideRow,
             isFeatureSlide: mode === 'features',
             bannerTabs: [],
@@ -6356,7 +6778,7 @@
                     id: `${tier}:${normalizeSmtSku(laptop.sku)}`,
                     model: laptop.title || laptop.sku || 'Selected laptop',
                     sku: laptop.sku,
-                    url: getUkspBannerUrl(laptop.sku, row.querySelector('.saleskit-app-name').textContent.trim())
+                    url: getUkspBannerUrl(laptop.sku, rowTitle)
                   };
                 })
               : []
@@ -6434,7 +6856,7 @@
       const slide = salesKitPresentationSlides[activeSalesKitPresentationSlide];
       const viewer = document.getElementById('salesKitPresentationBannerViewer');
       const image = document.getElementById('salesKitPresentationBannerImage');
-      if (!slide || !slide.isFeatureSlide || !viewer || !image || !banner.url) return;
+      if (!slide || !viewer || !image || !slide.isFeatureSlide || !banner.url) return;
 
       let tab = slide.bannerTabs.find(item => item.id === banner.id);
       if (!tab) {
@@ -6477,7 +6899,7 @@
       if (!tabsElement || !viewer || !image || !errorElement) return;
 
       tabsElement.replaceChildren();
-      const hasTabs = Boolean(slide && slide.isFeatureSlide && Array.isArray(slide.bannerTabs) && slide.bannerTabs.length);
+      const hasTabs = Boolean(slide && Array.isArray(slide.bannerTabs) && slide.bannerTabs.length);
       tabsElement.hidden = !hasTabs;
       if (hasTabs) {
         slide.bannerTabs.forEach(tab => {
@@ -6520,6 +6942,8 @@
       const activeTab = slide && Array.isArray(slide.bannerTabs)
         ? slide.bannerTabs.find(tab => tab.id === slide.activeBannerTabId)
         : null;
+      const overlay = document.getElementById('salesKitPresentation');
+      if (overlay) overlay.classList.toggle('is-banner-open', Boolean(slide && slide.bannerOpen && activeTab));
       if (!slide || !slide.bannerOpen || !activeTab) {
         viewer.classList.remove('is-open');
         viewer.setAttribute('aria-hidden', 'true');
@@ -6531,12 +6955,18 @@
       }
 
       errorElement.hidden = true;
+      const downloadButton = document.getElementById('salesKitPresentationBannerDownload');
       image.hidden = false;
       image.src = activeTab.url;
       image.alt = `${activeTab.model} ${slide.title} banner`;
+      if (downloadButton) {
+        downloadButton.disabled = false;
+        downloadButton.onclick = () => downloadBannerImage(activeTab.url, `${activeTab.model} - ${slide.title}`, downloadButton);
+      }
       image.onerror = () => {
         image.hidden = true;
         errorElement.hidden = false;
+        if (downloadButton) downloadButton.disabled = true;
       };
       viewer.classList.add('is-open');
       viewer.setAttribute('aria-hidden', 'false');
@@ -6641,6 +7071,7 @@
           button.type = 'button';
           button.className = 'saleskit-presentation-view-banner';
           button.innerHTML = '<i class="bi bi-image me-1"></i>View banner';
+          button.appendChild(createFeatureBannerPreview(banner.url));
           button.addEventListener('click', () => openSalesKitPresentationBanner(banner, slide.title));
           cells[index + 1].appendChild(button);
         });
@@ -6725,6 +7156,7 @@
       if (overlay) {
         overlay.classList.remove('is-open');
         overlay.classList.remove('is-whole-result');
+        overlay.classList.remove('is-banner-open');
         overlay.setAttribute('aria-hidden', 'true');
       }
       if (bannerViewer) {
@@ -6767,6 +7199,7 @@
       hint.className = 'small text-primary fw-semibold mt-1';
       hint.innerHTML = '<i class="bi bi-image me-1"></i>View banner';
       cell.appendChild(hint);
+      cell.appendChild(createFeatureBannerPreview(bannerUrl));
       const openTab = () => openSalesKitFeatureBannerTab(laptop, feature, bannerUrl);
       cell.addEventListener('click', openTab);
       cell.addEventListener('keydown', event => {
@@ -7338,6 +7771,9 @@
       if (lower.includes('gpu') || lower.includes('graphics') || lower.includes('rtx') || lower.includes('geforce') || lower.includes('radeon')) {
         return 'bi-gpu-card';
       }
+      if (lower.includes('cooling') || lower.includes('fan') || lower.includes('thermal')) {
+        return 'bi-fan';
+      }
       return 'bi-cpu';
     }
 
@@ -7887,6 +8323,8 @@
       window.SERVER_INITIAL_DATA = data;
       window.sheetData = data;
       window.UKSP_BANNER_DATA = data.ukspBannerData || { features: [], skus: [] };
+      applyHeaderLogo();
+      applyApplicationLogo();
       if (Array.isArray(data.recoTableData)) window.RECO_TABLE_DATA = data.recoTableData;
       try {
         localStorage.setItem('ghz_cached_sheet_data', JSON.stringify(data));
@@ -8011,6 +8449,8 @@
               window.SERVER_INITIAL_DATA = data;
               window.sheetData = data;
               window.UKSP_BANNER_DATA = data.ukspBannerData || { features: [], skus: [] };
+              applyHeaderLogo();
+              applyApplicationLogo();
               try {
                 localStorage.setItem('ghz_cached_sheet_data', JSON.stringify(data));
               } catch (lsErr) {}
@@ -8077,6 +8517,24 @@
       refreshAllData({ silent: true, automatic: true });
     });
 
+    // Customer Profiling reaches the bottom of the window, whatever the size of the results beside it.
+    function fitCustomerProfilingPanel() {
+      const panel = document.querySelector('.reco-layout .customer-profiling-sidebar');
+      if (!panel || !panel.offsetParent) return; // Reco Table page not shown
+      const top = panel.getBoundingClientRect().top + window.scrollY;
+      panel.style.setProperty('--profiling-panel-height', `${Math.round(window.innerHeight - top - 24)}px`);
+    }
+    window.addEventListener('resize', fitCustomerProfilingPanel);
+    window.addEventListener('load', fitCustomerProfilingPanel);
+    document.addEventListener('DOMContentLoaded', fitCustomerProfilingPanel);
+
+    // SalesKit Server reports new data (after a Google Sheets sync or a restore).
+    if (window.saleskit && typeof window.saleskit.onDataChanged === 'function') {
+      window.saleskit.onDataChanged(function() {
+        refreshAllData({ silent: true, automatic: true });
+      });
+    }
+
     function loadSheetDataIfAvailable() {
       if (window.saleskit && typeof window.saleskit.getInitialData === 'function') {
         window.saleskit.getInitialData().then(function(data) {
@@ -8095,6 +8553,8 @@
               window.SERVER_INITIAL_DATA = data;
               window.sheetData = data;
               window.UKSP_BANNER_DATA = data.ukspBannerData || { features: [], skus: [] };
+              applyHeaderLogo();
+              applyApplicationLogo();
               try {
                 localStorage.setItem('ghz_cached_sheet_data', JSON.stringify(data));
               } catch (lsErr) {}
@@ -8128,6 +8588,22 @@
           .getInitialData(true);
       }
     }
+  </script>
+  <button type="button" class="scroll-top-btn" id="scrollTopBtn" aria-label="Back to top" title="Back to top">
+    <i class="bi bi-arrow-up"></i>
+  </button>
+  <script>
+    (function () {
+      const button = document.getElementById('scrollTopBtn');
+      if (!button) return;
+      // The desktop app scrolls <body> (below the title bar); browsers scroll the window.
+      const scroller = document.documentElement.classList.contains('is-desktop-app') ? document.body : window;
+      const scrollTop = () => scroller === window ? window.scrollY : scroller.scrollTop;
+      const update = () => button.classList.toggle('is-visible', scrollTop() > 400);
+      scroller.addEventListener('scroll', update, { passive: true });
+      button.addEventListener('click', () => scroller.scrollTo({ top: 0, behavior: 'smooth' }));
+      update();
+    })();
   </script>
 </body>
 </html>

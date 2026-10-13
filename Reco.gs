@@ -53,7 +53,7 @@ function doGet(e) {
     if (!output) {
       output = HtmlService.createHtmlOutput(
         '<div style="font-family:sans-serif;padding:32px;max-width:700px;margin:40px auto;border:1.5px solid #cbd5e1;border-radius:12px;background:#f8fafc;">' +
-        '<h2 style="color:#0012b3;margin-top:0;">GigaHertz Online Sales Dashboard</h2>' +
+        '<h2 style="color:#0012b3;margin-top:0;">Gigahertz Sales Tools</h2>' +
         '<h3 style="color:#b91c1c;">Template File Not Found</h3>' +
         '<p>Google Apps Script could not find an HTML file in this project. Please make sure you have added an HTML file in your Apps Script project editor (e.g. <code>saleskit.html</code> or <code>recotable.html</code> or <code>index.html</code>).</p>' +
         '<details style="margin-top:16px;background:#ffffff;padding:12px;border:1px solid #e2e8f0;border-radius:8px;">' +
@@ -65,7 +65,7 @@ function doGet(e) {
     }
 
     output
-      .setTitle('GigaHertz Online Sales Dashboard')
+      .setTitle('Gigahertz Sales Tools')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 
@@ -405,7 +405,7 @@ function getImageBase64(rawUrl) {
 function getInitialData(forceRefresh) {
   // 0. High-performance multi-chunk CacheService check: returns in < 15ms if warm
   const cache = CacheService.getScriptCache();
-  const CACHE_PREFIX = 'ghz_init_v21_uksp_banner_';
+  const CACHE_PREFIX = 'ghz_init_v22_logo_sheet_';
   if (!forceRefresh && cache) {
     try {
       const countStr = cache.get(CACHE_PREFIX + 'count');
@@ -432,6 +432,9 @@ function getInitialData(forceRefresh) {
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const logoSheet = ss ? ss.getSheetByName('LOGO') : null;
+  const rawApplicationLogo = logoSheet ? getCellUrlOrFormula(logoSheet, 'A2') : '';
+  const rawHeaderLogo = logoSheet ? getCellUrlOrFormula(logoSheet, 'B2') : '';
 
   // Pictures Sheet layout:
   // Column E (index 4): Brand Name in Brand Logo lookup table (e.g. HP, ASUS, DELL, LENOVO, ACER)
@@ -531,14 +534,14 @@ function getInitialData(forceRefresh) {
     return str;
   }
 
-  const appLogoUrl = rawAppLogo ? formatImageUrl(rawAppLogo) : '';
+  const applicationLogoUrl = rawApplicationLogo ? formatImageUrl(rawApplicationLogo) : '';
+  const appLogoUrl = applicationLogoUrl || (rawAppLogo ? formatImageUrl(rawAppLogo) : '');
   const tabLogoUrl = rawTabLogo ? formatImageUrl(rawTabLogo) : '';
   // Convert logos lazily in the browser; serial image fetches slow data boot.
   const tabLogoBase64 = '';
   const websiteLogoUrl = rawWebsiteLogo ? formatImageUrl(rawWebsiteLogo) : '';
-  // Header bar circular icon (upper-left, next to the dashboard title) uses
-  // the same Pictures!R2 value as websiteLogoUrl.
-  const headerLogoUrl = websiteLogoUrl;
+  // The upper-left dashboard logo uses LOGO!B2; Pictures!R2 remains a fallback.
+  const headerLogoUrl = rawHeaderLogo ? formatImageUrl(rawHeaderLogo) : websiteLogoUrl;
   const headerLogoBase64 = '';
 
   // STEP 1: Scan all rows to build Brand Name (Col E) -> Brand Logo (Col F / Col G) mapping
@@ -845,6 +848,7 @@ function getInitialData(forceRefresh) {
   const dvApplicationsPerSkuData = appUkspData;
 
   const resultData = {
+    applicationLogoUrl: applicationLogoUrl || appLogoUrl,
     appLogoUrl: appLogoUrl || websiteLogoUrl,
     tabLogoUrl: tabLogoUrl,
     tabLogoBase64: tabLogoBase64,

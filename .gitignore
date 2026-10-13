@@ -11,3 +11,6 @@ yarn-debug.log*
 pnpm-debug.log*
 *.sqlite-shm
 *.sqlite-wal
+# Server URL + token baked into the installer
+electron/embedded-config.json
+dist-server/

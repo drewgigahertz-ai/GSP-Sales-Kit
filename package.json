@@ -1,13 +1,16 @@
 {
   "name": "saleskit-desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "GigaHertz SalesKit desktop application",
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
-    "dist": "electron-builder --win nsis",
+    "dist": "electron-builder --win nsis --publish never",
+    "release": "node scripts/check-release.js && electron-builder --win nsis --publish always",
+    "start:server": "electron server/main.js",
+    "dist:server": "electron-builder --config server-builder.json --win nsis --publish never",
     "postinstall": "electron-rebuild -f -w better-sqlite3"
   },
   "dependencies": {
@@ -16,6 +19,7 @@
     "better-sqlite3": "^12.2.0",
     "bootstrap": "^5.3.8",
     "bootstrap-icons": "^1.13.1",
+    "electron-updater": "^6.8.9",
     "googleapis": "^183.0.0",
     "html2canvas": "^1.4.1"
   },
@@ -32,15 +36,21 @@
     },
     "files": [
       "electron/**/*",
+      "!electron/embedded-config.example.json",
+      "!electron/database.js",
+      "!electron/sheets-sync.js",
+      "!electron/local-api.js",
+      "!node_modules/googleapis{,/**/*}",
+      "!node_modules/better-sqlite3{,/**/*}",
       "saleskit.html",
       "package.json"
     ],
-    "extraResources": [
-      {
-        "from": "mydata.db",
-        "to": "mydata.db"
-      }
-    ],
+    "publish": {
+      "provider": "github",
+      "owner": "drewgigahertz-ai",
+      "repo": "GSP-Sales-Kit",
+      "releaseType": "release"
+    },
     "win": {
       "target": "nsis"
     },

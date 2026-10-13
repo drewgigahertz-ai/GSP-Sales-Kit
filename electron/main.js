@@ -1,11 +1,13 @@
-const { app, BrowserWindow, dialog, ipcMain, protocol } = require('electron');
+const { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, net, protocol } = require('electron');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
-const database = require('./database');
-const { DEFAULT_SPREADSHEET_ID, fetchSpreadsheetData } = require('./sheets-sync');
-const { createLocalApi } = require('./local-api');
 const { ImageCache } = require('./image-cache');
 const { createSnapshotCache } = require('./snapshot-cache');
+const { getConfig } = require('./app-config');
+const { startAutoUpdates } = require('./updater');
+
+// SalesKit is a client: it loads its data from the SalesKit Server, which does the Google Sheets sync.
 
 protocol.registerSchemesAsPrivileged([{
   scheme: 'saleskit-image',
@@ -14,9 +16,6 @@ protocol.registerSchemesAsPrivileged([{
 
 let mainWindow;
 let imageCache;
-let activeSyncPromise = null;
-let localApi;
-let sheetsSyncTimer;
 let snapshotCache;
 
 function reportSyncProgress(progress) {
@@ -25,69 +24,49 @@ function reportSyncProgress(progress) {
   }
 }
 
-function settingsPath() {
-  return path.join(app.getPath('userData'), 'settings.json');
-}
+// Tells the server which laptop is asking, for its Devices list.
+const CLIENT_HEADERS = {
+  'X-SalesKit-Client': os.hostname(),
+  'X-SalesKit-User': os.userInfo().username,
+  'X-SalesKit-Version': app.getVersion()
+};
 
-function getSavedCredentialPath() {
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS && fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)) {
-    return process.env.GOOGLE_APPLICATION_CREDENTIALS;
+// The address that answered last time is tried first.
+let workingServerUrl = '';
+let loadedDataVersion = null;
+
+async function requestServer(pathname, { timeoutMs = 8000 } = {}) {
+  const { serverUrls, serverToken } = getConfig();
+  if (!serverUrls.length) throw new Error('SalesKit has no server address. Add it to electron/embedded-config.json and rebuild.');
+  const headers = { Accept: 'application/json', ...CLIENT_HEADERS };
+  if (serverToken) headers.Authorization = `Bearer ${serverToken}`;
+  const ordered = workingServerUrl && serverUrls.includes(workingServerUrl)
+    ? [workingServerUrl, ...serverUrls.filter((url) => url !== workingServerUrl)]
+    : serverUrls;
+
+  let networkError;
+  for (const serverUrl of ordered) {
+    let response;
+    try {
+      response = await fetch(`${serverUrl}${pathname}`, { headers, signal: AbortSignal.timeout(timeoutMs) });
+    } catch (error) {
+      // Unreachable at this address; try the next one.
+      networkError = error;
+      continue;
+    }
+    workingServerUrl = serverUrl;
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || `SalesKit Server returned HTTP ${response.status}.`);
+    return result;
   }
-
-  try {
-    const saved = JSON.parse(fs.readFileSync(settingsPath(), 'utf8'));
-    if (saved.serviceAccountPath && fs.existsSync(saved.serviceAccountPath)) return saved.serviceAccountPath;
-  } catch {}
-
-  return '';
-}
-
-function serverUrl() {
-  return String(process.env.SALESKIT_SERVER_URL || '').replace(/\/+$/, '');
-}
-
-async function requestServer(pathname, options = {}) {
-  const url = serverUrl();
-  if (!url) throw new Error('Set SALESKIT_SERVER_URL to connect to the laptop data server.');
-  const headers = { Accept: 'application/json', ...options.headers };
-  if (process.env.SALESKIT_SERVER_TOKEN) headers.Authorization = `Bearer ${process.env.SALESKIT_SERVER_TOKEN}`;
-  const response = await fetch(`${url}${pathname}`, { ...options, headers });
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(result.error || `Laptop server returned HTTP ${response.status}.`);
-  return result;
-}
-
-function importSheetsSnapshot() {
-  if (activeSyncPromise) return activeSyncPromise;
-  activeSyncPromise = performSheetsImport().finally(() => {
-    activeSyncPromise = null;
-  });
-  return activeSyncPromise;
-}
-
-async function performSheetsImport() {
-  if (!database.getStatus().connected) throw new Error('No local SQLite database is open.');
-  const credentialsPath = getSavedCredentialPath();
-  if (!credentialsPath) throw new Error('Google Sheets credentials are not configured.');
-
-  reportSyncProgress({ phase: 'sheets', completed: 0, total: 0, message: 'Connecting to Google Sheets…' });
-  const sheets = await fetchSpreadsheetData({
-    credentialsPath,
-    spreadsheetId: process.env.SALESKIT_SPREADSHEET_ID || DEFAULT_SPREADSHEET_ID
-  }, reportSyncProgress);
-  reportSyncProgress({ phase: 'sqlite', message: 'Updating the local database…' });
-  const databaseSummary = database.replaceSheetsData(sheets);
-  return {
-    canceled: false,
-    changed: databaseSummary.changed,
-    database: databaseSummary,
-    data: database.getInitialData()
-  };
+  throw new Error(`SalesKit Server is not reachable (${ordered.join(', ')}): ${networkError.message}`);
 }
 
 async function getRemoteSnapshot() {
   try {
-    const data = await requestServer('/api/initial-data');
+    const { dataVersion } = await requestServer('/api/version').catch(() => ({ dataVersion: null }));
+    const data = await requestServer('/api/initial-data', { timeoutMs: 60000 });
+    loadedDataVersion = dataVersion;
     if (snapshotCache) snapshotCache.save(data);
     return { data, offline: false };
   } catch (error) {
@@ -106,34 +85,14 @@ function imageUrlsFromData(data) {
   Object.values(data.specsMap || {}).forEach((spec) => add(spec.image));
   Object.values(data.skuImageMap || {}).forEach(add);
   Object.values(data.appsLogoMap || {}).forEach(add);
+  add(data.applicationLogoUrl);
+  add(data.headerLogoUrl);
   Object.values(data.appsDataList || []).forEach((app) => add(app.icon));
   Object.values(data.appUkspData?.applications || []).forEach((app) => add(app.icon));
   (data.ukspBannerData?.skus || []).forEach((laptop) => {
     Object.values(laptop.features || {}).forEach(add);
   });
   return [...urls];
-}
-
-async function performLocalSync() {
-  const sheetsConfigured = Boolean(getSavedCredentialPath());
-  const result = !sheetsConfigured
-    ? {
-        canceled: false,
-        sheetsSkipped: true,
-        changed: false,
-        database: { changeCount: 0, updatedCount: 0, deletedCount: 0 },
-        data: database.getInitialData()
-      }
-    : await importSheetsSnapshot();
-  if (result.canceled) return result;
-  reportSyncProgress({ phase: 'images', completed: 0, total: 0, message: 'Syncing images…' });
-  const imageSummary = await imageCache.sync(database.getImageUrls(), reportSyncProgress);
-  return {
-    ...result,
-    offline: false,
-    images: imageSummary,
-    data: await imageCache.mapPayload(result.data)
-  };
 }
 
 async function performRemoteSync() {
@@ -155,63 +114,73 @@ async function performRemoteSync() {
   };
 }
 
-function startSheetsSyncSchedule() {
-  if (sheetsSyncTimer) return;
-  const intervalMinutes = Math.max(1, Number(process.env.SALESKIT_SHEETS_SYNC_INTERVAL_MINUTES) || 15);
-  sheetsSyncTimer = setInterval(() => {
-    if (!getSavedCredentialPath()) return;
-    importSheetsSnapshot().catch((error) => {
-      console.error('Scheduled Google Sheets refresh failed:', error.message);
-    });
-  }, intervalMinutes * 60 * 1000);
+// Every 2 minutes, ask the server whether its data changed since we loaded it; the window then reloads quietly.
+const DATA_CHECK_INTERVAL_MS = 2 * 60 * 1000;
+
+function startDataChangeChecks() {
+  setInterval(async () => {
+    try {
+      const { dataVersion } = await requestServer('/api/version');
+      if (loadedDataVersion !== null && dataVersion !== null && dataVersion !== loadedDataVersion &&
+          mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('data:changed', dataVersion);
+      }
+    } catch {}
+  }, DATA_CHECK_INTERVAL_MS);
 }
 
-function startLocalApi() {
-  const host = process.env.SALESKIT_SERVER_HOST || '127.0.0.1';
-  const port = Number(process.env.SALESKIT_SERVER_PORT) || 3000;
-  const token = process.env.SALESKIT_SERVER_TOKEN || '';
-  const loopback = ['127.0.0.1', 'localhost', '::1'].includes(host.toLowerCase());
-  if (!loopback && !token) throw new Error('Set SALESKIT_SERVER_TOKEN before allowing LAN access.');
-
-  localApi = createLocalApi({ database, token });
-  localApi.on('error', (error) => console.error('Local data API failed:', error.message));
-  localApi.listen(port, host, () => console.log(`SalesKit data API listening at http://${host}:${port}`));
-}
-
-ipcMain.handle('database:status', () => serverUrl()
-  ? requestServer('/api/status')
-  : database.getStatus());
-ipcMain.handle('database:initial-data', async () => {
-  const data = serverUrl()
-    ? (await getRemoteSnapshot()).data
-    : database.getInitialData();
-  return imageCache.mapPayload(data);
-});
-ipcMain.handle('database:sync', () => serverUrl() ? performRemoteSync() : performLocalSync());
-ipcMain.handle('database:tables', () => serverUrl()
-  ? requestServer('/api/tables')
-  : database.listTables());
-ipcMain.handle('database:table-data', (_event, tableName, options = {}) => {
-  if (!serverUrl()) return database.getTableData(tableName, options);
-  const params = new URLSearchParams({ table: tableName });
-  for (const key of ['limit', 'offset', 'search']) {
-    if (options[key] !== undefined) params.set(key, String(options[key]));
+ipcMain.handle('database:status', () => requestServer('/api/status'));
+ipcMain.handle('database:initial-data', async () => imageCache.mapPayload((await getRemoteSnapshot()).data));
+ipcMain.handle('application:set-icon', async (event, imageUrl) => {
+  if (!mainWindow || event.sender !== mainWindow.webContents) {
+    throw new Error('Only the main SalesKit window can update the application icon.');
   }
-  return requestServer(`/api/table-data?${params}`);
-});
-ipcMain.handle('database:open', async () => {
-  if (serverUrl()) throw new Error('Client mode uses the laptop server database and cannot open a local database.');
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'Open SQLite database',
-    properties: ['openFile'],
-    filters: [
-      { name: 'SQLite databases', extensions: ['db', 'sqlite', 'sqlite3'] },
-      { name: 'All files', extensions: ['*'] }
-    ]
-  });
+  if (typeof imageUrl !== 'string' || !/^https:\/\//i.test(imageUrl)) {
+    throw new Error('The application logo must be an HTTPS image URL.');
+  }
 
-  if (result.canceled || !result.filePaths[0]) return { canceled: true };
-  return database.openDatabase(result.filePaths[0]);
+  const response = await net.fetch(imageUrl);
+  if (!response.ok) throw new Error(`Application logo request failed with HTTP ${response.status}.`);
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.toLowerCase().startsWith('image/')) {
+    throw new Error('The application logo URL did not return an image.');
+  }
+  const imageBuffer = Buffer.from(await response.arrayBuffer());
+  if (!imageBuffer.length || imageBuffer.length > 10 * 1024 * 1024) {
+    throw new Error('The application logo image is empty or larger than 10 MB.');
+  }
+  const icon = nativeImage.createFromBuffer(imageBuffer);
+  if (icon.isEmpty()) throw new Error('Electron could not decode the application logo image.');
+  mainWindow.setIcon(icon);
+  return true;
+});
+ipcMain.handle('database:sync', () => performRemoteSync());
+
+const BANNER_IMAGE_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/svg+xml': 'svg', 'image/avif': 'avif' };
+
+async function readBannerImage(url) {
+  const dataMatch = /^data:(image\/[a-z0-9.+-]+);base64,(.+)$/i.exec(url);
+  if (dataMatch) return { contentType: dataMatch[1].toLowerCase(), buffer: Buffer.from(dataMatch[2], 'base64') };
+  if (!/^(https?|saleskit-image):\/\//i.test(url)) throw new Error('This banner cannot be downloaded.');
+  const response = url.startsWith('saleskit-image://') ? await imageCache.serve(url) : await net.fetch(url);
+  if (!response.ok) throw new Error(`Banner download failed with HTTP ${response.status}.`);
+  const contentType = (response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+  return { contentType, buffer: Buffer.from(await response.arrayBuffer()) };
+}
+
+ipcMain.handle('banner:save', async (_event, url, suggestedName = 'banner') => {
+  if (typeof url !== 'string') throw new Error('This banner cannot be downloaded.');
+  const { contentType, buffer } = await readBannerImage(url);
+  const extension = BANNER_IMAGE_TYPES[contentType] || 'png';
+  const safeName = String(suggestedName).replace(/[\\/:*?"<>|]+/g, '_').trim() || 'banner';
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Save banner',
+    defaultPath: path.join(app.getPath('downloads'), `${safeName}.${extension}`),
+    filters: [{ name: 'Images', extensions: [extension] }]
+  });
+  if (result.canceled || !result.filePath) return { canceled: true };
+  fs.writeFileSync(result.filePath, buffer);
+  return { canceled: false, filePath: result.filePath };
 });
 
 function createWindow() {
@@ -223,6 +192,12 @@ function createWindow() {
     show: false,
     backgroundColor: '#f3f5f2',
     title: 'GigaHertz SalesKit',
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#d5d9e0',
+      symbolColor: '#334155',
+      height: 36
+    },
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -244,37 +219,15 @@ app.whenReady().then(() => {
   imageCache = new ImageCache(path.join(app.getPath('userData'), 'image-cache'));
   protocol.handle('saleskit-image', ({ url }) => imageCache.serve(url));
 
-  if (!serverUrl()) {
-    const defaultDatabasePath = app.isPackaged
-      ? path.join(app.getPath('userData'), 'mydata.db')
-      : path.join(app.getAppPath(), 'mydata.db');
-    const bundledDatabasePath = path.join(process.resourcesPath, 'mydata.db');
-
-    if (app.isPackaged && !fs.existsSync(defaultDatabasePath) && fs.existsSync(bundledDatabasePath)) {
-      fs.mkdirSync(path.dirname(defaultDatabasePath), { recursive: true });
-      fs.copyFileSync(bundledDatabasePath, defaultDatabasePath);
-    }
-
-    const configuredPath = process.env.SALESKIT_DB_PATH || defaultDatabasePath;
-    try {
-      database.openDatabase(configuredPath, { create: true });
-      startLocalApi();
-      startSheetsSyncSchedule();
-    } catch (error) {
-      console.error('Could not initialize the local data server:', error.message);
-    }
-  }
-
+  Menu.setApplicationMenu(null);
   createWindow();
+  startAutoUpdates();
+  startDataChangeChecks();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
-app.on('before-quit', () => {
-  if (localApi) localApi.close();
-  database.closeDatabase();
-});
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });

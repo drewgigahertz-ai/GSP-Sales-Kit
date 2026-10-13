@@ -1,0 +1,937 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:">
+  <title>GigaHertz SalesKit Server</title>
+  <link href="../node_modules/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="../node_modules/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="../node_modules/@fontsource/plus-jakarta-sans/400.css" rel="stylesheet">
+  <link href="../node_modules/@fontsource/plus-jakarta-sans/600.css" rel="stylesheet">
+  <link href="../node_modules/@fontsource/plus-jakarta-sans/700.css" rel="stylesheet">
+  <link href="../node_modules/@fontsource/plus-jakarta-sans/800.css" rel="stylesheet">
+  <style>
+    :root {
+      --brand: #0012b3;
+      --brand-soft: #e8ecff;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --bg: #f1f5fb;
+      --ok: #059669;
+      --ok-soft: #dcfce7;
+      --warn: #b45309;
+      --warn-soft: #fef3c7;
+      --bad: #dc2626;
+      --bad-soft: #fee2e2;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Plus Jakarta Sans', 'Segoe UI', Arial, sans-serif;
+      font-size: 0.9rem;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 24px;
+      background: linear-gradient(120deg, #000a6b, var(--brand) 60%, #1f4fff);
+      color: #fff;
+      box-shadow: 0 4px 18px rgba(0, 18, 179, 0.25);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 11px;
+      background: rgba(255, 255, 255, 0.16);
+      font-size: 1.25rem;
+    }
+
+    .brand-logo {
+      display: block;
+      height: 38px;
+      width: auto;
+    }
+
+    /* Divider between the GigaHertz logo and the app name. */
+    .brand-logo:not([hidden]) + .brand-mark + .brand-text {
+      padding-left: 12px;
+      border-left: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .brand-title {
+      white-space: nowrap;
+      font-size: 1.05rem;
+      font-weight: 800;
+      line-height: 1.1;
+    }
+
+    .brand-sub {
+      font-size: 0.75rem;
+      opacity: 0.75;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+      font-weight: 700;
+      font-size: 0.82rem;
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #94a3b8;
+    }
+
+    .status-pill.is-running .status-dot {
+      background: #4ade80;
+      box-shadow: 0 0 0 4px rgba(74, 222, 128, 0.25);
+    }
+
+    .status-pill.is-error .status-dot {
+      background: #f87171;
+      box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.25);
+    }
+
+    main {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 22px 24px 32px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 18px;
+    }
+
+    .span-2 {
+      grid-column: 1 / -1;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      font-size: 0.95rem;
+      font-weight: 800;
+    }
+
+    .panel-title i {
+      color: var(--brand);
+    }
+
+    .panel-body {
+      padding: 16px 18px;
+    }
+
+    .label {
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .field + .field {
+      margin-top: 14px;
+    }
+
+    .copy-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #f8fafc;
+    }
+
+    .copy-row + .copy-row {
+      margin-top: 6px;
+    }
+
+    .copy-row code {
+      flex: 1;
+      overflow: hidden;
+      color: var(--ink);
+      font-size: 0.86rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .btn-icon {
+      padding: 3px 9px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .btn-brand {
+      border-color: var(--brand);
+      background: var(--brand);
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .btn-brand:hover,
+    .btn-brand:focus {
+      border-color: #000c80;
+      background: #000c80;
+      color: #fff;
+    }
+
+    .btn-brand:disabled {
+      border-color: #94a3b8;
+      background: #94a3b8;
+    }
+
+    .sync-status {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px;
+      border-radius: 12px;
+      background: #f8fafc;
+    }
+
+    .sync-icon {
+      display: grid;
+      flex: 0 0 auto;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: var(--brand-soft);
+      color: var(--brand);
+      font-size: 1.3rem;
+    }
+
+    .sync-status.is-ok .sync-icon {
+      background: var(--ok-soft);
+      color: var(--ok);
+    }
+
+    .sync-status.is-error .sync-icon {
+      background: var(--bad-soft);
+      color: var(--bad);
+    }
+
+    .sync-headline {
+      font-weight: 800;
+    }
+
+    .sync-detail {
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    .progress {
+      height: 6px;
+      margin-top: 12px;
+      border-radius: 999px;
+    }
+
+    .progress-bar {
+      background: var(--brand);
+    }
+
+    .key-path {
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 0.82rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .key-missing {
+      color: var(--bad);
+      font-weight: 700;
+    }
+
+    .table-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+      gap: 8px;
+    }
+
+    .table-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+
+    .table-name {
+      overflow: hidden;
+      font-weight: 600;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .table-count {
+      flex: 0 0 auto;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--brand-soft);
+      color: var(--brand);
+      font-size: 0.75rem;
+      font-weight: 800;
+    }
+
+    .log-list {
+      max-height: 300px;
+      margin: 0;
+      padding: 0;
+      overflow-y: auto;
+      list-style: none;
+      font-size: 0.82rem;
+    }
+
+    .log-list li {
+      display: grid;
+      grid-template-columns: 96px 20px minmax(0, 1fr);
+      gap: 8px;
+      align-items: baseline;
+      padding: 6px 2px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .log-time {
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .log-success i { color: var(--ok); }
+    .log-error i { color: var(--bad); }
+    .log-warning i { color: var(--warn); }
+    .log-info i,
+    .log-request i { color: var(--brand); }
+    .log-request { color: var(--muted); }
+
+    .empty {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .toast-msg {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 20;
+      padding: 10px 16px;
+      border-radius: 10px;
+      background: var(--ink);
+      color: #fff;
+      font-weight: 600;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+    }
+
+    .toast-msg.show {
+      opacity: 1;
+      transform: none;
+    }
+
+    .toast-msg.is-error {
+      background: var(--bad);
+    }
+
+    /* ---------- Tabs ---------- */
+    .nav-tabs-top {
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .nav-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 14px;
+      border: 0;
+      border-radius: 9px;
+      background: transparent;
+      color: rgba(255, 255, 255, 0.82);
+      font: inherit;
+      font-size: 0.84rem;
+      font-weight: 700;
+    }
+
+    .nav-tab:hover {
+      color: #fff;
+    }
+
+    .nav-tab.active {
+      background: #fff;
+      color: var(--brand);
+    }
+
+    .nav-badge {
+      min-width: 20px;
+      padding: 1px 6px;
+      border-radius: 999px;
+      background: #4ade80;
+      color: #052e16;
+      font-size: 0.7rem;
+      text-align: center;
+    }
+
+    .view[hidden] {
+      display: none !important;
+    }
+
+    .table-item {
+      cursor: pointer;
+    }
+
+    .table-item:hover {
+      border-color: var(--brand);
+    }
+
+    /* ---------- Data (spreadsheet) ---------- */
+    main.is-data {
+      max-width: none;
+      padding: 0;
+    }
+
+    .sheet {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 66px);
+      background: #fff;
+    }
+
+    .sheet-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #f8fafc;
+    }
+
+    .sheet-title {
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .sheet-search {
+      max-width: 280px;
+    }
+
+    .sheet-count {
+      margin-left: auto;
+      color: var(--muted);
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+
+    .formula-bar {
+      display: flex;
+      align-items: stretch;
+      border-bottom: 1px solid var(--line);
+      font-size: 0.82rem;
+    }
+
+    .formula-ref {
+      flex: 0 0 auto;
+      min-width: 92px;
+      padding: 6px 12px;
+      border-right: 1px solid var(--line);
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .formula-value {
+      flex: 1;
+      max-height: 84px;
+      padding: 6px 12px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .sheet-grid-wrap {
+      flex: 1;
+      overflow: auto;
+    }
+
+    .sheet-grid {
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 0.8rem;
+    }
+
+    .sheet-grid th,
+    .sheet-grid td {
+      max-width: 260px;
+      padding: 5px 9px;
+      overflow: hidden;
+      border-right: 1px solid #e5e9f0;
+      border-bottom: 1px solid #e5e9f0;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .sheet-grid thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #eef2f8;
+      color: #334155;
+      font-weight: 700;
+      text-align: left;
+    }
+
+    .sheet-grid .col-letter {
+      display: block;
+      color: #94a3b8;
+      font-size: 0.68rem;
+      font-weight: 600;
+    }
+
+    .sheet-grid .row-head {
+      position: sticky;
+      left: 0;
+      z-index: 1;
+      min-width: 52px;
+      background: #eef2f8;
+      color: #64748b;
+      font-weight: 600;
+      text-align: right;
+    }
+
+    .sheet-grid thead .row-head {
+      z-index: 3;
+    }
+
+    .sheet-grid tbody tr:hover td {
+      background: #f5f8ff;
+    }
+
+    .sheet-grid td.selected {
+      outline: 2px solid var(--brand);
+      outline-offset: -2px;
+      background: #eef2ff !important;
+    }
+
+    .sheet-grid mark {
+      padding: 0;
+      background: #fde68a;
+    }
+
+    .sheet-empty {
+      padding: 40px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .sheet-tabs {
+      display: flex;
+      gap: 2px;
+      padding: 0 10px;
+      overflow-x: auto;
+      border-top: 1px solid var(--line);
+      background: #f1f5f9;
+    }
+
+    .sheet-tab {
+      flex: 0 0 auto;
+      padding: 8px 14px;
+      border: 0;
+      border-top: 3px solid transparent;
+      background: transparent;
+      color: #475569;
+      font: inherit;
+      font-size: 0.8rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .sheet-tab:hover {
+      background: #e2e8f0;
+    }
+
+    .sheet-tab.active {
+      border-top-color: var(--brand);
+      background: #fff;
+      color: var(--brand);
+    }
+
+    .sheet-tab small {
+      margin-left: 6px;
+      color: #94a3b8;
+      font-weight: 600;
+    }
+
+    /* ---------- Devices & backups ---------- */
+    .summary-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .summary-tile {
+      min-width: 160px;
+      padding: 14px 18px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+    }
+
+    .summary-value {
+      font-size: 1.6rem;
+      font-weight: 800;
+      line-height: 1.1;
+    }
+
+    .list-table {
+      width: 100%;
+      margin: 0;
+      font-size: 0.85rem;
+    }
+
+    .list-table th {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .list-table td {
+      white-space: nowrap;
+      padding: 11px 14px;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: middle;
+    }
+
+    .list-table tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .state-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .state-badge::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .state-online { background: var(--ok-soft); color: var(--ok); }
+    .state-offline { background: #f1f5f9; color: #64748b; }
+    .state-rejected { background: var(--bad-soft); color: var(--bad); }
+
+    .data-tag {
+      font-size: 0.74rem;
+      font-weight: 600;
+    }
+
+    .data-tag.is-current { color: var(--ok); }
+    .data-tag.is-old { color: var(--warn); }
+
+    .device-name {
+      font-weight: 700;
+    }
+
+    .muted-small {
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    @media (max-width: 960px) {
+      .layout {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img class="brand-logo" id="headerLogo" alt="GigaHertz" hidden>
+      <div class="brand-mark" id="brandMark"><i class="bi bi-hdd-network"></i></div>
+      <div class="brand-text">
+        <div class="brand-title">SalesKit Server</div>
+        <div class="brand-sub"><span id="brandCompany">GigaHertz · </span><span id="appVersion">—</span></div>
+      </div>
+    </div>
+    <nav class="nav-tabs-top" role="tablist">
+      <button class="nav-tab active" data-view="overview" role="tab"><i class="bi bi-speedometer2"></i> Overview</button>
+      <button class="nav-tab" data-view="data" role="tab"><i class="bi bi-table"></i> Data</button>
+      <button class="nav-tab" data-view="devices" role="tab"><i class="bi bi-laptop"></i> Devices <span class="nav-badge" id="onlineBadge" hidden>0</span></button>
+      <button class="nav-tab" data-view="backups" role="tab"><i class="bi bi-archive"></i> Backups</button>
+    </nav>
+    <div class="status-pill" id="statusPill"><span class="status-dot"></span><span id="statusText">Starting…</span></div>
+  </header>
+
+  <main id="main">
+    <!-- DATA: spreadsheet view of the database -->
+    <section class="view" id="view-data" hidden>
+      <div class="sheet">
+        <div class="sheet-toolbar">
+          <span class="sheet-title" id="sheetTitle">—</span>
+          <div class="input-group input-group-sm sheet-search">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input class="form-control" id="sheetSearch" placeholder="Search this sheet…" spellcheck="false">
+          </div>
+          <span class="sheet-count" id="sheetCount"></span>
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-secondary" id="sheetPrev" title="Previous rows"><i class="bi bi-chevron-left"></i></button>
+            <button class="btn btn-outline-secondary" id="sheetNext" title="Next rows"><i class="bi bi-chevron-right"></i></button>
+          </div>
+          <button class="btn btn-sm btn-light btn-icon" id="sheetReload" title="Reload this sheet"><i class="bi bi-arrow-clockwise"></i></button>
+        </div>
+        <div class="formula-bar">
+          <div class="formula-ref" id="formulaRef">—</div>
+          <div class="formula-value" id="formulaValue">Click a cell to see its full value.</div>
+        </div>
+        <div class="sheet-grid-wrap" id="sheetGridWrap">
+          <table class="sheet-grid" id="sheetGrid"></table>
+        </div>
+        <div class="sheet-tabs" id="sheetTabs" role="tablist"></div>
+      </div>
+    </section>
+
+    <!-- DEVICES -->
+    <section class="view" id="view-devices" hidden>
+      <div class="summary-row">
+        <div class="summary-tile"><div class="label">Online now</div><div class="summary-value text-success" id="devOnline">0</div></div>
+        <div class="summary-tile"><div class="label">Known devices</div><div class="summary-value" id="devTotal">0</div></div>
+        <div class="summary-tile"><div class="label">Rejected (wrong token)</div><div class="summary-value text-danger" id="devRejected">0</div></div>
+      </div>
+      <section class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title"><i class="bi bi-laptop"></i> SalesKit laptops</h2>
+          <span class="muted-small">Last refresh = when the laptop last loaded the data · Online = checked in during the last 5 minutes</span>
+        </div>
+        <div class="table-responsive">
+          <table class="list-table">
+            <thead>
+              <tr><th>Status</th><th>Computer</th><th>Windows user</th><th>IP address</th><th>SalesKit</th><th>Last refresh</th><th>Last seen</th><th>First seen</th><th>Requests</th><th></th></tr>
+            </thead>
+            <tbody id="deviceRows"></tbody>
+          </table>
+        </div>
+      </section>
+      <p class="muted-small mt-3"><i class="bi bi-info-circle"></i> Laptops on SalesKit 1.0.0 show only their IP address; computer name, user and version appear once they update.</p>
+    </section>
+
+    <!-- BACKUPS -->
+    <section class="view" id="view-backups" hidden>
+      <section class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title"><i class="bi bi-archive"></i> Database backups</h2>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-light btn-icon" id="openBackups"><i class="bi bi-folder2-open"></i> Open folder</button>
+            <button class="btn btn-sm btn-brand btn-icon" id="backupNow"><i class="bi bi-plus-lg"></i> Back up now</button>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="list-table">
+            <thead><tr><th>Created</th><th>Why</th><th>Size</th><th></th></tr></thead>
+            <tbody id="backupRows"></tbody>
+          </table>
+        </div>
+      </section>
+      <p class="muted-small mt-3"><i class="bi bi-info-circle"></i> A backup is saved automatically before every sync that changes data. The newest 10 are kept. Restoring replaces the current data, and every SalesKit laptop reloads it automatically.</p>
+    </section>
+
+    <!-- OVERVIEW -->
+    <section class="view" id="view-overview">
+    <div class="alert alert-danger d-flex gap-2 align-items-start" id="apiError" hidden>
+      <i class="bi bi-exclamation-octagon-fill"></i><div id="apiErrorText"></div>
+    </div>
+
+    <div class="layout">
+      <!-- Connection -->
+      <section class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title"><i class="bi bi-broadcast"></i> Client connection</h2>
+          <button class="btn btn-sm btn-outline-primary btn-icon" id="copyClientConfig" title="Copy the server URL and token as embedded-config.json">
+            <i class="bi bi-clipboard-plus"></i> Copy client config
+          </button>
+        </div>
+        <div class="panel-body">
+          <div class="field">
+            <div class="label">Address for SalesKit clients</div>
+            <div id="addressList"></div>
+          </div>
+          <div class="field">
+            <div class="label">Access token</div>
+            <div class="copy-row">
+              <code id="tokenPreview">—</code>
+              <button class="btn btn-sm btn-light btn-icon" id="copyToken"><i class="bi bi-clipboard"></i> Copy</button>
+              <button class="btn btn-sm btn-outline-danger btn-icon" id="newToken"><i class="bi bi-arrow-repeat"></i> New</button>
+            </div>
+            <div class="form-text">Clients need this exact token. A new token locks out clients until they are rebuilt.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Sync -->
+      <section class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title"><i class="bi bi-cloud-arrow-down"></i> Google Sheets sync</h2>
+          <button class="btn btn-sm btn-brand btn-icon" id="syncNow"><i class="bi bi-arrow-clockwise"></i> Sync now</button>
+        </div>
+        <div class="panel-body">
+          <div class="sync-status" id="syncStatus">
+            <div class="sync-icon"><i class="bi bi-clock-history" id="syncIcon"></i></div>
+            <div class="flex-grow-1">
+              <div class="sync-headline" id="syncHeadline">No sync yet</div>
+              <div class="sync-detail" id="syncDetail">—</div>
+            </div>
+          </div>
+          <div class="progress" id="syncProgressWrap" hidden>
+            <div class="progress-bar progress-bar-striped progress-bar-animated" id="syncProgressBar" style="width: 5%"></div>
+          </div>
+          <div class="sync-detail mt-2" id="syncProgressText" hidden></div>
+          <div class="sync-detail mt-2" id="nextSync"></div>
+        </div>
+      </section>
+
+      <!-- Settings -->
+      <section class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title"><i class="bi bi-sliders"></i> Settings</h2>
+        </div>
+        <div class="panel-body">
+          <div class="field">
+            <div class="label">Google service-account key</div>
+            <div class="copy-row">
+              <span class="key-path flex-grow-1" id="keyPath">—</span>
+              <button class="btn btn-sm btn-light btn-icon" id="chooseKey"><i class="bi bi-folder2-open"></i> Choose…</button>
+            </div>
+          </div>
+          <form id="settingsForm" class="row g-3 mt-1">
+            <div class="col-12">
+              <label class="label" for="spreadsheetId">Spreadsheet ID</label>
+              <input class="form-control form-control-sm" id="spreadsheetId" spellcheck="false" required>
+            </div>
+            <div class="col-6">
+              <label class="label" for="syncInterval">Sync every</label>
+              <select class="form-select form-select-sm" id="syncInterval">
+                <option value="5">5 minutes</option>
+                <option value="15">15 minutes</option>
+                <option value="30">30 minutes</option>
+                <option value="60">1 hour</option>
+                <option value="180">3 hours</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="label" for="port">Port</label>
+              <input class="form-control form-control-sm" id="port" type="number" min="1024" max="65535" required>
+            </div>
+            <div class="col-12 d-flex align-items-center justify-content-between gap-3">
+              <div class="form-check form-switch m-0">
+                <input class="form-check-input" type="checkbox" role="switch" id="autoStart">
+                <label class="form-check-label" for="autoStart">Start with Windows</label>
+              </div>
+              <button class="btn btn-sm btn-brand btn-icon" type="submit"><i class="bi bi-check2"></i> Save settings</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- Data -->
+      <section class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title"><i class="bi bi-database"></i> Data</h2>
+          <span class="sync-detail" id="dbPath"></span>
+        </div>
+        <div class="panel-body">
+          <div class="table-list" id="tableList"></div>
+        </div>
+      </section>
+
+      <!-- Activity -->
+      <section class="panel span-2">
+        <div class="panel-head">
+          <h2 class="panel-title"><i class="bi bi-activity"></i> Activity</h2>
+          <div class="form-check form-switch m-0">
+            <input class="form-check-input" type="checkbox" role="switch" id="showRequests" checked>
+            <label class="form-check-label sync-detail" for="showRequests">Show client requests</label>
+          </div>
+        </div>
+        <div class="panel-body">
+          <ul class="log-list" id="logList"></ul>
+        </div>
+      </section>
+    </div>
+    </section>
+  </main>
+
+  <div class="toast-msg" id="toast"></div>
+  <script src="renderer.js"></script>
+</body>
+</html>

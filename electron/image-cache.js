@@ -57,9 +57,12 @@ class ImageCache {
       const fileName = this.manifest && this.manifest[urlKey(value)];
       return fileName ? `saleskit-image://cache/${fileName}` : value;
     };
+    data.applicationLogoSourceUrl = data.applicationLogoUrl;
+    data.applicationLogoUrl = map(data.applicationLogoUrl);
     Object.values(data.specsMap || {}).forEach((spec) => { spec.image = map(spec.image); });
     Object.entries(data.skuImageMap || {}).forEach(([key, value]) => { data.skuImageMap[key] = map(value); });
     Object.entries(data.appsLogoMap || {}).forEach(([key, value]) => { data.appsLogoMap[key] = map(value); });
+    data.headerLogoUrl = map(data.headerLogoUrl);
     Object.values(data.appsDataList || []).forEach((app) => { app.icon = map(app.icon); });
     Object.values(data.appUkspData?.applications || []).forEach((app) => { app.icon = map(app.icon); });
     (data.ukspBannerData?.skus || []).forEach((laptop) => {

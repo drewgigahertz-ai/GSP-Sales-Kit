@@ -1,0 +1,39 @@
+{
+  "appId": "com.gigahertz.saleskit.server",
+  "productName": "GigaHertz SalesKit Server",
+  "extraMetadata": {
+    "name": "saleskit-server",
+    "main": "server/main.js"
+  },
+  "directories": {
+    "output": "dist-server"
+  },
+  "files": [
+    "server/**/*",
+    "electron/database.js",
+    "electron/sheets-sync.js",
+    "electron/local-api.js",
+    "electron/embedded-config.json",
+    "package.json",
+    "!node_modules/electron-updater{,/**/*}",
+    "!node_modules/html2canvas{,/**/*}",
+    "!node_modules/@fontsource/outfit{,/**/*}"
+  ],
+  "extraResources": [
+    {
+      "from": "mydata.db",
+      "to": "mydata.db"
+    }
+  ],
+  "publish": null,
+  "win": {
+    "target": "nsis"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "SalesKit Server"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "serverUrl": "http://SERVER-IP:3000",
+  "serverUrls": [
+    "http://SERVER-IP:3000",
+    "http://SERVER-COMPUTER-NAME:3000"
+  ],
+  "serverToken": "paste the token from SalesKit Server (Copy client config)"
+}

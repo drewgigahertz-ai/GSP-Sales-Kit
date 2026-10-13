@@ -8,9 +8,11 @@ const SHEET_TABLES = new Set([
   'specs',
   'criteria_segment_application',
   'dv_transposed',
+  'application_description',
   'uksp_transposed',
   'uksp_banner',
-  'reco_table'
+  'reco_table',
+  'logo'
 ]);
 
 function quoteIdentifier(identifier) {
@@ -377,23 +379,47 @@ function makeApplicationMatrix(rows) {
   };
 }
 
-function makeUkspData(rows) {
-  const excludedColumns = new Set(['id', 'features', 'order_index']);
-  const skuColumns = rows.length
+function makeApplicationDescriptionData(rows) {
+  const excludedColumns = new Set(['id', 'sku', 'order_index']);
+  const appNames = rows.length
     ? Object.keys(rows[0]).filter((column) => !excludedColumns.has(column.toLowerCase()))
     : [];
-  const modelRow = rows[0] || {};
-  const featureRows = rows.slice(1).filter((row) => text(row.FEATURES));
-  const features = [...new Set(featureRows.map((row) => text(row.FEATURES)))];
+
+  return {
+    applications: appNames.map((name) => {
+      const values = {};
+      for (const row of rows) {
+        const rawSku = text(row.SKU);
+        const value = text(row[name]);
+        if (!rawSku || !value || value.startsWith('#')) continue;
+        values[canonicalSku(rawSku)] = value;
+        values[cleanSku(rawSku).toLowerCase()] = value;
+        values[rawSku.toLowerCase()] = value;
+      }
+      return { name, values };
+    })
+  };
+}
+
+// UKSP TRANSPOSED has one row per SKU (the SKU is in the FEATURES column) and one column per feature.
+function makeUkspData(rows, modelBySku = {}) {
+  const excludedColumns = new Set(['id', 'features', 'order_index']);
+  const features = rows.length
+    ? Object.keys(rows[0]).filter((column) => !excludedColumns.has(column.toLowerCase()))
+    : [];
+  const skuRows = rows.filter((row) => text(row.FEATURES));
 
   return {
     features,
-    skus: skuColumns.map((sku, colIndex) => ({
-      sku,
-      model: text(modelRow[sku]),
-      colIndex: colIndex + 1,
-      features: Object.fromEntries(featureRows.map((row) => [text(row.FEATURES), text(row[sku])]))
-    }))
+    skus: skuRows.map((row, index) => {
+      const sku = text(row.FEATURES);
+      return {
+        sku,
+        model: modelBySku[canonicalSku(sku)] || '',
+        colIndex: index + 1,
+        features: Object.fromEntries(features.map((feature) => [feature, text(row[feature])]))
+      };
+    })
   };
 }
 
@@ -416,19 +442,32 @@ function makeUkspBannerData(rows) {
   };
 }
 
+function makeLogoData(rows) {
+  const row = rows.find((item) => item.id === 'logo') || rows[0] || {};
+  return {
+    applicationLogoUrl: normalizeImageUrl(row.application_logo || row['Application Logo']),
+    headerLogoUrl: normalizeImageUrl(row.header_logo || row['Upper left logo'])
+  };
+}
+
 function getInitialData() {
   if (!connection) throw new Error('Open a database before loading SalesKit data.');
 
   const specRows = getRows('specs');
   const { specsMap, specsBySku } = makeSpecsMap(specRows);
   const applicationMatrix = makeApplicationMatrix(getRows('dv_transposed'));
+  const applicationDescriptionData = makeApplicationDescriptionData(getRows('application_description'));
   const criteriaSegmentData = makeCriteriaData(
     getRows('criteria_segment_application'),
     specsBySku,
     Object.fromEntries(applicationMatrix.applications.map(({ name, hierarchy }) => [name.toLowerCase(), hierarchy]))
   );
-  const ukspPerSkuData = makeUkspData(getRows('uksp'));
-  const ukspBannerData = makeUkspBannerData(getRows('uksp_banner'));
+  const ukspBannerData = makeUkspBannerData(getRows('uksp_banner'));  const modelBySku = Object.fromEntries(Object.entries(specsBySku).map(([sku, spec]) => [sku, spec.title]));
+  ukspBannerData.skus.forEach(({ sku, model }) => {
+    if (model) modelBySku[canonicalSku(sku)] = model;
+  });
+  const ukspPerSkuData = makeUkspData(getRows('uksp_transposed'), modelBySku);
+  const logoData = makeLogoData(getRows('logo'));
   const recoTableData = getRows('reco_table');
   const appsLogoMap = Object.fromEntries(applicationMatrix.applications.map(({ name, icon }) => [name, icon]));
   const skuImageMap = Object.fromEntries(Object.values(specsBySku).map((spec) => [spec.cleanSku, spec.image]));
@@ -436,6 +475,7 @@ function getInitialData() {
   const skuModelMap = Object.fromEntries(Object.values(specsBySku).map((spec) => [spec.cleanSku, spec.title]));
 
   return {
+    ...logoData,
     skuList: criteriaSegmentData.laptops.map(({ cleanSku: sku }) => sku),
     skuImageMap,
     skuBrandMap,
@@ -457,6 +497,7 @@ function getInitialData() {
     ukspPerSkuData,
     ukspBannerData,
     appUkspData: applicationMatrix,
+    applicationDescriptionData,
     dvApplicationsPerSkuData: applicationMatrix,
     sheetStatus: {
       skuCount: criteriaSegmentData.laptops.length,
@@ -556,6 +597,8 @@ function getImageUrls() {
   Object.values(data.specsMap).forEach((spec) => add(spec.image));
   Object.values(data.skuImageMap).forEach(add);
   Object.values(data.appsLogoMap).forEach(add);
+  add(data.applicationLogoUrl);
+  add(data.headerLogoUrl);
   data.appsDataList.forEach((app) => add(app.icon));
   (data.ukspBannerData?.skus || []).forEach((laptop) => {
     Object.values(laptop.features || {}).forEach(add);
@@ -568,6 +611,7 @@ function mapCachedImageUrls(data, resolveImageUrl) {
   Object.values(data.specsMap || {}).forEach((spec) => { spec.image = map(spec.image); });
   Object.entries(data.skuImageMap || {}).forEach(([key, value]) => { data.skuImageMap[key] = map(value); });
   Object.entries(data.appsLogoMap || {}).forEach(([key, value]) => { data.appsLogoMap[key] = map(value); });
+  data.headerLogoUrl = map(data.headerLogoUrl);
   Object.values(data.appsDataList || []).forEach((app) => { app.icon = map(app.icon); });
   Object.values(data.appUkspData?.applications || []).forEach((app) => { app.icon = map(app.icon); });
   (data.ukspBannerData?.skus || []).forEach((laptop) => {
@@ -582,6 +626,14 @@ function mapCachedImageUrls(data, resolveImageUrl) {
   return data;
 }
 
+// Copies the open database to `destination` while it stays in use.
+async function backupDatabase(destination) {
+  if (!connection) throw new Error('Open a database before backing it up.');
+  fs.mkdirSync(path.dirname(destination), { recursive: true });
+  await connection.backup(destination);
+  return destination;
+}
+
 function closeDatabase() {
   if (connection) connection.close();
   connection = null;
@@ -589,6 +641,7 @@ function closeDatabase() {
 }
 
 module.exports = {
+  backupDatabase,
   closeDatabase,
   getImageUrls,
   getInitialData,
