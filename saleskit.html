@@ -4658,6 +4658,7 @@
       });
 
       updateAppsDisplayText();
+      filterAppsCheckboxes(document.getElementById('appsSearchInput')?.value);
     }
 
     function buildSalesKitAppsCheckboxes() {
@@ -4686,6 +4687,7 @@
       });
 
       updateSalesKitAppsDisplayText();
+      filterSalesKitAppsMenu(document.getElementById('salesKitAppsSearchInput')?.value);
     }
 
     function buildAppsCheckboxes() {
@@ -4952,7 +4954,18 @@
     function toggleAppsMenu() {
       closeAllMenusExcept('appsDropdownMenu');
       const menu = document.getElementById('appsDropdownMenu');
-      if (menu) menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
+      if (menu) {
+        const isVisible = (menu.style.display === 'block');
+        menu.style.display = isVisible ? 'none' : 'block';
+        if (!isVisible) {
+          const searchInput = document.getElementById('appsSearchInput');
+          if (searchInput) {
+            searchInput.value = '';
+            filterAppsCheckboxes('');
+            setTimeout(() => searchInput.focus(), 50);
+          }
+        }
+      }
     }
 
     let LOCATION_DATABASE = [
@@ -4980,6 +4993,7 @@
         item.onclick = function() { selectLocation(loc); };
         container.appendChild(item);
       });
+      filterLocationMenu(document.getElementById('locationSearchInput')?.value);
     }
 
     function filterLocationMenu(query) {
@@ -5275,6 +5289,8 @@
       });
 
       updateFeaturesDisplayText();
+      filterFeaturesMenu(document.getElementById('featuresSearchInput')?.value);
+      filterSalesKitFeaturesMenu(document.getElementById('salesKitFeaturesSearchInput')?.value);
     }
 
     function handleFeatureToggle(feat) {
@@ -5431,7 +5447,18 @@
       const menuId = tier + 'DropdownMenu';
       closeAllMenusExcept(menuId);
       const menu = document.getElementById(menuId);
-      if (menu) menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
+      if (menu) {
+        const isVisible = (menu.style.display === 'block');
+        menu.style.display = isVisible ? 'none' : 'block';
+        if (!isVisible) {
+          const searchInput = getProductSearchInput(tier);
+          if (searchInput) {
+            searchInput.value = '';
+            filterProductMenu(searchInput, tier);
+            setTimeout(() => searchInput.focus(), 50);
+          }
+        }
+      }
     }
 
     function updateRecoBanner() {
@@ -5821,7 +5848,15 @@
           div.onclick = function() { selectProduct(tier, prod); };
           listEl.appendChild(div);
         });
+
+        // A rebuilt list keeps what is typed in its search box.
+        const searchInput = getProductSearchInput(tier);
+        if (searchInput && searchInput.value.trim()) filterProductMenu(searchInput, tier);
       });
+    }
+
+    function getProductSearchInput(tier) {
+      return document.querySelector(`#${tier}DropdownMenu input[type="text"]`);
     }
 
     // ============================================================
