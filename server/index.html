@@ -826,7 +826,7 @@
       <section class="panel">
         <div class="panel-head">
           <h2 class="panel-title"><i class="bi bi-person-plus"></i> Add a user</h2>
-          <span class="muted-small">Users log in to SalesKit each time they open it. Their branch is fixed by you.</span>
+          <span class="muted-small">Users only see their own branch's stock. Choose ALL for managers who need every branch.</span>
         </div>
         <div class="panel-body">
           <form id="addUserForm" class="row g-3 align-items-end" autocomplete="off">
@@ -840,7 +840,7 @@
             </div>
             <div class="col-md-2">
               <label class="label" for="newBranch">Branch</label>
-              <input class="form-control form-control-sm" id="newBranch" list="branchOptions" placeholder="e.g. ALB" required spellcheck="false">
+              <input class="form-control form-control-sm" id="newBranch" list="branchOptions" placeholder="ALB, or ALL" required spellcheck="false" title="The user only sees this branch. ALL = every branch (managers).">
               <datalist id="branchOptions"></datalist>
             </div>
             <div class="col-md-2">

@@ -186,6 +186,8 @@ ipcMain.handle('auth:login', async (_event, username, password) => {
   try {
     const result = await requestServer('/api/login', { method: 'POST', body: { username: String(username || ''), password: String(password || '') } });
     session = { key: result.sessionKey, user: result.user };
+    // The page keeps its own copy of the data; drop it so a shared laptop never shows the previous user's branches.
+    await mainWindow.webContents.executeJavaScript("localStorage.removeItem('ghz_cached_sheet_data')").catch(() => {});
     showSalesKit();
     return { ok: true, user: result.user };
   } catch (error) {

@@ -416,7 +416,7 @@ function renderDevices(list) {
     const account = device.account;
     const userCell = addCell(account ? account.displayName : device.user ? `(${device.user})` : '', account ? 'device-name' : 'muted-small');
     userCell.title = account ? `Signed in as ${account.username}` : 'Not signed in. Shows the Windows user, if known.';
-    addCell(account ? account.branch : '', account ? 'fw-semibold' : '');
+    addCell(account ? branchLabel(account.branch) : '', account ? 'fw-semibold' : '');
     const laptop = [device.make, device.model].filter(Boolean).join(' · ');
     addCell(laptop);
     addCell(device.name || 'Unknown (SalesKit 1.0.1 or older)', device.name ? '' : 'muted-small');
@@ -481,6 +481,10 @@ setInterval(() => { if (currentView === 'devices') loadDevices(); }, 30 * 1000);
 
 // ---------- Users ----------
 
+function branchLabel(branch) {
+  return branch === 'ALL' || branch === 'ALL BRANCHES' ? 'All branches' : branch;
+}
+
 function renderUsers(list) {
   const active = list.filter((user) => !user.disabled).length;
   $('userSummary').textContent = `${list.length} user${list.length === 1 ? '' : 's'} · ${active} active`;
@@ -504,7 +508,7 @@ function renderUsers(list) {
     };
     addCell(user.displayName, 'device-name');
     addCell(user.username, 'muted-small');
-    const branch = addCell(user.branch, 'fw-semibold');
+    const branch = addCell(branchLabel(user.branch), 'fw-semibold');
     branch.title = 'Click to change the branch';
     branch.style.cursor = 'pointer';
     branch.addEventListener('click', () => editBranch(user, branch));
@@ -545,7 +549,7 @@ async function loadUsers() {
   const [list, branches] = await Promise.all([run(null, api.getUsers), run(null, api.getBranches)]);
   if (list) renderUsers(list);
   if (branches) {
-    $('branchOptions').replaceChildren(...branches.map((branch) => new Option(branch, branch)));
+    $('branchOptions').replaceChildren(new Option('All branches (managers)', 'ALL'), ...branches.map((branch) => new Option(branch, branch)));
   }
 }
 
@@ -566,10 +570,11 @@ function editBranch(user, cell) {
     done = true;
     const value = input.value.trim().toUpperCase();
     if (!save || !value || value === user.branch) {
-      cell.textContent = user.branch;
+      cell.textContent = branchLabel(user.branch);
       return;
     }
-    run(null, () => api.updateUser(user.username, { branch: value }), `Branch set to ${value}`).then((next) => (next ? renderUsers(next) : (cell.textContent = user.branch)));
+    run(null, () => api.updateUser(user.username, { branch: value }), `Branch set to ${branchLabel(value)}; ${user.displayName} must log in again`)
+      .then((next) => (next ? renderUsers(next) : (cell.textContent = branchLabel(user.branch))));
   };
   input.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') finish(true);

@@ -48,7 +48,8 @@ function readJsonBody(request, limit = 10 * 1024) {
 }
 
 // token: the shared app key every SalesKit sends (keeps scanners out).
-// accounts (optional): { login(username, password, address), logout(key), userForSession(key), allowWithoutLogin() }
+// accounts (optional): { login(username, password, address), logout(key), userForSession(key), allowWithoutLogin(),
+//   prepareInitialData(data, user), canBrowseTables(user) }
 //   When given, data routes also need a signed-in user, sent as the X-SalesKit-Session header.
 function createLocalApi({ database, token = '', onRequest = null, getDataVersion = () => null, accounts = null }) {
   return http.createServer(async (request, response) => {
@@ -113,7 +114,12 @@ function createLocalApi({ database, token = '', onRequest = null, getDataVersion
       } else if (request.method === 'GET' && url.pathname === '/api/version') {
         sendJson(response, 200, { dataVersion: getDataVersion() });
       } else if (request.method === 'GET' && url.pathname === '/api/initial-data') {
-        sendJson(response, 200, database.getInitialData());
+        const data = database.getInitialData();
+        sendJson(response, 200, accounts && accounts.prepareInitialData ? accounts.prepareInitialData(data, user) : data);
+      } else if ((url.pathname === '/api/tables' || url.pathname === '/api/table-data') &&
+          accounts && accounts.canBrowseTables && !accounts.canBrowseTables(user)) {
+        // Raw tables hold every branch, so branch-locked users cannot browse them.
+        sendJson(response, 403, { error: 'Not available for your account.' });
       } else if (request.method === 'GET' && url.pathname === '/api/tables') {
         sendJson(response, 200, database.listTables());
       } else if (request.method === 'GET' && url.pathname === '/api/table-data') {

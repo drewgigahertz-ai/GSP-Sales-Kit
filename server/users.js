@@ -22,6 +22,13 @@ function passwordMatches(password, stored) {
   return crypto.timingSafeEqual(actual, expected);
 }
 
+// "ALL" (or "ALL BRANCHES") lets a manager see every branch; otherwise a branch code such as "ALB".
+function normalizeBranch(branch) {
+  const code = String(branch || '').trim().toUpperCase().replace(/\s+/g, ' ');
+  if (!code) throw new Error('Choose the user\'s branch.');
+  return code === 'ALL BRANCHES' ? 'ALL' : code;
+}
+
 function checkPassword(password) {
   if (String(password || '').length < 8) throw new Error('Passwords need at least 8 characters.');
 }
@@ -75,12 +82,12 @@ function createUserStore(database, { legacyFile = '' } = {}) {
     const name = String(username || '').trim().toLowerCase();
     if (!USERNAME.test(name)) throw new Error('Usernames are 3–32 characters: letters, numbers, dot, dash or underscore.');
     if (users[name]) throw new Error('That username is already taken.');
-    if (!String(branch || '').trim()) throw new Error('Choose the user\'s branch.');
+    const branchCode = normalizeBranch(branch);
     checkPassword(password);
     users[name] = {
       username: name,
       displayName: String(displayName || '').trim() || name,
-      branch: String(branch).trim().toUpperCase(),
+      branch: branchCode,
       passwordHash: hashPassword(password),
       disabled: false,
       createdAt: new Date().toISOString(),
@@ -94,8 +101,8 @@ function createUserStore(database, { legacyFile = '' } = {}) {
     const user = get(username);
     if (changes.displayName !== undefined) user.displayName = String(changes.displayName).trim() || user.username;
     if (changes.branch !== undefined) {
-      if (!String(changes.branch).trim()) throw new Error('Choose the user\'s branch.');
-      user.branch = String(changes.branch).trim().toUpperCase();
+      user.branch = normalizeBranch(changes.branch);
+      signOut(user.username); // their next login loads the new branch's data
     }
     if (changes.disabled !== undefined) {
       user.disabled = Boolean(changes.disabled);
