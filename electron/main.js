@@ -7,6 +7,7 @@ const { createSnapshotCache } = require('./snapshot-cache');
 const { getConfig } = require('./app-config');
 const { startAutoUpdates, getUpdateStatus, installUpdateNow, noticeLatestVersion } = require('./updater');
 const { createUpdateResume } = require('./update-resume');
+const { createLogoCache } = require('./logo-cache');
 const { getDeviceInfo } = require('./device-info');
 
 // SalesKit is a client: it loads its data from the SalesKit Server, which does the Google Sheets sync.
@@ -20,6 +21,7 @@ let mainWindow;
 let imageCache;
 let snapshotCache;
 let updateResume;
+let logoCache;
 
 function reportSyncProgress(progress) {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -177,13 +179,12 @@ ipcMain.handle('auth:info', async () => {
   const message = loginMessage;
   loginMessage = '';
   const saved = snapshotCache && snapshotCache.load();
-  // The GigaHertz header logo from the last saved data, if its image is in the local cache.
-  const logo = saved && saved.headerLogoUrl ? await imageCache.resolve(saved.headerLogoUrl) : '';
   return {
     version: app.getVersion(),
     message,
     offlineAvailable: Boolean(saved),
-    logo: String(logo || '').startsWith('saleskit-image://') ? logo : ''
+    // The GigaHertz header logo from the last saved data, if its image is in the local cache.
+    logo: (await logoCache.cachedLogos()).header
   };
 });
 
@@ -239,9 +240,11 @@ ipcMain.handle('application:set-icon', async (event, imageUrl) => {
   const icon = nativeImage.createFromBuffer(imageBuffer);
   if (icon.isEmpty()) throw new Error('Electron could not decode the application logo image.');
   mainWindow.setIcon(icon);
+  logoCache.saveWindowIcon(icon);
   return true;
 });
 ipcMain.handle('database:sync', () => performRemoteSync());
+ipcMain.handle('logos:cached', () => logoCache.cachedLogos());
 ipcMain.handle('app:version', () => app.getVersion());
 ipcMain.handle('update:status', () => getUpdateStatus());
 ipcMain.handle('update:install', () => installUpdateNow());
@@ -281,6 +284,8 @@ function createWindow() {
     minHeight: 620,
     show: false,
     backgroundColor: '#f3f5f2',
+    // The logo from last time, until the page applies the current one.
+    icon: logoCache.loadWindowIcon() || undefined,
     title: 'GigaHertz SalesKit',
     titleBarStyle: 'hidden',
     titleBarOverlay: {
@@ -308,6 +313,7 @@ function createWindow() {
 app.whenReady().then(() => {
   snapshotCache = createSnapshotCache(path.join(app.getPath('userData'), 'saleskit-data-cache.json'));
   imageCache = new ImageCache(path.join(app.getPath('userData'), 'image-cache'));
+  logoCache = createLogoCache({ userDataDir: app.getPath('userData'), imageCache, snapshotCache });
   updateResume = createUpdateResume(path.join(app.getPath('userData'), 'update-resume.bin'));
   // Restarted to install an update: open SalesKit signed in as before. (If the server no longer
   // knows the session, the first data request shows the login screen.)

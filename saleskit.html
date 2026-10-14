@@ -3308,10 +3308,8 @@
         return;
       }
 
-      if (!rawUrl) {
-        img.removeAttribute('src');
-        return;
-      }
+      // No data yet: keep the saved logo that applyCachedLogos() showed.
+      if (!rawUrl) return;
 
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         google.script.run
@@ -3327,6 +3325,25 @@
       } else {
         img.src = rawUrl;
         img.style.display = '';
+      }
+    }
+
+    // Shows the logos saved on this laptop right away, before the server data arrives.
+    async function applyCachedLogos() {
+      if (!window.saleskit || typeof window.saleskit.getCachedLogos !== 'function') return;
+      try {
+        const logos = await window.saleskit.getCachedLogos();
+        const header = document.getElementById('headerLogoImg');
+        if (logos.header && header && !header.getAttribute('src')) {
+          header.src = logos.header;
+          header.style.display = '';
+        }
+        const titlebarLogo = document.getElementById('appTitlebarLogo');
+        if (logos.application && titlebarLogo && !titlebarLogo.getAttribute('src')) titlebarLogo.src = logos.application;
+        const favicon = document.getElementById('applicationFavicon');
+        if (logos.application && favicon && !favicon.getAttribute('href')) favicon.href = logos.application;
+      } catch (error) {
+        console.warn('Saved logos are not available:', error.message);
       }
     }
 
@@ -4546,6 +4563,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
+      applyCachedLogos();
       let initialPage = 'recotable';
       try {
         const params = new URLSearchParams(window.location.search);

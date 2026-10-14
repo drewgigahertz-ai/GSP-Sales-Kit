@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('saleskit', {
   getInitialData: () => ipcRenderer.invoke('database:initial-data'),
   syncData: (options = {}) => ipcRenderer.invoke('database:sync', options),
   setApplicationIcon: (imageUrl) => ipcRenderer.invoke('application:set-icon', imageUrl),
+  getCachedLogos: () => ipcRenderer.invoke('logos:cached'),
   onSyncProgress: (callback) => {
     const listener = (_event, progress) => callback(progress);
     ipcRenderer.on('sync:progress', listener);
