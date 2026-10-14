@@ -608,6 +608,7 @@ ipcMain.handle('server:restore-backup', async (_event, name) => {
   } finally {
     database.openDatabase(databasePath);
   }
+  users.reload();
   bumpDataVersion();
   log('warning', `Database restored from ${name}. Clients will reload it automatically.`);
   pushState();
@@ -638,7 +639,6 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     settings = loadSettings();
     devices = createDeviceRegistry(path.join(app.getPath('userData'), 'devices.json'));
-    users = createUserStore(app.getPath('userData'));
     Menu.setApplicationMenu(null);
     createWindow();
     createTray();
@@ -646,6 +646,7 @@ if (!app.requestSingleInstanceLock()) {
 
     try {
       openServerDatabase();
+      users = createUserStore(database, { legacyFile: path.join(app.getPath('userData'), 'users.json') });
       backups = createBackupStore(path.join(app.getPath('userData'), 'backups'), database);
       startApi();
       loadLogos();

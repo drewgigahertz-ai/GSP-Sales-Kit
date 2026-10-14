@@ -626,6 +626,32 @@ function mapCachedImageUrls(data, resolveImageUrl) {
   return data;
 }
 
+// SalesKit Server user accounts. The "__saleskit_" prefix keeps this table out of the Google Sheets sync,
+// the Data tab and the client API, while database backups still include it.
+const USERS_TABLE = '__saleskit_users';
+
+function ensureUsersTable() {
+  if (!connection) throw new Error('Open a database before using accounts.');
+  connection.exec(`CREATE TABLE IF NOT EXISTS ${quoteIdentifier(USERS_TABLE)} (username TEXT PRIMARY KEY, data TEXT NOT NULL)`);
+}
+
+function loadUsers() {
+  ensureUsersTable();
+  return Object.fromEntries(connection.prepare(`SELECT username, data FROM ${quoteIdentifier(USERS_TABLE)}`).all()
+    .map(({ username, data }) => [username, JSON.parse(data)]));
+}
+
+function saveUser(user) {
+  ensureUsersTable();
+  connection.prepare(`INSERT OR REPLACE INTO ${quoteIdentifier(USERS_TABLE)} (username, data) VALUES (?, ?)`)
+    .run(user.username, JSON.stringify(user));
+}
+
+function deleteUser(username) {
+  ensureUsersTable();
+  connection.prepare(`DELETE FROM ${quoteIdentifier(USERS_TABLE)} WHERE username = ?`).run(username);
+}
+
 // Branch codes (BR column of RECO TABLE), for assigning users to a branch.
 function listBranches() {
   if (!connection || !listTables().some(({ name }) => name === 'reco_table')) return [];
@@ -652,13 +678,16 @@ function closeDatabase() {
 module.exports = {
   backupDatabase,
   closeDatabase,
+  deleteUser,
   getImageUrls,
   getInitialData,
   getStatus,
   getTableData,
   listBranches,
   listTables,
+  loadUsers,
   mapCachedImageUrls,
   openDatabase,
-  replaceSheetsData
+  replaceSheetsData,
+  saveUser
 };

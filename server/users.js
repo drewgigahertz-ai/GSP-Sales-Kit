@@ -1,7 +1,7 @@
-// SalesKit user accounts and login sessions. Passwords are stored as salted scrypt hashes, never as text.
+// SalesKit user accounts and login sessions. Accounts live in the server database (table __saleskit_users);
+// passwords are stored as salted scrypt hashes, never as text.
 const crypto = require('node:crypto');
 const fs = require('node:fs');
-const path = require('node:path');
 
 const SESSION_IDLE_MS = 12 * 60 * 60 * 1000; // a session ends after 12 hours without use
 const MAX_FAILURES = 5; // wrong passwords before a lock
@@ -26,21 +26,33 @@ function checkPassword(password) {
   if (String(password || '').length < 8) throw new Error('Passwords need at least 8 characters.');
 }
 
-function createUserStore(directory) {
-  const usersPath = path.join(directory, 'users.json');
-  let users = {};
-  try {
-    users = JSON.parse(fs.readFileSync(usersPath, 'utf8')) || {};
-  } catch {}
+// database: needs loadUsers(), saveUser(user) and deleteUser(username).
+// legacyFile: an older users.json to import once (renamed to users.json.imported afterwards).
+function createUserStore(database, { legacyFile = '' } = {}) {
+  let users = database.loadUsers();
+
+  if (!Object.keys(users).length && legacyFile && fs.existsSync(legacyFile)) {
+    try {
+      const imported = JSON.parse(fs.readFileSync(legacyFile, 'utf8')) || {};
+      Object.values(imported).forEach((user) => database.saveUser(user));
+      fs.renameSync(legacyFile, `${legacyFile}.imported`);
+      users = database.loadUsers();
+    } catch {}
+  }
 
   const sessions = new Map(); // session key -> { username, createdAt, lastUsed }
   const failures = new Map(); // "user:<name>" / "ip:<address>" -> { count, lockedUntil }
 
-  function save() {
-    fs.mkdirSync(directory, { recursive: true });
-    const temporary = `${usersPath}.tmp`;
-    fs.writeFileSync(temporary, JSON.stringify(users, null, 2), 'utf8');
-    fs.renameSync(temporary, usersPath);
+  function save(user) {
+    database.saveUser(user);
+  }
+
+  // Reads the accounts again, e.g. after a database backup was restored.
+  function reload() {
+    users = database.loadUsers();
+    for (const [key, session] of sessions) {
+      if (!users[session.username] || users[session.username].disabled) sessions.delete(key);
+    }
   }
 
   function publicUser(user) {
@@ -74,7 +86,7 @@ function createUserStore(directory) {
       createdAt: new Date().toISOString(),
       lastLogin: null
     };
-    save();
+    save(users[name]);
     return publicUser(users[name]);
   }
 
@@ -89,7 +101,7 @@ function createUserStore(directory) {
       user.disabled = Boolean(changes.disabled);
       if (user.disabled) signOut(user.username);
     }
-    save();
+    save(user);
     return publicUser(user);
   }
 
@@ -97,7 +109,7 @@ function createUserStore(directory) {
     const user = get(username);
     checkPassword(password);
     user.passwordHash = hashPassword(password);
-    save();
+    save(user);
     signOut(user.username);
     return publicUser(user);
   }
@@ -106,7 +118,7 @@ function createUserStore(directory) {
     const user = get(username);
     signOut(user.username);
     delete users[user.username];
-    save();
+    database.deleteUser(user.username);
   }
 
   // Ends every open session of a user; their SalesKit asks them to log in again.
@@ -152,7 +164,7 @@ function createUserStore(directory) {
     failures.delete(userKey);
     failures.delete(ipKey);
     user.lastLogin = new Date().toISOString();
-    save();
+    save(user);
     const sessionKey = crypto.randomBytes(32).toString('hex');
     const now = Date.now();
     sessions.set(sessionKey, { username: user.username, createdAt: now, lastUsed: now });
@@ -176,7 +188,7 @@ function createUserStore(directory) {
     sessions.delete(String(sessionKey || ''));
   }
 
-  return { list, create, update, setPassword, remove, signOut, login, logout, userForSession };
+  return { list, create, update, setPassword, remove, signOut, login, logout, userForSession, reload };
 }
 
 module.exports = { createUserStore };

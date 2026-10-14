@@ -638,7 +638,7 @@ function renderBackups() {
     restore.className = 'btn btn-sm btn-outline-danger btn-icon';
     restore.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Restore';
     restore.addEventListener('click', () => {
-      if (!confirm(`Restore the data from ${formatTime(backup.createdAt, true)}?\n\nThe current data is backed up first, and every SalesKit laptop will reload the restored data. The next sync from Google Sheets will overwrite it again.`)) return;
+      if (!confirm(`Restore the data from ${formatTime(backup.createdAt, true)}?\n\nUser accounts also go back to how they were then (including passwords). The current data is backed up first, and every SalesKit laptop reloads the restored data. The next sync from Google Sheets updates the sheet data again.`)) return;
       run(restore, () => api.restoreBackup(backup.name), 'Backup restored').then((next) => next && render(next));
     });
     actions.appendChild(restore);
