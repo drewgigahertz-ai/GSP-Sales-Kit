@@ -1735,6 +1735,10 @@
       padding: 0;
     }
 
+    .search-no-match {
+      display: none !important;
+    }
+
     .saleskit-feature-banner-panel {
       padding: 20px;
       border: 1px solid #dbe3ee;
@@ -4720,8 +4724,19 @@
       const rows = container.querySelectorAll('.app-checkbox-row');
       rows.forEach(row => {
         const labelText = row.querySelector('label')?.textContent?.toLowerCase() || '';
-        row.style.display = labelText.includes(q) ? 'flex' : 'none';
+        setSearchMatch(row, labelText.includes(q));
       });
+    }
+
+    // Rows use Bootstrap's d-flex (display: flex !important), which beats an inline display: none,
+    // so search results are hidden with a class that is also !important.
+    function setSearchMatch(element, matches) {
+      element.classList.toggle('search-no-match', !matches);
+      element.style.removeProperty('display');
+    }
+
+    function isSearchMatch(element) {
+      return !element.classList.contains('search-no-match');
     }
 
     function toggleSalesKitAppsMenu(event) {
@@ -4749,7 +4764,7 @@
       const rows = container.querySelectorAll('.app-checkbox-row');
       rows.forEach(row => {
         const labelText = (row.querySelector('label')?.textContent || row.textContent || '').toLowerCase().trim();
-        row.style.display = !q || labelText.includes(q) ? 'flex' : 'none';
+        setSearchMatch(row, !q || labelText.includes(q));
       });
     }
 
@@ -5020,7 +5035,7 @@
       if (!container) return;
       const items = container.querySelectorAll('.custom-dropdown-item');
       items.forEach(it => {
-        it.style.display = (!q || it.textContent.toLowerCase().includes(q)) ? 'block' : 'none';
+        setSearchMatch(it, !q || it.textContent.toLowerCase().includes(q));
       });
     }
 
@@ -5140,7 +5155,7 @@
       const items = container.querySelectorAll('.feature-checkbox-row');
       items.forEach(it => {
         const txt = it.querySelector('label')?.textContent?.toLowerCase() || '';
-        it.style.display = (!q || txt.includes(q)) ? 'flex' : 'none';
+        setSearchMatch(it, !q || txt.includes(q));
       });
     }
 
@@ -5252,7 +5267,7 @@
       const rows = container.querySelectorAll('.feature-checkbox-row');
       rows.forEach(row => {
         const labelText = row.querySelector('label')?.textContent?.toLowerCase() || '';
-        row.style.display = labelText.includes(q) ? 'flex' : 'none';
+        setSearchMatch(row, labelText.includes(q));
       });
     }
 
@@ -6058,7 +6073,7 @@
       const standardItems = listEl.querySelectorAll('.custom-dropdown-item:not(.sheet-extra-item)');
       standardItems.forEach(it => {
         const matches = !query || it.textContent.toLowerCase().includes(query);
-        it.style.display = matches ? 'flex' : 'none';
+        setSearchMatch(it, matches);
       });
 
       const existingExtras = listEl.querySelectorAll('.sheet-extra-item, .sheet-extra-header');
