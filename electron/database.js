@@ -14,7 +14,6 @@ const SHEET_TABLES = new Set([
   'specs',
   'criteria_segment_application',
   'dv_transposed',
-  'application_description',
   'uksp_transposed',
   'uksp_banner',
   'reco_table',
@@ -385,28 +384,6 @@ function makeApplicationMatrix(rows) {
   };
 }
 
-function makeApplicationDescriptionData(rows) {
-  const excludedColumns = new Set(['id', 'sku', 'order_index']);
-  const appNames = rows.length
-    ? Object.keys(rows[0]).filter((column) => !excludedColumns.has(column.toLowerCase()))
-    : [];
-
-  return {
-    applications: appNames.map((name) => {
-      const values = {};
-      for (const row of rows) {
-        const rawSku = text(row.SKU);
-        const value = text(row[name]);
-        if (!rawSku || !value || value.startsWith('#')) continue;
-        values[canonicalSku(rawSku)] = value;
-        values[cleanSku(rawSku).toLowerCase()] = value;
-        values[rawSku.toLowerCase()] = value;
-      }
-      return { name, values };
-    })
-  };
-}
-
 // UKSP TRANSPOSED has one row per SKU (the SKU is in the FEATURES column) and one column per feature.
 function makeUkspData(rows, modelBySku = {}) {
   const excludedColumns = new Set(['id', 'features', 'order_index']);
@@ -463,7 +440,6 @@ function getInitialData() {
   const specRows = getRows('specs');
   const { specsMap, specsBySku } = makeSpecsMap(specRows);
   const applicationMatrix = makeApplicationMatrix(getRows('dv_transposed'));
-  const applicationDescriptionData = makeApplicationDescriptionData(getRows('application_description'));
   const criteriaSegmentData = makeCriteriaData(
     getRows('criteria_segment_application'),
     specsBySku,
@@ -504,7 +480,6 @@ function getInitialData() {
     ukspPerSkuData,
     ukspBannerData,
     appUkspData: applicationMatrix,
-    applicationDescriptionData,
     dvApplicationsPerSkuData: applicationMatrix,
     bannerData: buildBannerData({
       laptops: getRows('banner_laptops'),

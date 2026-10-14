@@ -2,16 +2,13 @@ const SHEETS = [
   'SPECS',
   'Criteria Segment-Application',
   'DV TRANSPOSED',
-  'APPLICATION DESCRIPTION',
   'UKSP TRANSPOSED',
   'UKSP Banner',
   'RECO TABLE',
   'LOGO'
 ];
 // Sheets whose first header cell is left blank in the spreadsheet.
-const FIRST_COLUMN_HEADERS = {
-  'APPLICATION DESCRIPTION': 'SKU'
-};
+const FIRST_COLUMN_HEADERS = {};
 const DEFAULT_SPREADSHEET_ID = '1qACk3I6yMwmIYauQFlcM3yryRcyIrx3bLYqmJZ2wVFE';
 const { BANNER_SHEETS, normalizeBannerSheets } = require('./banner-data');
 
