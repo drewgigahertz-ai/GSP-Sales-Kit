@@ -12,6 +12,7 @@ const { createBackupStore } = require('./backups');
 const { createUserStore } = require('./users');
 const { hasFullAccess, filterDataForBranch } = require('./branch-filter');
 const { createClientReleaseWatcher } = require('./client-release');
+const { createCompressedData } = require('./compressed-data');
 const { version: APP_VERSION } = require('../package.json');
 
 const APP_NAME = 'GigaHertz SalesKit Server';
@@ -226,10 +227,25 @@ function pushState() {
 async function startApi() {
   await stopApi();
   apiError = '';
+  // One full data object per data version; each branch's (compressed) copy is made from it.
+  let fullData = null;
+  let fullDataVersion = null;
+  const payloads = createCompressedData({
+    getDataVersion: () => settings.dataVersion,
+    scopeOf: (user) => (!user || hasFullAccess(user.branch) ? 'ALL' : String(user.branch).trim().toUpperCase()),
+    build: (scope) => {
+      if (fullDataVersion !== settings.dataVersion || !fullData) {
+        fullData = database.getInitialData();
+        fullDataVersion = settings.dataVersion;
+      }
+      return scope === 'ALL' ? fullData : filterDataForBranch(fullData, scope);
+    }
+  });
   const server = createLocalApi({
     database,
     token: settings.token,
     getDataVersion: () => settings.dataVersion,
+    getInitialPayload: (user, options) => payloads.get(user, options),
     getLatestClientVersion: () => clientRelease.get().version,
     accounts: {
       login: (username, password, address) => users.login(username, password, address),

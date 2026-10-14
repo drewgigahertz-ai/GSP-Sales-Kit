@@ -8,6 +8,7 @@ const { getConfig } = require('./app-config');
 const { startAutoUpdates, getUpdateStatus, installUpdateNow, noticeLatestVersion } = require('./updater');
 const { createUpdateResume } = require('./update-resume');
 const { createLogoCache } = require('./logo-cache');
+const { createDataLoader } = require('./data-loader');
 const { getDeviceInfo } = require('./device-info');
 
 // SalesKit is a client: it loads its data from the SalesKit Server, which does the Google Sheets sync.
@@ -20,6 +21,7 @@ protocol.registerSchemesAsPrivileged([{
 let mainWindow;
 let imageCache;
 let snapshotCache;
+let dataLoader;
 let updateResume;
 let logoCache;
 
@@ -33,11 +35,15 @@ function reportSyncProgress(progress) {
 const CLIENT_HEADERS = {
   'X-SalesKit-Client': os.hostname(),
   'X-SalesKit-User': os.userInfo().username,
-  'X-SalesKit-Version': app.getVersion()
+  'X-SalesKit-Version': app.getVersion(),
+  // The server may send the duplicate benchmark table once (see data-loader.js).
+  'X-SalesKit-Features': 'dedupe',
+  'Accept-Encoding': 'gzip'
 };
 
 // The address that answered last time is tried first.
 let workingServerUrl = '';
+// Fingerprint of the data the window shows: the server's per-branch ETag, or its data version (older servers).
 let loadedDataVersion = null;
 
 // Signed-in user for this run of SalesKit ({ key, user }). Users log in every time SalesKit opens; it is only
@@ -45,7 +51,8 @@ let loadedDataVersion = null;
 let session = null;
 let onLoginPage = true;
 
-async function requestServer(pathname, { timeoutMs = 8000, method = 'GET', body } = {}) {
+// withMeta: return { status, etag, body } instead of the body; a 304 (Not Modified) is then not an error.
+async function requestServer(pathname, { timeoutMs = 8000, method = 'GET', body, headers: extraHeaders = {}, withMeta = false } = {}) {
   const { serverUrls, serverToken } = getConfig();
   if (!serverUrls.length) throw new Error('SalesKit has no server address. Add it to electron/embedded-config.json and rebuild.');
   const device = await getDeviceInfo();
@@ -53,6 +60,7 @@ async function requestServer(pathname, { timeoutMs = 8000, method = 'GET', body 
   if (serverToken) headers.Authorization = `Bearer ${serverToken}`;
   if (session) headers['X-SalesKit-Session'] = session.key;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
+  Object.assign(headers, extraHeaders);
   const ordered = workingServerUrl && serverUrls.includes(workingServerUrl)
     ? [workingServerUrl, ...serverUrls.filter((url) => url !== workingServerUrl)]
     : serverUrls;
@@ -73,13 +81,14 @@ async function requestServer(pathname, { timeoutMs = 8000, method = 'GET', body 
       continue;
     }
     workingServerUrl = serverUrl;
+    if (withMeta && response.status === 304) return { status: 304, etag: response.headers.get('etag'), body: null };
     const result = await response.json().catch(() => ({}));
     if (!response.ok) {
       // The session ended (server restarted, password changed, or signed out by the administrator).
       if (result.code === 'login_required' && pathname !== '/api/login' && !onLoginPage) showLogin('Please log in again.');
       throw Object.assign(new Error(result.error || `SalesKit Server returned HTTP ${response.status}.`), { code: result.code, status: response.status });
     }
-    return result;
+    return withMeta ? { status: response.status, etag: response.headers.get('etag'), body: result } : result;
   }
   throw Object.assign(new Error(`SalesKit Server is not reachable (${ordered.join(', ')}): ${networkError.message}`), { code: 'unreachable' });
 }
@@ -88,13 +97,13 @@ async function getRemoteSnapshot() {
   try {
     const { dataVersion, latestClientVersion } = await requestServer('/api/version').catch(() => ({ dataVersion: null }));
     noticeLatestVersion(latestClientVersion);
-    const data = await requestServer('/api/initial-data', { timeoutMs: 60000 });
-    loadedDataVersion = dataVersion;
-    if (snapshotCache) snapshotCache.save(data);
+    // Downloads only when this account's data changed since the saved copy (see data-loader.js).
+    const { data, tag } = await dataLoader.load();
+    loadedDataVersion = tag || dataVersion;
     return { data, offline: false };
   } catch (error) {
     if (error.code === 'login_required') throw error;
-    const data = snapshotCache && snapshotCache.load();
+    const data = dataLoader.savedDataFor(session && session.user);
     if (!data) throw error;
     console.warn('Using the last saved SalesKit data while the server is unavailable:', error.message);
     return { data, offline: true };
@@ -146,9 +155,11 @@ function startDataChangeChecks() {
   setInterval(async () => {
     if (!session) return;
     try {
-      const { dataVersion, latestClientVersion } = await requestServer('/api/version');
+      const { dataVersion, dataTag, latestClientVersion } = await requestServer('/api/version');
       noticeLatestVersion(latestClientVersion);
-      if (loadedDataVersion !== null && dataVersion !== null && dataVersion !== loadedDataVersion &&
+      // Newer servers fingerprint each branch's data, so a change at another branch is ignored here.
+      const current = dataTag !== undefined ? dataTag : dataVersion;
+      if (loadedDataVersion !== null && current !== null && current !== loadedDataVersion &&
           mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('data:changed', dataVersion);
       }
@@ -178,11 +189,10 @@ function showSalesKit() {
 ipcMain.handle('auth:info', async () => {
   const message = loginMessage;
   loginMessage = '';
-  const saved = snapshotCache && snapshotCache.load();
   return {
     version: app.getVersion(),
     message,
-    offlineAvailable: Boolean(saved),
+    offlineAvailable: dataLoader.hasSaved(),
     // The GigaHertz header logo from the last saved data, if its image is in the local cache.
     logo: (await logoCache.cachedLogos()).header
   };
@@ -204,7 +214,7 @@ ipcMain.handle('auth:login', async (_event, username, password) => {
 
 // Only offered while the server cannot be reached: SalesKit opens with the last saved data.
 ipcMain.handle('auth:offline', () => {
-  if (!snapshotCache || !snapshotCache.load()) return false;
+  if (!dataLoader.hasSaved()) return false;
   showSalesKit();
   return true;
 });
@@ -219,6 +229,11 @@ ipcMain.handle('auth:logout', async () => {
 
 ipcMain.handle('database:status', () => requestServer('/api/status'));
 ipcMain.handle('database:initial-data', async () => imageCache.mapPayload((await getRemoteSnapshot()).data));
+// The saved data, shown while the current data loads; null when this account may not see it.
+ipcMain.handle('database:saved-data', async () => {
+  const data = dataLoader.savedDataFor(session && session.user);
+  return data ? imageCache.mapPayload(data) : null;
+});
 ipcMain.handle('application:set-icon', async (event, imageUrl) => {
   if (!mainWindow || event.sender !== mainWindow.webContents) {
     throw new Error('Only the main SalesKit window can update the application icon.');
@@ -313,7 +328,14 @@ function createWindow() {
 app.whenReady().then(() => {
   snapshotCache = createSnapshotCache(path.join(app.getPath('userData'), 'saleskit-data-cache.json'));
   imageCache = new ImageCache(path.join(app.getPath('userData'), 'image-cache'));
-  logoCache = createLogoCache({ userDataDir: app.getPath('userData'), imageCache, snapshotCache });
+  dataLoader = createDataLoader({
+    requestServer,
+    snapshotCache,
+    metaPath: path.join(app.getPath('userData'), 'saleskit-data-cache.meta.json'),
+    getUser: () => (session ? session.user : null)
+  });
+  // Logo addresses come from the small meta file, so the large saved data is not read for them.
+  logoCache = createLogoCache({ userDataDir: app.getPath('userData'), imageCache, snapshotCache: { load: () => dataLoader.loadMeta() } });
   updateResume = createUpdateResume(path.join(app.getPath('userData'), 'update-resume.bin'));
   // Restarted to install an update: open SalesKit signed in as before. (If the server no longer
   // knows the session, the first data request shows the login screen.)

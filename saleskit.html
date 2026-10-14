@@ -4632,6 +4632,14 @@
       updateMatchedFeaturesInRecoResults();
       restoreAppStateFromStorage();
       updateTierSelectionHeading();
+      // Show the saved data at once (if this account may see it); the current data replaces it when it arrives.
+      if (window.saleskit && typeof window.saleskit.getSavedData === 'function') {
+        window.saleskit.getSavedData().then(function(data) {
+          if (data) applyDesktopInitialData(data, true);
+        }).catch(function(err) {
+          console.warn('Saved data is not available:', err);
+        });
+      }
       if (window.saleskit && typeof window.saleskit.getInitialData === 'function') {
         window.saleskit.getInitialData().then(function(data) {
           applyDesktopInitialData(data);
@@ -8590,8 +8598,12 @@
     }
 
 
-    function applyDesktopInitialData(data) {
+    // fromSaved: the copy saved on this laptop, shown while the current data loads. It never
+    // replaces data that already came from the server.
+    function applyDesktopInitialData(data, fromSaved) {
       if (!data) return;
+      if (fromSaved && window._desktopCurrentDataApplied) return;
+      if (!fromSaved) window._desktopCurrentDataApplied = true;
       window.SERVER_INITIAL_DATA = data;
       window.sheetData = data;
       window.UKSP_BANNER_DATA = data.ukspBannerData || { features: [], skus: [] };
@@ -8892,15 +8904,8 @@
     }
 
     function loadSheetDataIfAvailable() {
-      if (window.saleskit && typeof window.saleskit.getInitialData === 'function') {
-        window.saleskit.getInitialData().then(function(data) {
-          applyDesktopInitialData(data);
-          startHourlyAutoRefresh();
-        }).catch(function(err) {
-          console.warn('Remote data load notice:', err);
-        });
-        return;
-      }
+      // The desktop app already asked for its data when the page loaded; asking again only repeats the download.
+      if (window.saleskit && typeof window.saleskit.getInitialData === 'function') return;
 
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         google.script.run

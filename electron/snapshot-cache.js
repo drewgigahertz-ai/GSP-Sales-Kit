@@ -16,6 +16,9 @@ function createSnapshotCache(filePath) {
   const resolvedPath = path.resolve(filePath);
 
   return {
+    exists() {
+      return fs.existsSync(resolvedPath);
+    },
     load() {
       try {
         const data = JSON.parse(fs.readFileSync(resolvedPath, 'utf8'));

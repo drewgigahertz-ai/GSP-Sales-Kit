@@ -1,5 +1,6 @@
 const http = require('node:http');
 const crypto = require('node:crypto');
+const zlib = require('node:zlib');
 
 function sendJson(response, status, value) {
   response.writeHead(status, {
@@ -52,7 +53,10 @@ function readJsonBody(request, limit = 10 * 1024) {
 //   prepareInitialData(data, user), canBrowseTables(user) }
 //   When given, data routes also need a signed-in user, sent as the X-SalesKit-Session header.
 // getLatestClientVersion: the newest SalesKit release, so open clients start updating within minutes.
-function createLocalApi({ database, token = '', onRequest = null, getDataVersion = () => null, getLatestClientVersion = () => null, accounts = null }) {
+// getInitialPayload(user, { dedupe }) (optional): { etag, gzip } of the prepared data for that user. Then
+//   /api/initial-data answers "304 Not Modified" to a matching If-None-Match, sends gzip when accepted,
+//   and /api/version includes the user's dataTag (the ETag), so laptops only download when their data changed.
+function createLocalApi({ database, token = '', onRequest = null, getDataVersion = () => null, getLatestClientVersion = () => null, getInitialPayload = null, accounts = null }) {
   return http.createServer(async (request, response) => {
     const url = new URL(request.url, 'http://localhost');
     const address = request.socket.remoteAddress || '';
@@ -113,7 +117,11 @@ function createLocalApi({ database, token = '', onRequest = null, getDataVersion
         const status = database.getStatus();
         sendJson(response, 200, { connected: status.connected, tableCount: status.tableCount });
       } else if (request.method === 'GET' && url.pathname === '/api/version') {
-        sendJson(response, 200, { dataVersion: getDataVersion(), latestClientVersion: getLatestClientVersion() });
+        const result = { dataVersion: getDataVersion(), latestClientVersion: getLatestClientVersion() };
+        if (getInitialPayload) result.dataTag = getInitialPayload(user, payloadOptions(request)).etag;
+        sendJson(response, 200, result);
+      } else if (request.method === 'GET' && url.pathname === '/api/initial-data' && getInitialPayload) {
+        sendPayload(request, response, getInitialPayload(user, payloadOptions(request)));
       } else if (request.method === 'GET' && url.pathname === '/api/initial-data') {
         const data = database.getInitialData();
         sendJson(response, 200, accounts && accounts.prepareInitialData ? accounts.prepareInitialData(data, user) : data);
@@ -137,6 +145,26 @@ function createLocalApi({ database, token = '', onRequest = null, getDataVersion
       sendJson(response, 500, { error: error.message || 'Server request failed.' });
     }
   });
+}
+
+function payloadOptions(request) {
+  return { dedupe: headerText(request, 'x-saleskit-features').split(',').map((item) => item.trim()).includes('dedupe') };
+}
+
+function sendPayload(request, response, payload) {
+  const headers = { 'Cache-Control': 'no-cache', ETag: payload.etag, Vary: 'Accept-Encoding' };
+  if (request.headers['if-none-match'] === payload.etag) {
+    response.writeHead(304, headers);
+    response.end();
+    return;
+  }
+  headers['Content-Type'] = 'application/json; charset=utf-8';
+  const gzip = /\bgzip\b/i.test(request.headers['accept-encoding'] || '');
+  const body = gzip ? payload.gzip : zlib.gunzipSync(payload.gzip);
+  if (gzip) headers['Content-Encoding'] = 'gzip';
+  headers['Content-Length'] = body.length;
+  response.writeHead(200, headers);
+  response.end(body);
 }
 
 module.exports = { createLocalApi };

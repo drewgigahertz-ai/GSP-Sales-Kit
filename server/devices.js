@@ -72,7 +72,8 @@ function createDeviceRegistry(filePath) {
       if (pathname === '/api/login') device.lastLogin = now;
     }
     // A successful data download is a refresh: remember when, and which data version it got.
-    if (pathname === '/api/initial-data' && status === 200) {
+    // (304: the laptop already had this data.)
+    if (pathname === '/api/initial-data' && (status === 200 || status === 304)) {
       device.lastRefresh = now;
       device.lastRefreshVersion = dataVersion;
     }

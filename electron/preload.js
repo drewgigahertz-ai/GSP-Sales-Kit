@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('saleskit', {
   getDatabaseStatus: () => ipcRenderer.invoke('database:status'),
   getInitialData: () => ipcRenderer.invoke('database:initial-data'),
+  getSavedData: () => ipcRenderer.invoke('database:saved-data'),
   syncData: (options = {}) => ipcRenderer.invoke('database:sync', options),
   setApplicationIcon: (imageUrl) => ipcRenderer.invoke('application:set-icon', imageUrl),
   getCachedLogos: () => ipcRenderer.invoke('logos:cached'),
