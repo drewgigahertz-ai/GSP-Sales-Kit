@@ -10,7 +10,7 @@ const { createLocalApi } = require('../electron/local-api');
 const { createDeviceRegistry } = require('./devices');
 const { createBackupStore } = require('./backups');
 const { createUserStore } = require('./users');
-const { ALL_BRANCHES, filterDataForBranch } = require('./branch-filter');
+const { hasFullAccess, filterDataForBranch } = require('./branch-filter');
 const { version: APP_VERSION } = require('../package.json');
 
 const APP_NAME = 'GigaHertz SalesKit Server';
@@ -224,7 +224,7 @@ async function startApi() {
       // Branch-locked users only receive their own branch's stock. (Older SalesKit without login
       // still gets everything while the transition switch is on.)
       prepareInitialData: (data, user) => (user ? filterDataForBranch(data, user.branch) : data),
-      canBrowseTables: (user) => !user || user.branch === ALL_BRANCHES
+      canBrowseTables: (user) => !user || hasFullAccess(user.branch)
     },
     onRequest: (request) => {
       const { method, path: pathname, status, address, client, user, denied } = request;

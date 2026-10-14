@@ -482,7 +482,8 @@ setInterval(() => { if (currentView === 'devices') loadDevices(); }, 30 * 1000);
 // ---------- Users ----------
 
 function branchLabel(branch) {
-  return branch === 'ALL' || branch === 'ALL BRANCHES' ? 'All branches' : branch;
+  if (branch === 'ALL' || branch === 'ALL BRANCHES') return 'All branches';
+  return branch === 'HO' ? 'HO (all branches)' : branch;
 }
 
 function renderUsers(list) {

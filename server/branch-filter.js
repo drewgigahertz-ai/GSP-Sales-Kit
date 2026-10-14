@@ -1,9 +1,14 @@
 // Trims the SalesKit data to one branch before it is sent to a branch-locked user, so other branches'
-// stock never reaches their laptop. Accounts with branch "ALL" receive everything.
+// stock never reaches their laptop. Accounts with branch "ALL" or "HO" (head office) receive everything.
 const ALL_BRANCHES = 'ALL';
+const FULL_ACCESS_BRANCHES = [ALL_BRANCHES, 'HO'];
 
 function sameBranch(a, b) {
   return String(a || '').trim().toUpperCase() === String(b || '').trim().toUpperCase();
+}
+
+function hasFullAccess(branch) {
+  return FULL_ACCESS_BRANCHES.some((code) => sameBranch(branch, code));
 }
 
 // The stock a laptop has at `branch` (location names are compared without regard to case).
@@ -13,7 +18,7 @@ function stockAt(stocksByLocation, branch) {
 }
 
 function filterDataForBranch(data, branch) {
-  if (!branch || sameBranch(branch, ALL_BRANCHES)) return data;
+  if (!branch || hasFullAccess(branch)) return data;
   const code = String(branch).trim().toUpperCase();
 
   const criteria = data.criteriaSegmentData || {};
@@ -36,4 +41,4 @@ function filterDataForBranch(data, branch) {
   };
 }
 
-module.exports = { ALL_BRANCHES, filterDataForBranch };
+module.exports = { ALL_BRANCHES, hasFullAccess, filterDataForBranch };
