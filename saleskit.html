@@ -2022,15 +2022,16 @@
       z-index: 30;
     }
 
+    /* The banner fills almost the whole screen, scaled up to fit even when the image file is small. */
     .saleskit-presentation-banner-viewer {
-      position: absolute;
+      position: fixed;
       inset: 0;
       z-index: 2;
       display: none;
       align-items: center;
       justify-content: center;
-      padding: clamp(16px, 4vw, 56px);
-      background: rgba(15, 23, 42, 0.92);
+      padding: 12px;
+      background: rgba(15, 23, 42, 0.96);
     }
 
     .saleskit-presentation-banner-viewer.is-open {
@@ -2038,8 +2039,8 @@
     }
 
     .saleskit-presentation-banner-viewer img {
-      max-width: 100%;
-      max-height: 100%;
+      width: 100%;
+      height: 100%;
       object-fit: contain;
     }
 
@@ -2082,7 +2083,7 @@
     }
 
     .saleskit-presentation.is-banner-open .saleskit-presentation-banner-viewer {
-      padding-top: 64px;
+      padding-top: 60px;
     }
 
     .saleskit-presentation-banner-tabs[hidden] {
