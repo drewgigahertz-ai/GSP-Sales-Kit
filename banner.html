@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SalesKit Banner</title>
+  <!-- Banner page of SalesKit, shown in the BANNER tab (see banner-bridge.js). Everything loads from the app,
+       so it also works offline. -->
+  <link href="./node_modules/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="./node_modules/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="./node_modules/@fontsource/outfit/400.css" rel="stylesheet">
+  <link href="./node_modules/@fontsource/outfit/500.css" rel="stylesheet">
+  <link href="./node_modules/@fontsource/outfit/600.css" rel="stylesheet">
+  <link href="./node_modules/@fontsource/outfit/700.css" rel="stylesheet">
+  <link href="./node_modules/@fontsource/outfit/800.css" rel="stylesheet">
+  <link href="./node_modules/@fontsource/plus-jakarta-sans/400.css" rel="stylesheet">
+  <link href="./node_modules/@fontsource/plus-jakarta-sans/500.css" rel="stylesheet">
+  <link href="./node_modules/@fontsource/plus-jakarta-sans/600.css" rel="stylesheet">
+  <link href="./node_modules/@fontsource/plus-jakarta-sans/700.css" rel="stylesheet">
+  <link href="./node_modules/@fontsource/plus-jakarta-sans/800.css" rel="stylesheet">
+  <style>
+    :root {
+      --banner-blue: #1a2cf0;
+      --banner-red: #e8101e;
+      --banner-ink: #0a0a0a;
+      --banner-gray: #e9e9ea;
+    }
+
+    html,
+    body {
+      width: auto;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      color: #1e293b;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    #app {
+      display: flex;
+      width: 100%;
+      height: 100%;
+    }
+
+    #side {
+      display: flex;
+      width: 320px;
+      flex: 0 0 320px;
+      flex-direction: column;
+      border-right: 1px solid #d9e3f0;
+      background: #fff;
+    }
+
+    #refreshBannerButton,
+    #fullscreenButton {
+      display: inline-flex;
+      min-height: 32px;
+      flex: 0 0 auto;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 6px 11px;
+      border: 1px solid #003ecb;
+      border-radius: 6px;
+      background: #003ecb;
+      color: #fff;
+      font: inherit;
+      font-size: .72rem;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+    }
+
+    #refreshBannerButton:hover,
+    #fullscreenButton:hover {
+      transform: translateY(-1px);
+      border-color: #001a66;
+      background: #001a66;
+      box-shadow: 0 3px 8px rgba(0, 18, 179, .2);
+    }
+
+    #refreshBannerButton:focus-visible,
+    #fullscreenButton:focus-visible,
+    #clearSearch:focus-visible {
+      outline: 3px solid rgba(0, 62, 203, .28);
+      outline-offset: 2px;
+    }
+
+    .sidebar-heading {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 14px 10px;
+      border-bottom: 2px solid #eef3fb;
+    }
+
+    .sidebar-heading-icon {
+      color: #0012b3;
+      font-size: 1.25rem;
+    }
+
+    .sidebar-heading-title {
+      color: #0012b3;
+      font-family: Outfit, sans-serif;
+      font-size: .9rem;
+      font-weight: 800;
+    }
+
+    .sidebar-heading-subtitle {
+      color: #64748b;
+      font-size: .67rem;
+    }
+
+    .search-panel {
+      padding: 12px;
+      border-bottom: 1px solid #d9e3f0;
+      background: #f4f8fd;
+    }
+
+    .search-label {
+      display: block;
+      margin-bottom: 6px;
+      color: #334155;
+      font-size: .68rem;
+      font-weight: 800;
+      letter-spacing: .045em;
+      text-transform: uppercase;
+    }
+
+    .search-field {
+      display: flex;
+      min-height: 36px;
+      align-items: center;
+      gap: 8px;
+      padding: 0 9px;
+      border: 1px solid #cbd8eb;
+      border-radius: 7px;
+      background: #fff;
+      color: #64748b;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+
+    .search-field:focus-within {
+      border-color: #003ecb;
+      box-shadow: 0 0 0 3px rgba(0, 62, 203, .12);
+    }
+
+    #productSearch {
+      width: 100%;
+      min-width: 0;
+      padding: 6px 0;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: #1e293b;
+      font: inherit;
+      font-size: .74rem;
+    }
+
+    #productSearch::placeholder {
+      color: #94a3b8;
+    }
+
+    #clearSearch {
+      display: none;
+      width: 22px;
+      height: 22px;
+      flex: 0 0 22px;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: 0;
+      border-radius: 5px;
+      background: transparent;
+      color: #64748b;
+      cursor: pointer;
+    }
+
+    #clearSearch.visible {
+      display: inline-flex;
+    }
+
+    #clearSearch:hover {
+      background: #eef3fb;
+      color: #0012b3;
+    }
+
+    #count {
+      min-height: .9rem;
+      margin-top: 5px;
+      color: #64748b;
+      font-size: .68rem;
+    }
+
+    .price-filter {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 7px;
+      color: #475569;
+      font-size: .68rem;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .price-filter input {
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      accent-color: #003ecb;
+      cursor: pointer;
+    }
+
+    #list {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    #list .list-group-item {
+      padding: 10px 12px;
+      border-right: 0;
+      border-left: 4px solid transparent;
+      border-radius: 0;
+      cursor: pointer;
+    }
+
+    #list .list-group-item.active {
+      border-color: #dee2e6;
+      border-left-color: var(--banner-blue);
+      background: #e8ecff;
+      color: #0f172a;
+    }
+
+    #list small {
+      display: block;
+      overflow: hidden;
+      color: #64748b;
+      font-size: .68rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .no-price-tag {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: #fff1f2;
+      color: #be123c;
+      font-size: .58rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    #main {
+      display: flex;
+      min-width: 0;
+      flex: 1;
+      flex-direction: column;
+    }
+
+    #bar {
+      display: flex;
+      min-height: 44px;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-bottom: 1px solid #d9e3f0;
+      background: #fff;
+    }
+
+    #wrap {
+      position: relative;
+      flex: 1;
+      overflow: hidden;
+      background: #c9ced8;
+    }
+
+    #wrap:fullscreen {
+      background: #000;
+    }
+
+    #wrap:fullscreen #stage {
+      will-change: transform, left, top;
+    }
+
+    #stage {
+      position: absolute;
+      width: 1600px;
+      height: 890px;
+      overflow: hidden;
+      transform-origin: 0 0;
+      transition: transform .45s cubic-bezier(.22, .61, .36, 1), left .45s cubic-bezier(.22, .61, .36, 1), top .45s cubic-bezier(.22, .61, .36, 1);
+      background: linear-gradient(115deg, #fff 0%, #f3f7fd 40%, #e8f0fb 100%);
+      font-family: Montserrat, Outfit, 'Segoe UI', Arial, sans-serif;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #stage {
+        transition: none;
+      }
+    }
+
+    #stage::before {
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(120deg, transparent 30%, rgba(120, 160, 235, .12) 30% 42%, transparent 42%),
+        linear-gradient(120deg, transparent 55%, rgba(120, 160, 235, .10) 55% 66%, transparent 66%),
+        linear-gradient(0deg, rgba(90, 150, 240, .22), transparent 28%),
+        linear-gradient(270deg, rgba(90, 150, 240, .30), transparent 14%);
+      content: "";
+    }
+
+    #stage .abs {
+      position: absolute;
+    }
+
+    .giga {
+      top: 42px;
+      left: 50px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--banner-blue);
+      font-size: 40px;
+      font-weight: 600;
+      letter-spacing: 2px;
+    }
+
+    .giga-mark {
+      position: relative;
+      width: 52px;
+      height: 52px;
+      border: 9px solid var(--banner-blue);
+      border-right-color: transparent;
+      border-radius: 50%;
+    }
+
+    .giga-mark::after {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      width: 34px;
+      height: 8px;
+      background: var(--banner-blue);
+      content: "";
+    }
+
+    .brandlogo {
+      top: 26px;
+      right: 18px;
+      display: flex;
+      width: 330px;
+      height: 100px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .brandlogo img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    .promo-picture {
+      top: 505px;
+      left: 265px;
+      width: 280px;
+      height: 220px;
+      object-fit: contain;
+    }
+
+    .banner-title {
+      top: 118px;
+      right: 0;
+      left: 0;
+      color: var(--banner-blue);
+      font-size: 84px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      line-height: 1;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .banner-model {
+      top: 198px;
+      right: 0;
+      left: 0;
+      color: var(--banner-ink);
+      font-size: 46px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-align: center;
+    }
+
+    .banner-tab {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--banner-blue);
+      color: #fff;
+      font-size: 25px;
+      font-weight: 700;
+    }
+
+    .cash-label {
+      z-index: 2;
+      top: 303px;
+      left: 160px;
+      width: 222px;
+      height: 43px;
+      clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+    }
+
+    .cash-box {
+      top: 322px;
+      left: 124px;
+      width: 613px;
+      height: 172px;
+      clip-path: polygon(66px 0, 100% 0, calc(100% - 67px) 100%, 0 100%);
+      background: var(--banner-blue);
+    }
+
+    .cash-value {
+      z-index: 3;
+      top: 360px;
+      left: 124px;
+      width: 600px;
+      color: #fff;
+      font-size: 76px;
+      font-weight: 700;
+      line-height: 1.1;
+      text-align: center;
+    }
+
+    .installment-label {
+      z-index: 3;
+      top: 463px;
+      left: 232px;
+      display: flex;
+      width: 148px;
+      height: 58px;
+      align-items: center;
+      justify-content: center;
+      clip-path: polygon(18px 0, 100% 0, 100% 100%, 0 100%);
+      background: var(--banner-red);
+      color: #fff;
+      font-size: 25px;
+      font-weight: 700;
+    }
+
+    .installment-value {
+      z-index: 2;
+      top: 463px;
+      left: 370px;
+      display: flex;
+      width: 262px;
+      height: 58px;
+      align-items: center;
+      justify-content: center;
+      clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+      background: var(--banner-gray);
+      font-size: 29px;
+      font-weight: 700;
+    }
+
+    .freebies {
+      display: none;
+      top: 552px;
+      left: 312px;
+      width: 190px;
+      height: 172px;
+    }
+
+    .freebies-band {
+      position: absolute;
+      top: 100px;
+      left: 6px;
+      width: 178px;
+      height: 62px;
+      padding-top: 8px;
+      transform: rotate(-2deg);
+      border-radius: 10px;
+      background: var(--banner-blue);
+      color: #ffd21f;
+      font-size: 28px;
+      font-weight: 800;
+      line-height: 1;
+      text-align: center;
+    }
+
+    .freebies-band span {
+      display: block;
+      color: #fff;
+      font-size: 24px;
+    }
+
+    .gift-icon {
+      position: absolute;
+      top: 0;
+      left: 45px;
+      color: #ff5a1f;
+      font-size: 96px;
+      line-height: 1;
+    }
+
+    .monthly-label {
+      z-index: 2;
+      top: 750px;
+      left: 200px;
+      width: 236px;
+      height: 57px;
+      padding-top: 4px;
+      clip-path: polygon(12px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+      background: var(--banner-blue);
+      color: #fff;
+      text-align: center;
+    }
+
+    .monthly-label b {
+      display: block;
+      margin-top: 2px;
+      font-size: 30px;
+      line-height: 1.1;
+    }
+
+    .monthly-label small {
+      display: block;
+      margin-top: -1px;
+      font-size: 14.5px;
+    }
+
+    .monthly-value {
+      top: 750px;
+      left: 424px;
+      display: flex;
+      width: 226px;
+      height: 57px;
+      align-items: center;
+      gap: 8px;
+      padding: 0 24px 0 28px;
+      clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 100%, 12px 100%);
+      background: #fff;
+      color: var(--banner-blue);
+      font-size: 27px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .monthly-value i {
+      flex: 0 0 auto;
+      margin-top: 15px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .monthly-value span {
+      min-width: 0;
+    }
+
+    .monthly-value.compact span {
+      font-size: 22px;
+    }
+
+    .section-label {
+      width: 193px;
+      height: 35px;
+      clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+      font-size: 21px;
+    }
+
+    .spec {
+      width: 300px;
+      height: 67px;
+    }
+
+    .spec-shape {
+      position: absolute;
+      inset: 0;
+      transform: skewX(-18deg);
+      border: 3px solid var(--banner-blue);
+      background: rgba(255, 255, 255, .85);
+    }
+
+    .spec-label {
+      position: absolute;
+      top: -10px;
+      left: 50%;
+      display: flex;
+      min-width: 148px;
+      height: 26px;
+      align-items: center;
+      justify-content: center;
+      padding: 0 20px;
+      transform: translateX(-50%);
+      clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+      background: var(--banner-blue);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .spec-value {
+      position: absolute;
+      inset: 14px 14px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--banner-blue);
+      font-size: 23px;
+      font-weight: 700;
+      line-height: 1.15;
+      text-align: center;
+    }
+
+    .feature {
+      top: 662px;
+      display: flex;
+      width: 143px;
+      height: 143px;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 8px 5px 10px;
+      overflow: hidden;
+      border: 5px solid var(--banner-blue);
+      background: #fff;
+      color: var(--banner-ink);
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.25;
+      text-align: center;
+    }
+
+    .feature img {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      width: 68px;
+      height: 68px;
+      transform: translateX(-50%);
+      object-fit: contain;
+    }
+
+    .feature span {
+      position: absolute;
+      right: 5px;
+      bottom: 8px;
+      left: 5px;
+      z-index: 1;
+      display: flex;
+      width: auto;
+      height: 42px;
+      align-items: center;
+      justify-content: center;
+      overflow-wrap: anywhere;
+      background: #fff;
+    }
+
+    .picture-slot[hidden] {
+      display: none;
+    }
+
+    .empty-message {
+      padding: 18px 12px;
+      color: #64748b;
+      font-size: .8rem;
+      text-align: center;
+    }
+
+    @media (max-width: 720px) {
+      #side {
+        width: 260px;
+        flex-basis: 260px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <aside id="side" aria-label="Product selection">
+      <div class="sidebar-heading">
+        <i class="bi bi-person-lines-fill sidebar-heading-icon" aria-hidden="true"></i>
+        <div>
+          <div class="sidebar-heading-title">Customer Profiling</div>
+          <div class="sidebar-heading-subtitle">Price banners · search item codes</div>
+        </div>
+      </div>
+      <div class="search-panel">
+        <label class="search-label" for="productSearch">Item code</label>
+        <div class="search-field">
+          <i class="bi bi-search" aria-hidden="true"></i>
+          <input id="productSearch" type="search" placeholder="Search item code or model..." autocomplete="off">
+          <button id="clearSearch" type="button" aria-label="Clear search" title="Clear search">
+            <i class="bi bi-x-lg" aria-hidden="true"></i>
+          </button>
+        </div>
+        <label class="price-filter" for="pricedOnly">
+          <input id="pricedOnly" type="checkbox" checked>
+          <span>Show laptops with prices only</span>
+        </label>
+        <div id="count" aria-live="polite"></div>
+      </div>
+      <div id="list" class="list-group list-group-flush" role="listbox" aria-label="Matching item codes"></div>
+    </aside>
+
+    <main id="main">
+      <div id="bar">
+        <i class="bi bi-laptop" aria-hidden="true"></i>
+        <span id="selectedItem" class="small flex-grow-1 text-muted text-truncate">Select an item code to generate its banner</span>
+        <span id="bannerStatus" class="small text-muted" aria-live="polite"></span>
+        <button id="refreshBannerButton" type="button" title="Load the latest data from the SalesKit server">
+          <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh data
+        </button>
+        <button id="fullscreenButton" type="button" aria-label="Enter fullscreen">
+          <i class="bi bi-fullscreen" aria-hidden="true"></i> Fullscreen
+        </button>
+      </div>
+      <div id="wrap">
+        <div id="stage" aria-label="Generated product banner">
+          <div class="abs giga"><div class="giga-mark"></div>IGAHERTZ</div>
+          <div class="abs brandlogo"><span id="brandName">N/A</span><img id="brandLogo" class="picture-slot" alt="" hidden></div>
+          <div class="abs banner-title" id="bannerTitle">SELECT A PRODUCT</div>
+          <div class="abs banner-model" id="partNumber"></div>
+
+          <div class="abs cash-box"></div>
+          <div class="abs banner-tab cash-label">CASH PRICE</div>
+          <div class="abs cash-value" id="cashPrice">N/A</div>
+          <div class="abs installment-label">12 MOS.</div>
+          <div class="abs installment-value" id="twelveMonths">N/A</div>
+
+          <div class="abs freebies">
+            <i class="bi bi-gift-fill gift-icon" aria-hidden="true"></i>
+            <div class="freebies-band">FREEBIES<span>PROMO</span></div>
+          </div>
+          <img id="promoPicture" class="abs promo-picture picture-slot" alt="" hidden>
+
+          <div class="abs monthly-label"><b>AS LOW AS</b><small>(for 12 Months Installment)</small></div>
+          <div class="abs monthly-value"><span id="monthlyPrice">N/A</span><i>/month</i></div>
+
+          <div class="abs banner-tab section-label" style="left:1072px;top:308px">QUICK SPECS</div>
+          <div class="abs spec" style="left:866px;top:365px"><div class="spec-shape"></div><div class="spec-label">PROCESSOR</div><div class="spec-value" id="spec-PROCESSOR">N/A</div></div>
+          <div class="abs spec" style="left:1158px;top:365px"><div class="spec-shape"></div><div class="spec-label">STORAGE</div><div class="spec-value" id="spec-STORAGE">N/A</div></div>
+          <div class="abs spec" style="left:866px;top:446px"><div class="spec-shape"></div><div class="spec-label">GRAPHICS</div><div class="spec-value" id="spec-GRAPHICS" style="font-size:19px">N/A</div></div>
+          <div class="abs spec" style="left:1158px;top:446px"><div class="spec-shape"></div><div class="spec-label">RESOLUTION</div><div class="spec-value" id="spec-RESOLUTION" style="font-size:18px">N/A</div></div>
+          <div class="abs spec" style="left:866px;top:527px"><div class="spec-shape"></div><div class="spec-label">MEMORY</div><div class="spec-value" id="spec-MEMORY">N/A</div></div>
+          <div class="abs spec" style="left:1158px;top:527px"><div class="spec-shape"></div><div class="spec-label">OS</div><div class="spec-value" id="spec-OS">N/A</div></div>
+
+          <div class="abs banner-tab section-label" style="left:1072px;top:616px">KEY FEATURES</div>
+          <div class="abs feature" style="left:852px" id="feature1"><img class="picture-slot" alt="" hidden><span></span></div>
+          <div class="abs feature" style="left:1010px" id="feature2"><img class="picture-slot" alt="" hidden><span></span></div>
+          <div class="abs feature" style="left:1169px" id="feature3"><img class="picture-slot" alt="" hidden><span></span></div>
+          <div class="abs feature" style="left:1327px" id="feature4"><img class="picture-slot" alt="" hidden><span></span></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // The SalesKit window (banner-bridge.js) sends the banner list ({ items }) and saves pictures on this
+    // laptop when they are first shown. Messages are only accepted from that window.
+    const $ = (id) => document.getElementById(id);
+    let bannerItems = [];
+    let currentItemCode = '';
+    let searchTimer;
+    let selectionVersion = 0;
+    let showPricedOnly = true;
+    let imageRequestSequence = 0;
+    const pendingImages = new Map();
+
+    function toParent(message) {
+      if (window.parent && window.parent !== window) window.parent.postMessage(message, '*');
+    }
+
+    window.addEventListener('message', (event) => {
+      if (event.source !== window.parent || !event.data) return;
+      const { channel } = event.data;
+      if (channel === 'saleskit-banner-data') {
+        bannerItems = Array.isArray(event.data.data && event.data.data.items) ? event.data.data.items : [];
+        loadItemList();
+        if (currentItemCode) selectItem(currentItemCode);
+      } else if (channel === 'saleskit-banner-image') {
+        const pending = pendingImages.get(event.data.requestId);
+        if (!pending) return;
+        pendingImages.delete(event.data.requestId);
+        window.clearTimeout(pending.timeout);
+        pending.resolve(event.data.url || pending.url);
+      } else if (channel === 'saleskit-banner-status') {
+        $('bannerStatus').textContent = event.data.message || '';
+        $('refreshBannerButton').disabled = Boolean(event.data.busy);
+      }
+    });
+
+    // The picture saved on this laptop (downloaded the first time); the web address if that is not possible.
+    function pictureUrl(url) {
+      if (!url) return Promise.resolve('');
+      if (!window.parent || window.parent === window) return Promise.resolve(url);
+      const requestId = `image-${++imageRequestSequence}`;
+      return new Promise((resolve) => {
+        const timeout = window.setTimeout(() => {
+          pendingImages.delete(requestId);
+          resolve(url);
+        }, 30000);
+        pendingImages.set(requestId, { resolve, timeout, url });
+        toParent({ channel: 'saleskit-banner-image', requestId, url });
+      });
+    }
+
+    function peso(value) {
+      if (value === null || value === undefined || value === '' || !Number.isFinite(Number(value))) return 'N/A';
+      return `₱${Number(value).toLocaleString('en-PH', { maximumFractionDigits: 0 })}`;
+    }
+
+    // Fallbacks read from the item code when BANNER SPECS has no value.
+    function valueFromItemCode(itemCode, key) {
+      const code = itemCode.toUpperCase();
+      if (key === 'STORAGE') {
+        const match = code.match(/(\d+\s?(?:GB|TB))\s*SSD/);
+        return match ? `${match[1].replace(/\s/g, '')} SSD` : '';
+      }
+      if (key === 'MEMORY') {
+        const match = code.match(/SSD\s+(\d+GB)/);
+        return match ? match[1] : '';
+      }
+      if (key === 'OS' && /WIN11|WIN 11/.test(code)) return 'WINDOWS 11';
+      return '';
+    }
+
+    function matchingItems() {
+      const query = $('productSearch').value.trim().replace(/\s+/g, ' ').toLowerCase();
+      return bannerItems.filter((item) => {
+        if (showPricedOnly && !item.hasPrice) return false;
+        if (!query) return true;
+        return [item.itemCode, item.brandModel, item.partNumber].some((value) => String(value || '').toLowerCase().includes(query));
+      });
+    }
+
+    function loadItemList() {
+      const visibleRows = matchingItems();
+      $('count').textContent = `${visibleRows.length} item code${visibleRows.length === 1 ? '' : 's'}`;
+      const list = $('list');
+      list.replaceChildren();
+
+      if (!visibleRows.length) {
+        const empty = document.createElement('div');
+        empty.className = 'empty-message';
+        empty.textContent = !bannerItems.length
+          ? 'No Banner data yet. It comes from the LAPTOP RAW, BANNER SPECS, DB PHOTOS and BANNER PRICES sheets through the SalesKit server.'
+          : showPricedOnly ? 'No matching item codes with prices.' : 'No matching item codes.';
+        list.appendChild(empty);
+        return;
+      }
+
+      visibleRows.forEach((row) => {
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.role = 'option';
+        option.setAttribute('aria-selected', String(row.itemCode === currentItemCode));
+        option.className = `list-group-item list-group-item-action${row.itemCode === currentItemCode ? ' active' : ''}`;
+
+        const model = document.createElement('span');
+        model.className = 'd-block fw-semibold';
+        model.textContent = `${row.brandModel || ''} · ${row.partNumber || ''}`;
+
+        const code = document.createElement('small');
+        code.textContent = row.itemCode;
+        code.title = row.itemCode;
+        if (!row.hasPrice) {
+          const badge = document.createElement('span');
+          badge.className = 'no-price-tag';
+          badge.textContent = 'no price';
+          code.appendChild(badge);
+        }
+
+        option.append(model, code);
+        option.addEventListener('click', () => selectItem(row.itemCode));
+        list.appendChild(option);
+      });
+    }
+
+    function setText(id, value) {
+      $(id).textContent = value || 'N/A';
+    }
+
+    async function setPicture(element, url, alt) {
+      const source = await pictureUrl(url);
+      element.alt = alt || '';
+      element.hidden = !source;
+      if (source) element.src = source;
+      else element.removeAttribute('src');
+    }
+
+    async function selectItem(itemCode) {
+      const item = bannerItems.find((row) => row.itemCode === itemCode);
+      if (!item) return;
+      const version = ++selectionVersion;
+      currentItemCode = itemCode;
+      loadItemList();
+
+      $('selectedItem').textContent = item.itemCode;
+      $('bannerTitle').textContent = item.brandModel || item.itemCode;
+      setText('brandName', item.brand);
+      setText('partNumber', item.partNumber);
+
+      ['PROCESSOR', 'STORAGE', 'GRAPHICS', 'RESOLUTION', 'MEMORY', 'OS'].forEach((key) => {
+        setText(`spec-${key}`, (item.specs && item.specs[key]) || valueFromItemCode(item.itemCode, key));
+      });
+
+      setText('cashPrice', peso(item.cash));
+      setText('twelveMonths', peso(item.twelveMonths));
+      const monthlyPrice = item.twelveMonths
+        ? `₱${(Number(item.twelveMonths) / 12).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        : 'N/A';
+      setText('monthlyPrice', monthlyPrice);
+      $('monthlyPrice').parentElement.classList.toggle('compact', monthlyPrice.length >= 9);
+
+      // Key features: up to four, centered as a group.
+      const visibleFeatures = [];
+      for (let index = 1; index <= 4; index++) {
+        const feature = $(`feature${index}`);
+        const itemFeature = (item.features || [])[index - 1];
+        feature.querySelector('span').textContent = itemFeature ? itemFeature.name : 'N/A';
+        feature.style.visibility = itemFeature ? 'visible' : 'hidden';
+        if (itemFeature) visibleFeatures.push(feature);
+      }
+      const featureWidth = 143;
+      const featureGap = 15;
+      const featureCenter = 1161;
+      const groupWidth = visibleFeatures.length * featureWidth + Math.max(0, visibleFeatures.length - 1) * featureGap;
+      visibleFeatures.forEach((feature, index) => {
+        feature.style.left = `${featureCenter - groupWidth / 2 + index * (featureWidth + featureGap)}px`;
+      });
+
+      // Pictures last: the text is already shown while they load.
+      const pictures = [
+        setPicture($('brandLogo'), item.brandPicture, item.brand),
+        setPicture($('promoPicture'), item.promo && item.promo.picture, item.promo && item.promo.name),
+        ...Array.from({ length: 4 }, (_, index) => {
+          const itemFeature = (item.features || [])[index];
+          return setPicture($(`feature${index + 1}`).querySelector('img'), itemFeature && itemFeature.picture, itemFeature && itemFeature.name);
+        })
+      ];
+      $('brandName').hidden = Boolean(item.brandPicture);
+      await Promise.all(pictures);
+      if (version !== selectionVersion) return;
+    }
+
+    const wrap = $('wrap');
+    const stage = $('stage');
+    function fitBanner() {
+      const scale = Math.min(wrap.clientWidth / 1600, wrap.clientHeight / 890);
+      stage.style.transform = `scale(${scale})`;
+      stage.style.left = `${(wrap.clientWidth - 1600 * scale) / 2}px`;
+      stage.style.top = `${(wrap.clientHeight - 890 * scale) / 2}px`;
+    }
+
+    $('productSearch').addEventListener('input', () => {
+      $('clearSearch').classList.toggle('visible', Boolean($('productSearch').value));
+      window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(loadItemList, 120);
+    });
+
+    $('clearSearch').addEventListener('click', () => {
+      $('productSearch').value = '';
+      $('clearSearch').classList.remove('visible');
+      $('productSearch').focus();
+      loadItemList();
+    });
+
+    $('pricedOnly').addEventListener('change', (event) => {
+      showPricedOnly = event.target.checked;
+      loadItemList();
+    });
+
+    function updateFullscreenButton() {
+      const isFullscreen = document.fullscreenElement === wrap;
+      const button = $('fullscreenButton');
+      button.innerHTML = isFullscreen
+        ? '<i class="bi bi-fullscreen-exit" aria-hidden="true"></i> Exit fullscreen'
+        : '<i class="bi bi-fullscreen" aria-hidden="true"></i> Fullscreen';
+      button.setAttribute('aria-label', isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen');
+      button.title = isFullscreen ? 'Exit fullscreen (Esc)' : 'View banner fullscreen';
+    }
+
+    $('fullscreenButton').addEventListener('click', async () => {
+      try {
+        if (document.fullscreenElement === wrap) await document.exitFullscreen();
+        else await wrap.requestFullscreen();
+      } catch (error) {
+        $('bannerStatus').textContent = error.message || 'Fullscreen is not available.';
+      }
+    });
+
+    // "Refresh data" asks SalesKit to load the latest data from the server (it reports back with a status).
+    $('refreshBannerButton').addEventListener('click', () => {
+      $('bannerStatus').textContent = 'Refreshing…';
+      toParent({ channel: 'saleskit-banner-refresh' });
+    });
+
+    new ResizeObserver(fitBanner).observe(wrap);
+    document.addEventListener('fullscreenchange', () => {
+      updateFullscreenButton();
+      fitBanner();
+    });
+    updateFullscreenButton();
+    fitBanner();
+    loadItemList();
+    toParent({ channel: 'saleskit-banner-ready' });
+  </script>
+</body>
+</html>

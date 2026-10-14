@@ -23,6 +23,7 @@
   <link href="./node_modules/@fontsource/plus-jakarta-sans/700.css" rel="stylesheet">
   <link href="./node_modules/@fontsource/plus-jakarta-sans/800.css" rel="stylesheet">
   <script src="./node_modules/html2canvas/dist/html2canvas.min.js"></script>
+  <script src="./banner-bridge.js"></script>
   <script>
     // If image fails or is missing, do not generate fallback dummy image
     function handleLaptopImgFallback(img, tier) {
@@ -1134,6 +1135,15 @@
     }
 
     /* Sub-views */
+    .banner-page-frame {
+      display: block;
+      width: 100%;
+      height: 70vh;
+      border: 1px solid #d9e3f0;
+      border-radius: 14px;
+      background: #fff;
+    }
+
     .view-section {
       display: none;
     }
@@ -2440,6 +2450,7 @@
     <div class="nav-tabs-dashboard" role="tablist">
       <button class="nav-tab-ghz active" id="tabRecoTable" onclick="navigateTo('recotable')" role="tab">RECO TABLE</button>
       <button class="nav-tab-ghz" id="tabSalesKit" onclick="navigateTo('saleskit')" role="tab">SALES KIT</button>
+      <button class="nav-tab-ghz" id="tabBanner" onclick="navigateTo('banner')" role="tab">BANNER</button>
     </div>
   </div>
 
@@ -3107,6 +3118,11 @@
           </table>
         </div>
       </div>
+    </div>
+
+    <!-- VIEW: BANNER (banner.html, connected by banner-bridge.js) -->
+    <div id="viewBanner" class="view-section">
+      <iframe id="bannerPageFrame" class="banner-page-frame" src="banner.html" title="Banner"></iframe>
     </div>
 
     <!-- VIEW: MIX & MATCH -->
@@ -4196,6 +4212,7 @@
       'saleskit': { tab: 'tabSalesKit', view: 'viewRecoTable' },
       'availability': { tab: 'tabAvailability', view: 'viewAvailability' },
       'mixmatch': { tab: 'tabMixMatch', view: 'viewMixMatch' },
+      'banner': { tab: 'tabBanner', view: 'viewBanner' },
       'uksp': { tab: 'tabUksp', view: 'viewUksp' },
       'attachment': { tab: 'tabAttachment', view: 'viewAttachment' }
     };
@@ -4291,6 +4308,7 @@
     function normalizeViewKey(key) {
       if (!key) return 'recotable';
       const clean = String(key).toLowerCase().replace(/[^a-z]/g, '');
+      if (clean.includes('banner')) return 'banner';
       if (clean.includes('sales') || clean.includes('kit') || clean === 'sk') return 'saleskit';
       if (clean.includes('reco') || clean.includes('table')) return 'recotable';
       if (clean.includes('avail')) return 'availability';
@@ -4484,7 +4502,7 @@
       currentActiveView = normKey;
 
       // Update all navigation tabs
-      const tabIds = ['tabAvailability', 'tabRecoTable', 'tabSalesKit', 'tabMixMatch', 'tabUksp', 'tabAttachment'];
+      const tabIds = ['tabAvailability', 'tabRecoTable', 'tabSalesKit', 'tabBanner', 'tabMixMatch', 'tabUksp', 'tabAttachment'];
       tabIds.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.remove('active');
@@ -4495,7 +4513,7 @@
       if (activeTabEl) activeTabEl.classList.add('active');
 
       // Standalone sub-views
-      const standaloneViews = ['viewAvailability', 'viewMixMatch', 'viewUksp', 'viewAttachment'];
+      const standaloneViews = ['viewAvailability', 'viewBanner', 'viewMixMatch', 'viewUksp', 'viewAttachment'];
       standaloneViews.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.remove('active');
@@ -4524,6 +4542,9 @@
         if (targetViewEl) targetViewEl.classList.add('active');
         if (normKey === 'uksp') {
           populateUkspGeneratorView();
+        }
+        if (normKey === 'banner' && typeof window.fitBannerFrame === 'function') {
+          requestAnimationFrame(window.fitBannerFrame);
         }
       }
     }
@@ -8604,6 +8625,7 @@
       if (!data) return;
       if (fromSaved && window._desktopCurrentDataApplied) return;
       if (!fromSaved) window._desktopCurrentDataApplied = true;
+      if (typeof window.updateBannerPage === 'function') window.updateBannerPage(data.bannerData);
       window.SERVER_INITIAL_DATA = data;
       window.sheetData = data;
       window.UKSP_BANNER_DATA = data.ukspBannerData || { features: [], skus: [] };

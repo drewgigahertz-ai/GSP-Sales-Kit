@@ -260,6 +260,14 @@ ipcMain.handle('application:set-icon', async (event, imageUrl) => {
 });
 ipcMain.handle('database:sync', () => performRemoteSync());
 ipcMain.handle('logos:cached', () => logoCache.cachedLogos());
+// Banner page pictures are saved on this laptop when first shown (not all at startup), then work offline.
+ipcMain.handle('images:cache', async (_event, url) => {
+  if (typeof url !== 'string' || !/^https:\/\//i.test(url)) return '';
+  const cached = await imageCache.resolve(url);
+  if (String(cached).startsWith('saleskit-image://')) return cached;
+  await imageCache.sync([url]);
+  return imageCache.resolve(url);
+});
 ipcMain.handle('app:version', () => app.getVersion());
 ipcMain.handle('update:status', () => getUpdateStatus());
 ipcMain.handle('update:install', () => installUpdateNow());

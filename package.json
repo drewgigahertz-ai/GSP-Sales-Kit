@@ -41,9 +41,12 @@
       "!electron/database.js",
       "!electron/sheets-sync.js",
       "!electron/local-api.js",
+      "!electron/banner-data.js",
       "!node_modules/googleapis{,/**/*}",
       "!node_modules/better-sqlite3{,/**/*}",
       "saleskit.html",
+      "banner.html",
+      "banner-bridge.js",
       "package.json"
     ],
     "publish": {

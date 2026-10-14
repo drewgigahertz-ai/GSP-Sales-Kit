@@ -13,6 +13,7 @@ const FIRST_COLUMN_HEADERS = {
   'APPLICATION DESCRIPTION': 'SKU'
 };
 const DEFAULT_SPREADSHEET_ID = '1qACk3I6yMwmIYauQFlcM3yryRcyIrx3bLYqmJZ2wVFE';
+const { BANNER_SHEETS, normalizeBannerSheets } = require('./banner-data');
 
 function collectionName(sheetName) {
   return sheetName.toLowerCase().trim().replace(/[\/\s]+/g, '_');
@@ -94,6 +95,24 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
     result[collectionName(sheetName)] = normalizeSheetValues(sheetName, response.data.values || []);
     onProgress({ phase: 'sheets', completed: index + 1, total: SHEETS.length, sheet: sheetName });
   }
+
+  // Banner page sheets. A missing tab is skipped (the Banner page then has no data) instead of failing the sync.
+  const metadata = await sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets(properties(title))' });
+  const titles = (metadata.data.sheets || []).map((sheet) => sheet.properties.title);
+  const bannerValues = {};
+  for (const sheetName of Object.values(BANNER_SHEETS)) {
+    const title = titles.find((name) => name.trim().toUpperCase() === sheetName);
+    if (!title) continue;
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `'${title.replace(/'/g, "''")}'!A:CZ`,
+      valueRenderOption: 'UNFORMATTED_VALUE',
+      dateTimeRenderOption: 'FORMATTED_STRING'
+    });
+    bannerValues[sheetName] = response.data.values || [];
+    onProgress({ phase: 'sheets', completed: SHEETS.length, total: SHEETS.length, sheet: sheetName });
+  }
+  Object.assign(result, normalizeBannerSheets(bannerValues));
 
   return result;
 }

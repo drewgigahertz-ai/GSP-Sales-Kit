@@ -4,7 +4,13 @@ const Database = require('better-sqlite3');
 
 let connection = null;
 let activePath = null;
+const { buildBannerData } = require('./banner-data');
+
 const SHEET_TABLES = new Set([
+  'banner_laptops',
+  'banner_specs',
+  'banner_photos',
+  'banner_prices',
   'specs',
   'criteria_segment_application',
   'dv_transposed',
@@ -499,6 +505,12 @@ function getInitialData() {
     appUkspData: applicationMatrix,
     applicationDescriptionData,
     dvApplicationsPerSkuData: applicationMatrix,
+    bannerData: buildBannerData({
+      laptops: getRows('banner_laptops'),
+      specs: getRows('banner_specs'),
+      photos: getRows('banner_photos'),
+      prices: getRows('banner_prices')
+    }, normalizeImageUrl),
     sheetStatus: {
       skuCount: criteriaSegmentData.laptops.length,
       specsCount: specRows.length,

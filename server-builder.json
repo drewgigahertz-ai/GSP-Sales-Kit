@@ -13,6 +13,7 @@
     "electron/database.js",
     "electron/sheets-sync.js",
     "electron/local-api.js",
+    "electron/banner-data.js",
     "electron/embedded-config.json",
     "package.json",
     "!node_modules/electron-updater{,/**/*}",
