@@ -1750,6 +1750,41 @@
       object-fit: contain;
     }
 
+    /* An open feature banner fills almost the whole window (below the title bar), over the table. */
+    .saleskit-feature-banner-view.is-fullscreen {
+      position: fixed;
+      top: 44px;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      z-index: 1900;
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+      border-radius: 14px;
+      background: #f8fafc;
+      box-shadow: 0 0 0 100vmax rgba(15, 23, 42, 0.55), 0 20px 50px rgba(15, 23, 42, 0.35);
+    }
+
+    .saleskit-feature-banner-view.is-fullscreen .saleskit-feature-banner-tabs {
+      flex: 0 0 auto;
+    }
+
+    .saleskit-feature-banner-view.is-fullscreen .saleskit-feature-banner-panel {
+      flex: 1 1 auto;
+      min-height: 0;
+      flex-direction: column;
+      padding: 12px 16px 16px;
+    }
+
+    .saleskit-feature-banner-view.is-fullscreen .saleskit-feature-banner-panel img {
+      flex: 1 1 auto;
+      min-height: 0;
+      width: 100%;
+      max-height: none;
+      object-fit: contain;
+    }
+
     .saleskit-presentation {
       display: none;
       position: fixed;
@@ -2900,8 +2935,10 @@
               </div>
             </div>
 
-            <div class="saleskit-feature-banner-tabs" id="salesKitFeatureBannerTabs" role="tablist" style="display: none;"></div>
-            <div class="saleskit-feature-banner-panel" id="salesKitFeatureBannerPanel" style="display: none;"></div>
+            <div class="saleskit-feature-banner-view" id="salesKitFeatureBannerView">
+              <div class="saleskit-feature-banner-tabs" id="salesKitFeatureBannerTabs" role="tablist" style="display: none;"></div>
+              <div class="saleskit-feature-banner-panel" id="salesKitFeatureBannerPanel" style="display: none;"></div>
+            </div>
 
             <!-- Sales Kit Benchmark Matrix -->
             <div class="saleskit-table-wrapper" id="salesKitTableWrapper">
@@ -6729,7 +6766,8 @@
       const activeTab = visibleTabs.find(tab => tab.id === activeSalesKitFeatureBannerTabId);
       const showTabs = visibleTabs.length > 0;
       tabsElement.style.display = showTabs ? 'flex' : 'none';
-      panelElement.style.display = showTabs && activeTab ? 'block' : 'none';
+      panelElement.style.display = showTabs && activeTab ? 'flex' : 'none';
+      document.getElementById('salesKitFeatureBannerView')?.classList.toggle('is-fullscreen', Boolean(showTabs && activeTab));
       tableWrapper.style.display = showTabs && activeTab ? 'none' : '';
       ['btnCopySalesKit', 'btnDownloadSalesKit', 'btnPresentSalesKit'].forEach(id => {
         const button = document.getElementById(id);
@@ -6777,7 +6815,15 @@
       title.textContent = `${activeTab.model} - ${activeTab.feature}`;
       const downloadButton = createBannerDownloadButton();
       downloadButton.addEventListener('click', () => downloadBannerImage(activeTab.image, `${activeTab.model} - ${activeTab.feature}`, downloadButton));
-      header.append(title, downloadButton);
+      const backButton = document.createElement('button');
+      backButton.type = 'button';
+      backButton.className = 'btn btn-light btn-sm rounded-pill px-3 border';
+      backButton.innerHTML = '<i class="bi bi-x-lg"></i> Back to table';
+      backButton.addEventListener('click', hideSalesKitFeatureBanner);
+      const actions = document.createElement('div');
+      actions.className = 'd-flex gap-2 flex-shrink-0';
+      actions.append(downloadButton, backButton);
+      header.append(title, actions);
       const image = document.createElement('img');
       image.src = activeTab.image;
       image.alt = `${activeTab.model} ${activeTab.feature} banner`;
@@ -6850,6 +6896,18 @@
       activeSalesKitFeatureBannerTabId = id;
       renderSalesKitFeatureBannerTabs();
     }
+
+    // Returns to the table; the banner tabs stay open above it.
+    function hideSalesKitFeatureBanner() {
+      activeSalesKitFeatureBannerTabId = null;
+      renderSalesKitFeatureBannerTabs();
+    }
+
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && document.getElementById('salesKitFeatureBannerView')?.classList.contains('is-fullscreen')) {
+        hideSalesKitFeatureBanner();
+      }
+    });
 
     function closeSalesKitFeatureBannerTab(id) {
       const closedIndex = salesKitFeatureBannerTabs.findIndex(tab => tab.id === id);
@@ -7336,7 +7394,7 @@
       cell.setAttribute('tabindex', '0');
       cell.title = `Open ${feature} banner for ${laptop.title || laptop.sku}`;
       const hint = document.createElement('span');
-      hint.className = 'small text-primary fw-semibold mt-1';
+      hint.className = 'small text-primary fw-semibold mt-1 saleskit-view-banner-hint';
       hint.innerHTML = '<i class="bi bi-image me-1"></i>View banner';
       cell.appendChild(hint);
       cell.appendChild(createFeatureBannerPreview(bannerUrl));
@@ -8431,7 +8489,12 @@
           useCORS: true,
           allowTaint: true,
           backgroundColor: '#ffffff',
-          logging: false
+          logging: false,
+          // "View banner" links and banner previews are for the screen only, not the saved image.
+          ignoreElements: element => Boolean(element.classList && (
+            element.classList.contains('saleskit-view-banner-hint') ||
+            element.classList.contains('saleskit-presentation-view-banner') ||
+            element.classList.contains('saleskit-feature-banner-preview')))
         });
 
         const dataUrl = canvas.toDataURL('image/png');
