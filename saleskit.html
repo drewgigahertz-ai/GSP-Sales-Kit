@@ -3926,8 +3926,8 @@
       };
     }
 
-    // SMT: every laptop with stock at the selected location appears in all three dropdowns.
-    // Each tier's recommended laptop (matching TAG and target market in RECO TABLE) is listed first and selected by default.
+    // SMT: the three dropdowns list the same laptops: every laptop with stock at the selected location, by stock.
+    // Each dropdown starts on its tier's recommended laptop (TAG and target market in RECO TABLE), if it has stock.
     function buildSmtProductCatalog(targetHierarchy) {
       const targetMarket = getSmtTargetMarket(targetHierarchy).toLowerCase();
       const rows = Array.isArray(window.RECO_TABLE_DATA) ? window.RECO_TABLE_DATA : [];
@@ -3963,7 +3963,7 @@
       Object.entries(tierTags).forEach(([tier, tag]) => {
         productCatalog[tier] = inStock
           .map(entry => ({ entry, recommended: entry.recommendedTags.has(tag) }))
-          .sort((a, b) => (b.recommended - a.recommended) || (b.entry.stock - a.entry.stock) || (a.entry.order - b.entry.order))
+          .sort((a, b) => (b.entry.stock - a.entry.stock) || (a.entry.order - b.entry.order))
           .map(({ entry, recommended }) => {
             const product = getSmtProductFromRow(entry.row, tier);
             // A copy, so the RECO TABLE stock shown here does not change the shared laptop data.
@@ -3975,6 +3975,8 @@
             };
           })
           .filter(Boolean);
+        const pick = productCatalog[tier].find(product => product.smtRecommended) || productCatalog[tier][0];
+        if (pick) pick.smtDefault = true;
       });
     }
 
@@ -4039,9 +4041,9 @@
       if (selectedRecommendationMode === 'SMT') {
         buildSmtProductCatalog(targetHierarchy);
         buildProductDropdowns();
-        selectProduct('exceed', productCatalog.exceed[0] || null);
-        selectProduct('meet', productCatalog.meet[0] || null);
-        selectProduct('budget', productCatalog.budget[0] || null);
+        ['exceed', 'meet', 'budget'].forEach(tier => {
+          selectProduct(tier, productCatalog[tier].find(product => product.smtDefault) || null);
+        });
         updateRecoBanner();
         return;
       }
@@ -5703,7 +5705,9 @@
 
         items.forEach((prod, index) => {
           const div = document.createElement('div');
-          const isTop = (index === 0);
+          const isSmt = selectedRecommendationMode === 'SMT';
+          // In SMT the list is by stock only; the starting laptop is marked as selected, with no tag labels.
+          const isTop = isSmt ? Boolean(prod.smtDefault) : (index === 0);
           div.className = `custom-dropdown-item ${isTop ? 'active' : ''}`;
           div.style.display = 'flex';
           div.style.flexDirection = 'column';
@@ -5711,9 +5715,8 @@
           div.style.gap = '3px';
 
           const stock = getLaptopStock(prod, selectedLocation);
-          const isSmt = selectedRecommendationMode === 'SMT';
-          const isHighlighted = isSmt ? Boolean(prod.smtRecommended) : isTop;
-          const highlightLabel = isSmt ? (prod.smtRecommended ? '★ Recommended' : '') : (isTop ? '★ Highest Stock' : '');
+          const isHighlighted = isTop;
+          const highlightLabel = isSmt ? '' : (isTop ? '★ Highest Stock' : '');
           const stockBadge = isBranch
             ? `<span class="badge ${isHighlighted ? 'bg-success' : 'bg-success-subtle text-success border border-success-subtle'} rounded-pill px-2 py-0.5" style="font-size: 0.68rem; font-weight: 700; white-space: nowrap;">
                 <i class="bi bi-box-seam me-1"></i>${stock} in stock ${highlightLabel}
@@ -5726,7 +5729,7 @@
             <div class="d-flex align-items-center justify-content-between w-100">
               <div class="d-flex flex-column pe-2" style="max-width: 76%; min-width: 0;">
                 <div class="d-flex align-items-center gap-1.5 flex-wrap">
-                  <span class="badge ${meta.cls} text-white" style="font-size:0.62rem; font-weight:800; letter-spacing:0.3px;">${meta.label} • TAG ${meta.tag}</span>
+                  ${isSmt ? '' : `<span class="badge ${meta.cls} text-white" style="font-size:0.62rem; font-weight:800; letter-spacing:0.3px;">${meta.label} • TAG ${meta.tag}</span>`}
                   <span class="fw-bold text-dark text-truncate" style="max-width: 100%;">${prod.title}</span>
                   ${(prod.price && String(prod.price).trim() !== '' && prod.price !== '0' && prod.price !== '0.00') ? `<span class="text-primary fw-semibold small">PHP ${escapeHtml(prod.price)}</span>` : ''}
                 </div>
