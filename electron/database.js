@@ -452,7 +452,8 @@ function makeLogoData(rows) {
   const row = rows.find((item) => item.id === 'logo') || rows[0] || {};
   return {
     applicationLogoUrl: normalizeImageUrl(row.application_logo || row['Application Logo']),
-    headerLogoUrl: normalizeImageUrl(row.header_logo || row['Upper left logo'])
+    headerLogoUrl: normalizeImageUrl(row.header_logo || row['Upper left logo']),
+    bannerLogoUrl: normalizeImageUrl(row.banner_logo)
   };
 }
 

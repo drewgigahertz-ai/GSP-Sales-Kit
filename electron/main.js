@@ -120,6 +120,7 @@ function imageUrlsFromData(data) {
   Object.values(data.appsLogoMap || {}).forEach(add);
   add(data.applicationLogoUrl);
   add(data.headerLogoUrl);
+  add(data.bannerLogoUrl);
   Object.values(data.appsDataList || []).forEach((app) => add(app.icon));
   Object.values(data.appUkspData?.applications || []).forEach((app) => add(app.icon));
   (data.ukspBannerData?.skus || []).forEach((laptop) => {

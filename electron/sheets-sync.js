@@ -62,11 +62,12 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
     if (sheetName === 'LOGO') {
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId,
-        range: `${quotedName}!A2:B2`,
+        range: `${quotedName}!A2:C2`,
         valueRenderOption: 'FORMULA',
         dateTimeRenderOption: 'FORMATTED_STRING'
       });
-      const [applicationLogo = '', headerLogo = ''] = response.data.values?.[0] || [];
+      // A2: application (window) logo, B2: header logo, C2: logo on the Banner page.
+      const [applicationLogo = '', headerLogo = '', bannerLogo = ''] = response.data.values?.[0] || [];
       const resolveImageFormula = (value) => {
         const formula = String(value || '').trim();
         const match = formula.match(/^=(?:IMAGE|HYPERLINK)\s*\(\s*"([^"]+)"/i);
@@ -74,12 +75,13 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
       };
       result[collectionName(sheetName)] = {
         collection: collectionName(sheetName),
-        columns: ['application_logo', 'header_logo'],
+        columns: ['application_logo', 'header_logo', 'banner_logo'],
         rows: [{
           id: 'logo',
           data: {
             application_logo: resolveImageFormula(applicationLogo),
-            header_logo: resolveImageFormula(headerLogo)
+            header_logo: resolveImageFormula(headerLogo),
+            banner_logo: resolveImageFormula(bannerLogo)
           }
         }]
       };

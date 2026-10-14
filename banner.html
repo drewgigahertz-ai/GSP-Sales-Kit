@@ -349,6 +349,33 @@
       content: "";
     }
 
+    /* The GigaHertz header logo from the LOGO sheet (white), shown in the banner blue through a mask.
+       Until it is available, the drawn "GIGAHERTZ" mark above is shown instead. */
+    .giga-logo {
+      top: 26px;
+      left: 40px;
+      width: 330px;
+      height: 100px;
+      background: var(--banner-blue);
+      -webkit-mask: var(--logo) left center / contain no-repeat;
+      mask: var(--logo) left center / contain no-repeat;
+    }
+
+    .giga-logo-image {
+      top: 26px;
+      left: 40px;
+      width: 330px;
+      height: 100px;
+      object-fit: contain;
+      object-position: left center;
+    }
+
+    .giga-logo-image[hidden],
+    .giga-logo[hidden],
+    .giga[hidden] {
+      display: none;
+    }
+
     .brandlogo {
       top: 26px;
       right: 18px;
@@ -722,7 +749,9 @@
       </div>
       <div id="wrap">
         <div id="stage" aria-label="Generated product banner">
-          <div class="abs giga"><div class="giga-mark"></div>IGAHERTZ</div>
+          <div class="abs giga" id="gigaMark"><div class="giga-mark"></div>IGAHERTZ</div>
+          <div class="abs giga-logo" id="gigaLogo" hidden></div>
+          <img class="abs giga-logo-image" id="gigaLogoImage" alt="GigaHertz" hidden>
           <div class="abs brandlogo"><span id="brandName">N/A</span><img id="brandLogo" class="picture-slot" alt="" hidden></div>
           <div class="abs banner-title" id="bannerTitle">SELECT A PRODUCT</div>
           <div class="abs banner-model" id="partNumber"></div>
@@ -780,6 +809,7 @@
       if (event.source !== window.parent || !event.data) return;
       const { channel } = event.data;
       if (channel === 'saleskit-banner-data') {
+        showLogo(event.data.logo);
         bannerItems = Array.isArray(event.data.data && event.data.data.items) ? event.data.data.items : [];
         loadItemList();
         if (currentItemCode) selectItem(currentItemCode);
@@ -808,6 +838,34 @@
         pendingImages.set(requestId, { resolve, timeout, url });
         toParent({ channel: 'saleskit-banner-image', requestId, url });
       });
+    }
+
+    // logos: { banner, header }. The Banner logo (LOGO sheet C2) is shown as it is; otherwise the white header
+    // logo (B2) in the banner blue; otherwise the drawn "GIGAHERTZ" mark.
+    let shownLogo = '';
+    function loads(url) {
+      return new Promise((resolve) => {
+        if (!url) return resolve(false);
+        const probe = new Image();
+        probe.onload = () => resolve(probe.naturalWidth > 0);
+        probe.onerror = () => resolve(false);
+        probe.src = url;
+      });
+    }
+
+    async function showLogo(logos) {
+      const { banner = '', header = '' } = logos || {};
+      const key = `${banner}|${header}`;
+      if (key === shownLogo) return;
+      shownLogo = key;
+      const useBanner = await loads(banner);
+      const useHeader = !useBanner && await loads(header);
+      if (key !== shownLogo) return;
+      $('gigaLogoImage').hidden = !useBanner;
+      if (useBanner) $('gigaLogoImage').src = banner;
+      $('gigaLogo').hidden = !useHeader;
+      if (useHeader) $('gigaLogo').style.setProperty('--logo', `url("${header.replace(/"/g, '%22')}")`);
+      $('gigaMark').hidden = useBanner || useHeader;
     }
 
     function peso(value) {

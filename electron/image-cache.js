@@ -63,6 +63,7 @@ class ImageCache {
     Object.entries(data.skuImageMap || {}).forEach(([key, value]) => { data.skuImageMap[key] = map(value); });
     Object.entries(data.appsLogoMap || {}).forEach(([key, value]) => { data.appsLogoMap[key] = map(value); });
     data.headerLogoUrl = map(data.headerLogoUrl);
+    data.bannerLogoUrl = map(data.bannerLogoUrl);
     Object.values(data.appsDataList || []).forEach((app) => { app.icon = map(app.icon); });
     Object.values(data.appUkspData?.applications || []).forEach((app) => { app.icon = map(app.icon); });
     (data.ukspBannerData?.skus || []).forEach((laptop) => {
@@ -153,7 +154,13 @@ class ImageCache {
     try {
       const body = await fs.readFile(path.join(this.directory, fileName));
       const extension = path.extname(fileName).slice(1);
-      return new Response(body, { headers: { 'Content-Type': EXTENSION_TYPES[extension] || 'application/octet-stream' } });
+      return new Response(body, {
+        headers: {
+          'Content-Type': EXTENSION_TYPES[extension] || 'application/octet-stream',
+          // The Banner page's logo mask loads saved images with CORS.
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
     } catch {
       return new Response('Not found', { status: 404 });
     }

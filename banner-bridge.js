@@ -9,6 +9,13 @@
     return document.getElementById('bannerPageFrame');
   }
 
+  // Logos from the LOGO sheet, as saved on this laptop when available: C2 is the Banner logo (shown in its
+  // own colors); B2, the white header logo, is used in the banner blue when C2 is empty or cannot be shown.
+  function logo() {
+    const data = window.SERVER_INITIAL_DATA || {};
+    return { banner: data.bannerLogoUrl || '', header: data.headerLogoUrl || '' };
+  }
+
   function send(message) {
     const target = frame();
     if (target && target.contentWindow) target.contentWindow.postMessage(message, '*');
@@ -17,7 +24,7 @@
   // Called by the page whenever SalesKit data is loaded or refreshed.
   window.updateBannerPage = function (bannerData) {
     latestBannerData = bannerData || { items: [] };
-    send({ channel: 'saleskit-banner-data', data: latestBannerData });
+    send({ channel: 'saleskit-banner-data', data: latestBannerData, logo: logo() });
     if (refreshTimer) {
       clearTimeout(refreshTimer);
       refreshTimer = null;
@@ -49,7 +56,7 @@
     if (!target || event.source !== target.contentWindow || !event.data) return;
     const { channel } = event.data;
     if (channel === 'saleskit-banner-ready') {
-      if (latestBannerData) send({ channel: 'saleskit-banner-data', data: latestBannerData });
+      if (latestBannerData) send({ channel: 'saleskit-banner-data', data: latestBannerData, logo: logo() });
     } else if (channel === 'saleskit-banner-image') {
       const url = await savedPicture(String(event.data.url || ''));
       send({ channel: 'saleskit-banner-image', requestId: event.data.requestId, url });
