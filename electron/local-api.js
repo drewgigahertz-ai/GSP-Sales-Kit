@@ -51,7 +51,8 @@ function readJsonBody(request, limit = 10 * 1024) {
 // accounts (optional): { login(username, password, address), logout(key), userForSession(key), allowWithoutLogin(),
 //   prepareInitialData(data, user), canBrowseTables(user) }
 //   When given, data routes also need a signed-in user, sent as the X-SalesKit-Session header.
-function createLocalApi({ database, token = '', onRequest = null, getDataVersion = () => null, accounts = null }) {
+// getLatestClientVersion: the newest SalesKit release, so open clients start updating within minutes.
+function createLocalApi({ database, token = '', onRequest = null, getDataVersion = () => null, getLatestClientVersion = () => null, accounts = null }) {
   return http.createServer(async (request, response) => {
     const url = new URL(request.url, 'http://localhost');
     const address = request.socket.remoteAddress || '';
@@ -112,7 +113,7 @@ function createLocalApi({ database, token = '', onRequest = null, getDataVersion
         const status = database.getStatus();
         sendJson(response, 200, { connected: status.connected, tableCount: status.tableCount });
       } else if (request.method === 'GET' && url.pathname === '/api/version') {
-        sendJson(response, 200, { dataVersion: getDataVersion() });
+        sendJson(response, 200, { dataVersion: getDataVersion(), latestClientVersion: getLatestClientVersion() });
       } else if (request.method === 'GET' && url.pathname === '/api/initial-data') {
         const data = database.getInitialData();
         sendJson(response, 200, accounts && accounts.prepareInitialData ? accounts.prepareInitialData(data, user) : data);

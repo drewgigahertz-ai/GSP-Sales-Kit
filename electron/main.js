@@ -5,7 +5,8 @@ const path = require('node:path');
 const { ImageCache } = require('./image-cache');
 const { createSnapshotCache } = require('./snapshot-cache');
 const { getConfig } = require('./app-config');
-const { startAutoUpdates, getUpdateStatus, installUpdateNow } = require('./updater');
+const { startAutoUpdates, getUpdateStatus, installUpdateNow, noticeLatestVersion } = require('./updater');
+const { createUpdateResume } = require('./update-resume');
 const { getDeviceInfo } = require('./device-info');
 
 // SalesKit is a client: it loads its data from the SalesKit Server, which does the Google Sheets sync.
@@ -18,6 +19,7 @@ protocol.registerSchemesAsPrivileged([{
 let mainWindow;
 let imageCache;
 let snapshotCache;
+let updateResume;
 
 function reportSyncProgress(progress) {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -36,7 +38,8 @@ const CLIENT_HEADERS = {
 let workingServerUrl = '';
 let loadedDataVersion = null;
 
-// Signed-in user for this run of SalesKit ({ key, user }). Never saved: users log in every time SalesKit opens.
+// Signed-in user for this run of SalesKit ({ key, user }). Users log in every time SalesKit opens; it is only
+// kept across the restart that installs an update (see update-resume.js).
 let session = null;
 let onLoginPage = true;
 
@@ -81,7 +84,8 @@ async function requestServer(pathname, { timeoutMs = 8000, method = 'GET', body 
 
 async function getRemoteSnapshot() {
   try {
-    const { dataVersion } = await requestServer('/api/version').catch(() => ({ dataVersion: null }));
+    const { dataVersion, latestClientVersion } = await requestServer('/api/version').catch(() => ({ dataVersion: null }));
+    noticeLatestVersion(latestClientVersion);
     const data = await requestServer('/api/initial-data', { timeoutMs: 60000 });
     loadedDataVersion = dataVersion;
     if (snapshotCache) snapshotCache.save(data);
@@ -133,13 +137,15 @@ async function performRemoteSync() {
 }
 
 // Every 2 minutes, ask the server whether its data changed since we loaded it; the window then reloads quietly.
+// The same answer names the newest SalesKit release, so a new version starts downloading within minutes.
 const DATA_CHECK_INTERVAL_MS = 2 * 60 * 1000;
 
 function startDataChangeChecks() {
   setInterval(async () => {
     if (!session) return;
     try {
-      const { dataVersion } = await requestServer('/api/version');
+      const { dataVersion, latestClientVersion } = await requestServer('/api/version');
+      noticeLatestVersion(latestClientVersion);
       if (loadedDataVersion !== null && dataVersion !== null && dataVersion !== loadedDataVersion &&
           mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('data:changed', dataVersion);
@@ -295,12 +301,17 @@ function createWindow() {
   mainWindow.webContents.on('will-navigate', (event, url) => {
     if (!url.startsWith('file://')) event.preventDefault();
   });
-  mainWindow.loadFile(path.join(__dirname, 'login.html'));
+  if (session) showSalesKit();
+  else mainWindow.loadFile(path.join(__dirname, 'login.html'));
 }
 
 app.whenReady().then(() => {
   snapshotCache = createSnapshotCache(path.join(app.getPath('userData'), 'saleskit-data-cache.json'));
   imageCache = new ImageCache(path.join(app.getPath('userData'), 'image-cache'));
+  updateResume = createUpdateResume(path.join(app.getPath('userData'), 'update-resume.bin'));
+  // Restarted to install an update: open SalesKit signed in as before. (If the server no longer
+  // knows the session, the first data request shows the login screen.)
+  session = updateResume.take();
   protocol.handle('saleskit-image', ({ url }) => imageCache.serve(url));
 
   Menu.setApplicationMenu(null);
@@ -308,7 +319,7 @@ app.whenReady().then(() => {
   createWindow();
   startAutoUpdates((status) => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update:status', status);
-  });
+  }, { onBeforeInstall: () => updateResume.save(session) });
   startDataChangeChecks();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

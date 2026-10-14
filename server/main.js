@@ -11,6 +11,7 @@ const { createDeviceRegistry } = require('./devices');
 const { createBackupStore } = require('./backups');
 const { createUserStore } = require('./users');
 const { hasFullAccess, filterDataForBranch } = require('./branch-filter');
+const { createClientReleaseWatcher } = require('./client-release');
 const { version: APP_VERSION } = require('../package.json');
 
 const APP_NAME = 'GigaHertz SalesKit Server';
@@ -44,6 +45,7 @@ let backups;
 let users;
 let devicesPushTimer = null;
 let headerLogo = '';
+let clientRelease;
 const logs = [];
 
 // ---------- Settings ----------
@@ -142,7 +144,19 @@ function getState() {
     onlineDevices: devices ? devices.list().filter((device) => device.online).length : 0,
     rejectedCount: devices ? devices.rejectedList().length : 0,
     userCount: users ? users.list().length : 0,
-    allowWithoutLogin: settings.allowWithoutLogin
+    allowWithoutLogin: settings.allowWithoutLogin,
+    clientRelease: clientRelease ? clientReleaseSummary() : null
+  };
+}
+
+// The newest SalesKit on GitHub, and how many online laptops already run it.
+function clientReleaseSummary() {
+  const latest = clientRelease.get();
+  const seen = devices ? devices.list().filter((device) => device.online && device.version) : [];
+  return {
+    ...latest,
+    deviceCount: seen.length,
+    upToDate: latest.version ? seen.filter((device) => device.version === latest.version).length : 0
   };
 }
 
@@ -216,6 +230,7 @@ async function startApi() {
     database,
     token: settings.token,
     getDataVersion: () => settings.dataVersion,
+    getLatestClientVersion: () => clientRelease.get().version,
     accounts: {
       login: (username, password, address) => users.login(username, password, address),
       logout: (key) => users.logout(key),
@@ -456,6 +471,10 @@ function openServerDatabase() {
 ipcMain.handle('server:get-state', () => getState());
 ipcMain.handle('server:get-logs', () => logs);
 ipcMain.handle('server:get-logos', () => ({ header: headerLogo }));
+ipcMain.handle('server:check-client-release', async () => {
+  await clientRelease.checkNow();
+  return getState();
+});
 ipcMain.handle('server:sync-now', async () => {
   await syncNow();
   return getState();
@@ -644,6 +663,14 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     settings = loadSettings();
     devices = createDeviceRegistry(path.join(app.getPath('userData'), 'devices.json'));
+    clientRelease = createClientReleaseWatcher({
+      fetchImpl: net.fetch,
+      onChange: (latest) => {
+        log('info', `Newest SalesKit release: v${latest.version}. Open laptops will start updating.`);
+        pushState();
+      }
+    });
+    clientRelease.start();
     Menu.setApplicationMenu(null);
     createWindow();
     createTray();
@@ -667,6 +694,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on('before-quit', () => {
     quitting = true;
     clearInterval(syncTimer);
+    if (clientRelease) clientRelease.stop();
     stopApi();
     database.closeDatabase();
   });

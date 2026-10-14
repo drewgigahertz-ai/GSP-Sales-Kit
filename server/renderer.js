@@ -186,6 +186,19 @@ function renderData() {
   });
 }
 
+function renderClientRelease() {
+  const release = state.clientRelease;
+  if (!release) return;
+  $('clientReleaseHeadline').textContent = release.version
+    ? `Newest release: v${release.version}`
+    : release.error ? 'Could not reach GitHub' : 'Checking GitHub…';
+  const parts = [];
+  if (release.version) parts.push(`${release.upToDate} of ${release.deviceCount} online laptops run it`);
+  if (release.error) parts.push(release.error);
+  if (release.checkedAt) parts.push(`checked ${timeAgo(release.checkedAt)}`);
+  $('clientReleaseDetail').textContent = parts.join(' · ');
+}
+
 function render(nextState) {
   state = nextState;
   renderStatus();
@@ -193,6 +206,7 @@ function render(nextState) {
   renderSync();
   renderSettings();
   renderData();
+  renderClientRelease();
   renderBackups();
   renderSheetTabs();
   $('onlineBadge').hidden = !state.onlineDevices;
@@ -657,6 +671,7 @@ $('openBackups').addEventListener('click', (event) => run(event.currentTarget, a
 // ---------- Events ----------
 
 $('syncNow').addEventListener('click', () => run(null, api.syncNow));
+$('checkClientRelease').addEventListener('click', (event) => run(event.currentTarget, api.checkClientRelease).then((next) => next && render(next)));
 $('chooseKey').addEventListener('click', (event) => run(event.currentTarget, api.chooseKey).then((next) => next && render(next)));
 $('copyToken').addEventListener('click', (event) => run(event.currentTarget, api.copyToken, 'Token copied'));
 $('copyClientConfig').addEventListener('click', (event) => run(event.currentTarget, () => api.copyClientConfig(), 'Client config copied'));
@@ -694,7 +709,11 @@ api.onSyncProgress((progress) => {
 });
 
 // Keep "x min ago" texts fresh.
-setInterval(() => state && renderSync(), 30 * 1000);
+setInterval(() => {
+  if (!state) return;
+  renderSync();
+  renderClientRelease();
+}, 30 * 1000);
 
 (async () => {
   render(await api.getState());
