@@ -5,24 +5,24 @@ const crypto = require('node:crypto');
 const zlib = require('node:zlib');
 
 // scopeOf(user): 'ALL' for full access, otherwise the branch code.
-// build(scope): the data object that scope receives.
+// build(scope, options): the data object that scope receives (options: { branchModes }).
 function createCompressedData({ getDataVersion, scopeOf, build }) {
   let version = null;
   const entries = new Map();
 
   // { etag, gzip, size } for this user. dedupe: the client rebuilds dvApplicationsPerSkuData from
   // appUkspData (they are the same table), so it is sent once (SalesKit 1.0.6 and newer).
-  function get(user, { dedupe = false } = {}) {
+  function get(user, { dedupe = false, branchModes = false } = {}) {
     const currentVersion = getDataVersion();
     if (currentVersion !== version) {
       version = currentVersion;
       entries.clear();
     }
     const scope = scopeOf(user);
-    const key = `${scope}|${dedupe ? 'dedupe' : 'full'}`;
+    const key = `${scope}|${dedupe ? 'dedupe' : 'full'}|${branchModes ? 'modes' : 'locked'}`;
     let entry = entries.get(key);
     if (!entry) {
-      let data = build(scope);
+      let data = build(scope, { branchModes });
       if (dedupe && data.dvApplicationsPerSkuData && data.dvApplicationsPerSkuData === data.appUkspData) {
         data = { ...data };
         delete data.dvApplicationsPerSkuData;

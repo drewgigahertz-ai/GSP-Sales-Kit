@@ -50,6 +50,7 @@
       "banner.html",
       "banner-bridge.js",
       "activity-tracker.js",
+      "branch-mode.js",
       "package.json"
     ],
     "publish": {

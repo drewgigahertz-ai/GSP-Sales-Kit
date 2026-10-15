@@ -41,4 +41,11 @@ function filterDataForBranch(data, branch) {
   };
 }
 
-module.exports = { ALL_BRANCHES, hasFullAccess, filterDataForBranch };
+// SalesKit 1.0.11 and newer: every branch's stock, plus the account's home branch. The app opens in SMT
+// with the Location locked to homeBranch, and asks before switching to OSD (all locations).
+function withHomeBranch(data, branch) {
+  if (!branch || hasFullAccess(branch)) return data;
+  return { ...data, homeBranch: String(branch).trim().toUpperCase() };
+}
+
+module.exports = { ALL_BRANCHES, hasFullAccess, filterDataForBranch, withHomeBranch };

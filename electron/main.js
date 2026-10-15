@@ -39,7 +39,7 @@ const CLIENT_HEADERS = {
   'X-SalesKit-User': os.userInfo().username,
   'X-SalesKit-Version': app.getVersion(),
   // The server may send the duplicate benchmark table once (see data-loader.js).
-  'X-SalesKit-Features': 'dedupe',
+  'X-SalesKit-Features': 'dedupe, branch-modes',
   'Accept-Encoding': 'gzip'
 };
 

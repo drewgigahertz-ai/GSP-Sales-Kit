@@ -159,8 +159,11 @@ function createLocalApi({ database, token = '', onRequest = null, getDataVersion
   });
 }
 
+// What the SalesKit app supports (X-SalesKit-Features): 'dedupe' (1.0.6+), 'branch-modes' (1.0.11+: branch
+// accounts get every branch's stock, locked to their branch in SMT and unlocked in OSD inside the app).
 function payloadOptions(request) {
-  return { dedupe: headerText(request, 'x-saleskit-features').split(',').map((item) => item.trim()).includes('dedupe') };
+  const features = headerText(request, 'x-saleskit-features').split(',').map((item) => item.trim());
+  return { dedupe: features.includes('dedupe'), branchModes: features.includes('branch-modes') };
 }
 
 function sendPayload(request, response, payload) {

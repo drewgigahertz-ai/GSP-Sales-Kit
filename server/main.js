@@ -11,7 +11,7 @@ const { createDeviceRegistry, deviceKey } = require('./devices');
 const { createActivityLog } = require('./activity');
 const { createBackupStore } = require('./backups');
 const { createUserStore } = require('./users');
-const { hasFullAccess, filterDataForBranch } = require('./branch-filter');
+const { hasFullAccess, filterDataForBranch, withHomeBranch } = require('./branch-filter');
 const { createClientReleaseWatcher } = require('./client-release');
 const { createCompressedData } = require('./compressed-data');
 const { version: APP_VERSION } = require('../package.json');
@@ -240,12 +240,14 @@ async function startApi() {
   const payloads = createCompressedData({
     getDataVersion: () => settings.dataVersion,
     scopeOf: (user) => (!user || hasFullAccess(user.branch) ? 'ALL' : String(user.branch).trim().toUpperCase()),
-    build: (scope) => {
+    build: (scope, { branchModes } = {}) => {
       if (fullDataVersion !== settings.dataVersion || !fullData) {
         fullData = database.getInitialData();
         fullDataVersion = settings.dataVersion;
       }
-      return scope === 'ALL' ? fullData : filterDataForBranch(fullData, scope);
+      if (scope === 'ALL') return fullData;
+      // 1.0.11+ locks the branch inside the app; older SalesKit only gets its own branch's stock.
+      return branchModes ? withHomeBranch(fullData, scope) : filterDataForBranch(fullData, scope);
     }
   });
   const server = createLocalApi({

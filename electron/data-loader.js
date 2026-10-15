@@ -22,8 +22,11 @@ function scopeOfUser(user) {
   return !branch || FULL_ACCESS_BRANCHES.includes(branch) ? 'ALL' : branch;
 }
 
+// A branch account's copy (branch-only stock from older servers, or all branches with its home branch) is
+// only shown to that branch.
 function scopeOfData(data) {
-  return data && data.lockedBranch ? normalizeBranch(data.lockedBranch) : 'ALL';
+  const branch = data && (data.lockedBranch || data.homeBranch);
+  return branch ? normalizeBranch(branch) : 'ALL';
 }
 
 // The server sends the application benchmark table once; the page expects it under both names.

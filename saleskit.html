@@ -25,6 +25,7 @@
   <script src="./node_modules/html2canvas/dist/html2canvas.min.js"></script>
   <script src="./banner-bridge.js"></script>
   <script src="./activity-tracker.js" defer></script>
+  <script src="./branch-mode.js" defer></script>
   <script>
     // If image fails or is missing, do not generate fallback dummy image
     function handleLaptopImgFallback(img, tier) {
@@ -1780,6 +1781,27 @@
 
     .saleskit-presentation.is-banner-open .saleskit-presentation-banner-viewer:has(.saleskit-presentation-banner-choices) {
       padding-top: 116px;
+    }
+
+    /* "Switch to OSD?" for branch accounts (branch-mode.js). */
+    .branch-mode-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 5000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(15, 23, 42, 0.45);
+    }
+
+    .branch-mode-dialog {
+      width: min(440px, 100%);
+      padding: 22px 24px;
+      border-radius: 16px;
+      background: #fff;
+      box-shadow: 0 20px 50px rgba(15, 23, 42, 0.3);
+      color: #0f172a;
     }
 
     .search-no-match {
@@ -8760,6 +8782,7 @@
         if (typeof renderSalesKitMatrix === 'function') renderSalesKitMatrix();
       }
       applyBranchLock(data.lockedBranch);
+      if (typeof window.applyBranchHome === 'function') window.applyBranchHome(data.homeBranch);
     }
 
     function updateRefreshButtons(label, isBusy) {
