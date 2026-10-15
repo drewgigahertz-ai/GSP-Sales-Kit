@@ -278,8 +278,9 @@
       background: #c9ced8;
     }
 
+    /* Any space the banner cannot fill (very wide screens) matches its background instead of black. */
     #wrap:fullscreen {
-      background: #000;
+      background: #e8f0fb;
     }
 
     #wrap:fullscreen #stage {
@@ -289,7 +290,7 @@
     #stage {
       position: absolute;
       width: 1600px;
-      height: 950px;
+      height: 900px;
       overflow: hidden;
       transform-origin: 0 0;
       transition: transform .45s cubic-bezier(.22, .61, .36, 1), left .45s cubic-bezier(.22, .61, .36, 1), top .45s cubic-bezier(.22, .61, .36, 1);
@@ -428,7 +429,7 @@
        blue tab like the QUICK SPECS labels, its value below. */
     .price-details {
       right: 40px;
-      bottom: 14px;
+      bottom: 10px;
       left: 40px;
       display: grid;
       height: 56px;
@@ -1070,14 +1071,22 @@
 
     const wrap = $('wrap');
     const stage = $('stage');
-    // The banner is designed at 1600 × 950 (the bottom 60 px hold the price details) and scaled to fit.
+    // The banner is designed at 1600 × 900 (16:9, the bottom 70 px hold the price details) and scaled to fit.
+    // In fullscreen on taller screens (16:10, 3:2) it grows downward so it fills the whole screen.
     const STAGE_WIDTH = 1600;
-    const STAGE_HEIGHT = 950;
+    const STAGE_HEIGHT = 900;
     function fitBanner() {
-      const scale = Math.min(wrap.clientWidth / STAGE_WIDTH, wrap.clientHeight / STAGE_HEIGHT);
+      const width = wrap.clientWidth;
+      const height = wrap.clientHeight;
+      if (!width || !height) return;
+      const stageHeight = document.fullscreenElement === wrap
+        ? Math.max(STAGE_HEIGHT, Math.round(STAGE_WIDTH * height / width))
+        : STAGE_HEIGHT;
+      stage.style.height = `${stageHeight}px`;
+      const scale = Math.min(width / STAGE_WIDTH, height / stageHeight);
       stage.style.transform = `scale(${scale})`;
-      stage.style.left = `${(wrap.clientWidth - STAGE_WIDTH * scale) / 2}px`;
-      stage.style.top = `${(wrap.clientHeight - STAGE_HEIGHT * scale) / 2}px`;
+      stage.style.left = `${(width - STAGE_WIDTH * scale) / 2}px`;
+      stage.style.top = `${(height - stageHeight * scale) / 2}px`;
     }
 
     $('productSearch').addEventListener('input', () => {
