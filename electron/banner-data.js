@@ -216,10 +216,11 @@ function buildBannerData(rows, imageUrl = (value) => value) {
     if (seen.has(key)) continue;
     seen.add(key);
     const price = pricesByItem.get(key);
-    // Promo picture: by PROMO TITLE first, then by the promo column (CS) when the title has no picture.
+    // Promo picture: by PROMO TITLE first (a blank title means "NO PROMO", which has its own picture in
+    // DB PHOTOS), then by the promo column (CS) when the title has no picture.
     let promo = null;
     if (price) {
-      const candidates = [price.promo_title, price.promo].filter((name) => name && matchKey(name) !== 'no promo');
+      const candidates = [price.promo_title || 'NO PROMO', price.promo].filter(Boolean);
       const match = candidates.map((name) => photo('promo', name)).find((row) => row && row.link);
       if (match) promo = { name: match.name, picture: imageUrl(match.link), trigger: match.trigger || '' };
       else if (candidates.length) promo = { name: candidates[0], picture: '', trigger: '' };
