@@ -16,8 +16,8 @@ const PRICE_DETAILS = [
   ['3WB', 'CH', true],
   ['HCB', 'CI', true],
   ['CF', 'CO', false],
-  ['B1', 'CP', false],
-  ['B2', 'CQ', false],
+  ['B1', 'CP', true],
+  ['B2', 'CQ', true],
   ['CNB', 'CK', true],
   ['3NB', 'CL', true],
   ['HCNB', 'CM', true]

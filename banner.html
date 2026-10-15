@@ -271,42 +271,6 @@
       background: #fff;
     }
 
-    /* BANNER PRICES details for the chosen laptop, under the banner (not part of the banner itself). */
-    #priceDetails {
-      display: grid;
-      grid-template-columns: repeat(9, minmax(0, 1fr));
-      border-top: 1px solid #d9e3f0;
-      background: #fff;
-    }
-
-    .price-detail {
-      min-width: 0;
-      padding: 7px 8px;
-      border-right: 1px solid #eef2f7;
-      text-align: center;
-    }
-
-    .price-detail:last-child {
-      border-right: 0;
-    }
-
-    .price-detail-title {
-      color: #0012b3;
-      font-family: Outfit, sans-serif;
-      font-size: .68rem;
-      font-weight: 800;
-      letter-spacing: .04em;
-    }
-
-    .price-detail-value {
-      overflow: hidden;
-      color: #0f172a;
-      font-size: .82rem;
-      font-weight: 700;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
     #wrap {
       position: relative;
       flex: 1;
@@ -325,7 +289,7 @@
     #stage {
       position: absolute;
       width: 1600px;
-      height: 890px;
+      height: 950px;
       overflow: hidden;
       transform-origin: 0 0;
       transition: transform .45s cubic-bezier(.22, .61, .36, 1), left .45s cubic-bezier(.22, .61, .36, 1), top .45s cubic-bezier(.22, .61, .36, 1);
@@ -458,6 +422,47 @@
       font-weight: 700;
       letter-spacing: 1px;
       text-align: center;
+    }
+
+    /* BANNER PRICES details for the chosen laptop, small along the bottom of the banner: each title on a
+       blue tab like the QUICK SPECS labels, its value below. */
+    .price-details {
+      right: 40px;
+      bottom: 14px;
+      left: 40px;
+      display: grid;
+      height: 56px;
+      grid-template-columns: repeat(9, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .price-detail {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .price-detail-title {
+      padding: 2px 14px;
+      clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+      background: var(--banner-blue);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .5px;
+    }
+
+    .price-detail-value {
+      max-width: 100%;
+      overflow: hidden;
+      color: var(--banner-blue);
+      font-size: 17px;
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .banner-tab {
@@ -820,9 +825,10 @@
           <div class="abs feature" style="left:1010px" id="feature2"><img class="picture-slot" alt="" hidden><span></span></div>
           <div class="abs feature" style="left:1169px" id="feature3"><img class="picture-slot" alt="" hidden><span></span></div>
           <div class="abs feature" style="left:1327px" id="feature4"><img class="picture-slot" alt="" hidden><span></span></div>
+
+          <div class="abs price-details" id="priceDetails" aria-label="Price details"></div>
         </div>
       </div>
-      <div id="priceDetails" aria-label="Price details"></div>
     </main>
   </div>
 
@@ -1064,11 +1070,14 @@
 
     const wrap = $('wrap');
     const stage = $('stage');
+    // The banner is designed at 1600 × 950 (the bottom 60 px hold the price details) and scaled to fit.
+    const STAGE_WIDTH = 1600;
+    const STAGE_HEIGHT = 950;
     function fitBanner() {
-      const scale = Math.min(wrap.clientWidth / 1600, wrap.clientHeight / 890);
+      const scale = Math.min(wrap.clientWidth / STAGE_WIDTH, wrap.clientHeight / STAGE_HEIGHT);
       stage.style.transform = `scale(${scale})`;
-      stage.style.left = `${(wrap.clientWidth - 1600 * scale) / 2}px`;
-      stage.style.top = `${(wrap.clientHeight - 890 * scale) / 2}px`;
+      stage.style.left = `${(wrap.clientWidth - STAGE_WIDTH * scale) / 2}px`;
+      stage.style.top = `${(wrap.clientHeight - STAGE_HEIGHT * scale) / 2}px`;
     }
 
     $('productSearch').addEventListener('input', () => {
