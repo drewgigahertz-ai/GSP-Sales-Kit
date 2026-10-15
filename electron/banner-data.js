@@ -220,7 +220,8 @@ function buildBannerData(rows, imageUrl = (value) => value) {
     // DB PHOTOS), then by the promo column (CS) when the title has no picture.
     let promo = null;
     if (price) {
-      const candidates = [price.promo_title || 'NO PROMO', price.promo].filter(Boolean);
+      // When neither has a picture in DB PHOTOS, the NO PROMO picture is shown.
+      const candidates = [price.promo_title || 'NO PROMO', price.promo, 'NO PROMO'].filter(Boolean);
       const match = candidates.map((name) => photo('promo', name)).find((row) => row && row.link);
       if (match) promo = { name: match.name, picture: imageUrl(match.link), trigger: match.trigger || '' };
       else if (candidates.length) promo = { name: candidates[0], picture: '', trigger: '' };
