@@ -1074,6 +1074,17 @@
     // 'ageing' (the AGEING BANNER picture) or 'generated'. A newly chosen laptop starts on its ageing banner.
     let bannerView = 'generated';
 
+    // Tells SalesKit which banner is on screen (shown on the server's Devices tab).
+    function reportShownBanner() {
+      const item = bannerItems.find((row) => row.itemCode === currentItemCode);
+      toParent({
+        channel: 'saleskit-banner-activity',
+        activity: item
+          ? { item: [item.brandModel, item.partNumber].filter(Boolean).join(' ') || item.itemCode, view: bannerView, fullscreen: document.fullscreenElement === $('wrap') }
+          : null
+      });
+    }
+
     function showBannerView(item, view) {
       bannerView = item.ageingBanner && (view === 'ageing' || item.ageingOnly) ? 'ageing' : 'generated';
       $('wrap').classList.toggle('show-ageing', bannerView === 'ageing');
@@ -1084,6 +1095,7 @@
         button.classList.toggle('is-active', active);
         button.setAttribute('aria-pressed', String(active));
       });
+      reportShownBanner();
     }
 
     $('bannerViewSwitch').addEventListener('click', (event) => {
@@ -1219,6 +1231,7 @@
     document.addEventListener('fullscreenchange', () => {
       updateFullscreenButton();
       fitBanner();
+      reportShownBanner();
     });
     updateFullscreenButton();
     fitBanner();

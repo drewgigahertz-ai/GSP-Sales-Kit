@@ -408,7 +408,7 @@ function renderDevices(list) {
   const rows = $('deviceRows');
   rows.replaceChildren();
   if (!list.length) {
-    rows.innerHTML = '<tr><td colspan="11" class="empty text-center py-4">No SalesKit laptop has connected yet.</td></tr>';
+    rows.innerHTML = '<tr><td colspan="12" class="empty text-center py-4">No SalesKit laptop has connected yet.</td></tr>';
     return;
   }
   list.forEach((device) => {
@@ -431,6 +431,18 @@ function renderDevices(list) {
     const userCell = addCell(account ? account.displayName : device.user ? `(${device.user})` : '', account ? 'device-name' : 'muted-small');
     userCell.title = account ? `Signed in as ${account.username}` : 'Not signed in. Shows the Windows user, if known.';
     addCell(account ? branchLabel(account.branch) : '', account ? 'fw-semibold' : '');
+    // What SalesKit shows right now (reported by 1.0.10 and newer while the laptop is online).
+    const showing = device.online && device.showing;
+    const showingCell = addCell(showing
+      ? (showing.idle ? `Idle · ${showing.text}` : showing.text)
+      : '', showing && !showing.idle ? (showing.banner ? 'showing-banner' : '') : 'muted-small');
+    if (showing && showing.since) {
+      const since = document.createElement('div');
+      since.className = 'muted-small';
+      since.textContent = `since ${timeAgo(showing.since).replace(' ago', '')}`;
+      showingCell.appendChild(since);
+      showingCell.title = `Since ${formatTime(showing.since, true)}`;
+    }
     const laptop = [device.make, device.model].filter(Boolean).join(' · ');
     addCell(laptop);
     addCell(device.name || 'Unknown (SalesKit 1.0.1 or older)', device.name ? '' : 'muted-small');
@@ -485,7 +497,41 @@ async function loadDevices() {
   const [list, rejected] = await Promise.all([run(null, api.getDevices), run(null, api.getRejected)]);
   if (list) renderDevices(list);
   if (rejected) renderRejected(rejected);
+  loadActivitySummary();
 }
+
+const ACTIVITY_KINDS = { banner: 'Banner', clearance: 'Clearance banner', 'feature-banner': 'Feature banner' };
+
+async function loadActivitySummary() {
+  const summary = await run(null, () => api.getActivitySummary(Number($('activityDays').value)));
+  const topRows = $('activityTopRows');
+  const branchRows = $('activityBranchRows');
+  topRows.replaceChildren();
+  branchRows.replaceChildren();
+  if (!summary || !summary.total) {
+    $('activityTotal').textContent = '';
+    topRows.innerHTML = '<tr><td colspan="5" class="empty text-center py-4">No banners shown in this period yet (SalesKit 1.0.10 and newer report them).</td></tr>';
+    return;
+  }
+  $('activityTotal').textContent = `${summary.total.toLocaleString()} banners shown`;
+  const cells = (tr, values) => values.forEach((value) => { tr.insertCell().textContent = value; });
+  summary.top.forEach((row) => {
+    const tr = topRows.insertRow();
+    cells(tr, [
+      row.kind === 'feature-banner' ? `Feature banner · ${row.detail}` : (row.detail || ACTIVITY_KINDS[row.kind] || row.kind),
+      row.item || '—',
+      row.times.toLocaleString(),
+      row.branches.toLocaleString(),
+      timeAgo(row.last)
+    ]);
+  });
+  summary.branches.forEach((row) => {
+    const tr = branchRows.insertRow();
+    cells(tr, [row.branch ? branchLabel(row.branch) : '(no login)', row.times.toLocaleString(), row.laptops.toLocaleString()]);
+  });
+}
+
+$('activityDays').addEventListener('change', loadActivitySummary);
 
 $('clearRejected').addEventListener('click', (event) => run(event.currentTarget, api.clearRejected).then((next) => next && renderRejected(next)));
 

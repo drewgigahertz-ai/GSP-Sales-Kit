@@ -6,6 +6,12 @@ const path = require('node:path');
 // Clients check in every 2 minutes, so anything seen within 5 minutes counts as online.
 const ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
+// SalesKit 1.0.1 and older do not send a computer name; they are known by IP address.
+function deviceKey(address, client = {}) {
+  const ip = String(address || '').replace(/^::ffff:/, '');
+  return client.name ? `name:${client.name.toLowerCase()}` : `ip:${ip}`;
+}
+
 function createDeviceRegistry(filePath) {
   let devices = {};
   let rejected = {};
@@ -49,8 +55,7 @@ function createDeviceRegistry(filePath) {
       return false;
     }
 
-    // SalesKit 1.0.1 and older do not send a computer name; they are known by IP address.
-    const key = client.name ? `name:${client.name.toLowerCase()}` : `ip:${ip}`;
+    const key = deviceKey(address, client);
     const isNew = !devices[key];
     const device = devices[key] || { key, firstSeen: now, requests: 0 };
     Object.assign(device, {
@@ -106,4 +111,4 @@ function createDeviceRegistry(filePath) {
   return { record, list, rejectedList, forget, clearRejected };
 }
 
-module.exports = { createDeviceRegistry };
+module.exports = { createDeviceRegistry, deviceKey };

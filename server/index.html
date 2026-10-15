@@ -721,6 +721,11 @@
       font-weight: 700;
     }
 
+    .showing-banner {
+      color: #0f5132;
+      font-weight: 600;
+    }
+
     .muted-small {
       color: var(--muted);
       font-size: 0.78rem;
@@ -796,13 +801,41 @@
         <div class="table-responsive">
           <table class="list-table">
             <thead>
-              <tr><th>Status</th><th>User</th><th>Location</th><th>Laptop</th><th>Computer</th><th>IP address</th><th>SalesKit</th><th>Last refresh</th><th>Last seen</th><th>Requests</th><th></th></tr>
+              <tr><th>Status</th><th>User</th><th>Location</th><th>Showing now</th><th>Laptop</th><th>Computer</th><th>IP address</th><th>SalesKit</th><th>Last refresh</th><th>Last seen</th><th>Requests</th><th></th></tr>
             </thead>
             <tbody id="deviceRows"></tbody>
           </table>
         </div>
       </section>
-      <p class="muted-small mt-3"><i class="bi bi-info-circle"></i> User and location come from the SalesKit login (1.0.5 and newer). Laptop brand and model are read from Windows.</p>
+      <p class="muted-small mt-3"><i class="bi bi-info-circle"></i> User and location come from the SalesKit login (1.0.5 and newer). Laptop brand and model are read from Windows. "Showing now" needs SalesKit 1.0.10 or newer.</p>
+
+      <section class="panel mt-3">
+        <div class="panel-head">
+          <h2 class="panel-title"><i class="bi bi-bar-chart"></i> Most shown banners</h2>
+          <div class="d-flex align-items-center gap-2">
+            <span class="muted-small" id="activityTotal"></span>
+            <select class="form-select form-select-sm w-auto" id="activityDays" aria-label="Period">
+              <option value="1">Today</option>
+              <option value="7">Last 7 days</option>
+              <option value="30" selected>Last 30 days</option>
+            </select>
+          </div>
+        </div>
+        <div class="row g-0">
+          <div class="col-lg-8 table-responsive">
+            <table class="list-table">
+              <thead><tr><th>Banner</th><th>Laptop</th><th>Shown</th><th>Branches</th><th>Last shown</th></tr></thead>
+              <tbody id="activityTopRows"></tbody>
+            </table>
+          </div>
+          <div class="col-lg-4 table-responsive">
+            <table class="list-table">
+              <thead><tr><th>Branch</th><th>Banners shown</th><th>Laptops</th></tr></thead>
+              <tbody id="activityBranchRows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
 
       <section class="panel mt-3">
         <div class="panel-head">

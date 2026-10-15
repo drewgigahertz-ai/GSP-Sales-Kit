@@ -9,6 +9,7 @@ const { startAutoUpdates, getUpdateStatus, installUpdateNow, noticeLatestVersion
 const { createUpdateResume } = require('./update-resume');
 const { createLogoCache } = require('./logo-cache');
 const { createDataLoader } = require('./data-loader');
+const { createActivityReporter } = require('./activity');
 const { getDeviceInfo } = require('./device-info');
 
 // SalesKit is a client: it loads its data from the SalesKit Server, which does the Google Sheets sync.
@@ -24,6 +25,7 @@ let snapshotCache;
 let dataLoader;
 let updateResume;
 let logoCache;
+let activityReporter;
 
 function reportSyncProgress(progress) {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -205,6 +207,7 @@ ipcMain.handle('auth:login', async (_event, username, password) => {
   try {
     const result = await requestServer('/api/login', { method: 'POST', body: { username: String(username || ''), password: String(password || '') } });
     session = { key: result.sessionKey, user: result.user };
+    if (activityReporter) activityReporter.reset();
     // The page keeps its own copy of the data; drop it so a shared laptop never shows the previous user's branches.
     await mainWindow.webContents.executeJavaScript("localStorage.removeItem('ghz_cached_sheet_data')").catch(() => {});
     showSalesKit();
@@ -263,6 +266,11 @@ ipcMain.handle('application:set-icon', async (event, imageUrl) => {
 });
 ipcMain.handle('database:sync', () => performRemoteSync());
 ipcMain.handle('logos:cached', () => logoCache.cachedLogos());
+// What the window shows, for the server's Devices tab ("Showing now").
+ipcMain.handle('activity:report', (event, activity) => {
+  if (activityReporter && mainWindow && event.sender === mainWindow.webContents) activityReporter.set(activity);
+  return true;
+});
 // Banner page pictures are saved on this laptop when first shown (not all at startup), then work offline.
 ipcMain.handle('images:cache', async (_event, url) => {
   if (typeof url !== 'string' || !/^https:\/\//i.test(url)) return '';
@@ -374,6 +382,11 @@ app.whenReady().then(() => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update:status', status);
   }, { onBeforeInstall: () => updateResume.save(session) });
   startDataChangeChecks();
+  activityReporter = createActivityReporter({
+    send: (report) => requestServer('/api/activity', { method: 'POST', body: report, timeoutMs: 5000 }),
+    getWindow: () => mainWindow,
+    isSignedIn: () => Boolean(session) && !onLoginPage
+  });
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

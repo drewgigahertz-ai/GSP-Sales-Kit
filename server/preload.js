@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('salesKitServer', {
   newToken: () => ipcRenderer.invoke('server:new-token'),
   getTableData: (table, options) => ipcRenderer.invoke('server:table-data', table, options),
   getDevices: () => ipcRenderer.invoke('server:get-devices'),
+  getActivitySummary: (days) => ipcRenderer.invoke('server:get-activity-summary', days),
   forgetDevice: (key) => ipcRenderer.invoke('server:forget-device', key),
   backupNow: () => ipcRenderer.invoke('server:backup-now'),
   restoreBackup: (name) => ipcRenderer.invoke('server:restore-backup', name),

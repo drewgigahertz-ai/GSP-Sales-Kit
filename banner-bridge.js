@@ -57,6 +57,10 @@
     const { channel } = event.data;
     if (channel === 'saleskit-banner-ready') {
       if (latestBannerData) send({ channel: 'saleskit-banner-data', data: latestBannerData, logo: logo() });
+    } else if (channel === 'saleskit-banner-activity') {
+      // What the Banner page shows, for the server's Devices tab (see activity-tracker.js).
+      window.bannerPageScreen = event.data.activity || null;
+      if (typeof window.reportScreen === 'function') window.reportScreen();
     } else if (channel === 'saleskit-banner-image') {
       const url = await savedPicture(String(event.data.url || ''));
       send({ channel: 'saleskit-banner-image', requestId: event.data.requestId, url });

@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('saleskit', {
   setApplicationIcon: (imageUrl) => ipcRenderer.invoke('application:set-icon', imageUrl),
   getCachedLogos: () => ipcRenderer.invoke('logos:cached'),
   cacheImage: (url) => ipcRenderer.invoke('images:cache', url),
+  reportActivity: (activity) => ipcRenderer.invoke('activity:report', activity),
   onSyncProgress: (callback) => {
     const listener = (_event, progress) => callback(progress);
     ipcRenderer.on('sync:progress', listener);

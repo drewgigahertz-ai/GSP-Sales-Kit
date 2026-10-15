@@ -49,6 +49,7 @@
       "saleskit.html",
       "banner.html",
       "banner-bridge.js",
+      "activity-tracker.js",
       "package.json"
     ],
     "publish": {

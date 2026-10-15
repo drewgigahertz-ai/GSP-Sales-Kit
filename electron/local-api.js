@@ -53,10 +53,11 @@ function readJsonBody(request, limit = 10 * 1024) {
 //   prepareInitialData(data, user), canBrowseTables(user) }
 //   When given, data routes also need a signed-in user, sent as the X-SalesKit-Session header.
 // getLatestClientVersion: the newest SalesKit release, so open clients start updating within minutes.
+// onActivity({ user, address, client, activity }) (optional): what a signed-in SalesKit is showing (POST /api/activity).
 // getInitialPayload(user, { dedupe }) (optional): { etag, gzip } of the prepared data for that user. Then
 //   /api/initial-data answers "304 Not Modified" to a matching If-None-Match, sends gzip when accepted,
 //   and /api/version includes the user's dataTag (the ETag), so laptops only download when their data changed.
-function createLocalApi({ database, token = '', onRequest = null, getDataVersion = () => null, getLatestClientVersion = () => null, getInitialPayload = null, accounts = null }) {
+function createLocalApi({ database, token = '', onRequest = null, getDataVersion = () => null, getLatestClientVersion = () => null, getInitialPayload = null, onActivity = null, accounts = null }) {
   return http.createServer(async (request, response) => {
     const url = new URL(request.url, 'http://localhost');
     const address = request.socket.remoteAddress || '';
@@ -113,7 +114,18 @@ function createLocalApi({ database, token = '', onRequest = null, getDataVersion
         }
       }
 
-      if (request.method === 'GET' && url.pathname === '/api/status') {
+      if (request.method === 'POST' && url.pathname === '/api/activity') {
+        const activity = await readJsonBody(request, 2048);
+        if (onActivity) {
+          onActivity({
+            user,
+            address,
+            client: { name: headerText(request, 'x-saleskit-client') },
+            activity: activity && typeof activity === 'object' ? activity : {}
+          });
+        }
+        sendJson(response, 200, { ok: true });
+      } else if (request.method === 'GET' && url.pathname === '/api/status') {
         const status = database.getStatus();
         sendJson(response, 200, { connected: status.connected, tableCount: status.tableCount });
       } else if (request.method === 'GET' && url.pathname === '/api/version') {

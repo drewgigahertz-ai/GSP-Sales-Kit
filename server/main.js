@@ -7,7 +7,8 @@ const path = require('node:path');
 const database = require('../electron/database');
 const { DEFAULT_SPREADSHEET_ID, fetchSpreadsheetData } = require('../electron/sheets-sync');
 const { createLocalApi } = require('../electron/local-api');
-const { createDeviceRegistry } = require('./devices');
+const { createDeviceRegistry, deviceKey } = require('./devices');
+const { createActivityLog } = require('./activity');
 const { createBackupStore } = require('./backups');
 const { createUserStore } = require('./users');
 const { hasFullAccess, filterDataForBranch } = require('./branch-filter');
@@ -47,6 +48,7 @@ let users;
 let devicesPushTimer = null;
 let headerLogo = '';
 let clientRelease;
+let activity;
 const logs = [];
 
 // ---------- Settings ----------
@@ -167,12 +169,17 @@ function bumpDataVersion() {
   writeSettings();
 }
 
+// Each device with what it is showing now ("Showing now" on the Devices tab).
+function devicesWithActivity() {
+  return devices.list().map((device) => ({ ...device, showing: activity ? activity.liveFor(device.key) : null }));
+}
+
 // Device updates can arrive many times a second; send the list at most once a second.
 function pushDevices() {
   if (devicesPushTimer) return;
   devicesPushTimer = setTimeout(() => {
     devicesPushTimer = null;
-    send('server:devices', devices.list());
+    send('server:devices', devicesWithActivity());
   }, 1000);
 }
 
@@ -246,6 +253,9 @@ async function startApi() {
     token: settings.token,
     getDataVersion: () => settings.dataVersion,
     getInitialPayload: (user, options) => payloads.get(user, options),
+    onActivity: ({ user, address, client, activity: report }) => {
+      if (activity && activity.record(deviceKey(address, client), user, report)) pushDevices();
+    },
     getLatestClientVersion: () => clientRelease.get().version,
     accounts: {
       login: (username, password, address) => users.login(username, password, address),
@@ -275,7 +285,7 @@ async function startApi() {
         if (pathname !== '/api/version') log('warning', `${who} needs to log in (older SalesKit or signed out)`);
       }
       // Clients poll /api/version every few minutes; keep those out of the activity log.
-      else if (pathname !== '/api/version' && pathname !== '/api/login') {
+      else if (pathname !== '/api/version' && pathname !== '/api/login' && pathname !== '/api/activity') {
         log(status < 400 ? 'request' : 'error', `${who} ${method} ${pathname} → ${status}`);
       }
     }
@@ -581,7 +591,8 @@ ipcMain.handle('server:copy-client-config', (_event, address) => {
 
 ipcMain.handle('server:table-data', (_event, tableName, options = {}) => database.getTableData(tableName, options));
 
-ipcMain.handle('server:get-devices', () => devices.list());
+ipcMain.handle('server:get-devices', () => devicesWithActivity());
+ipcMain.handle('server:get-activity-summary', (_event, days) => (activity ? activity.summary(Number(days) || 30) : null));
 ipcMain.handle('server:get-rejected', () => devices.rejectedList());
 ipcMain.handle('server:clear-rejected', () => {
   devices.clearRejected();
@@ -627,7 +638,7 @@ ipcMain.handle('server:remove-user', (_event, username) => userAction(() => {
 
 ipcMain.handle('server:forget-device', (_event, key) => {
   devices.forget(String(key));
-  return devices.list();
+  return devicesWithActivity();
 });
 
 ipcMain.handle('server:backup-now', async () => {
@@ -679,6 +690,11 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     settings = loadSettings();
     devices = createDeviceRegistry(path.join(app.getPath('userData'), 'devices.json'));
+    try {
+      activity = createActivityLog(path.join(app.getPath('userData'), 'activity.db'));
+    } catch (error) {
+      log('error', `Could not open the activity history: ${error.message}`);
+    }
     clientRelease = createClientReleaseWatcher({
       fetchImpl: net.fetch,
       onChange: (latest) => {
@@ -711,6 +727,7 @@ if (!app.requestSingleInstanceLock()) {
     quitting = true;
     clearInterval(syncTimer);
     if (clientRelease) clientRelease.stop();
+    if (activity) activity.close();
     stopApi();
     database.closeDatabase();
   });
