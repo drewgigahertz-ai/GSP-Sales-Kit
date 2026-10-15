@@ -239,11 +239,12 @@ ipcMain.handle('application:set-icon', async (event, imageUrl) => {
   if (!mainWindow || event.sender !== mainWindow.webContents) {
     throw new Error('Only the main SalesKit window can update the application icon.');
   }
-  if (typeof imageUrl !== 'string' || !/^https:\/\//i.test(imageUrl)) {
+  if (typeof imageUrl !== 'string' || !/^(https|saleskit-image):\/\//i.test(imageUrl)) {
     throw new Error('The application logo must be an HTTPS image URL.');
   }
 
-  const response = await net.fetch(imageUrl);
+  // A logo saved on this laptop is read from the image cache (no download, works offline).
+  const response = imageUrl.startsWith('saleskit-image://') ? await imageCache.serve(imageUrl) : await net.fetch(imageUrl);
   if (!response.ok) throw new Error(`Application logo request failed with HTTP ${response.status}.`);
   const contentType = response.headers.get('content-type') || '';
   if (!contentType.toLowerCase().startsWith('image/')) {
@@ -334,7 +335,21 @@ function createWindow() {
   else mainWindow.loadFile(path.join(__dirname, 'login.html'));
 }
 
+// One SalesKit at a time: a second start brings the open window to the front instead (two copies would
+// fight over the same saved data and browser cache).
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  });
+}
+
 app.whenReady().then(() => {
+  if (!app.hasSingleInstanceLock()) return;
   snapshotCache = createSnapshotCache(path.join(app.getPath('userData'), 'saleskit-data-cache.json'));
   imageCache = new ImageCache(path.join(app.getPath('userData'), 'image-cache'));
   dataLoader = createDataLoader({

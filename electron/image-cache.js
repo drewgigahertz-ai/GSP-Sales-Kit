@@ -57,7 +57,8 @@ class ImageCache {
       const fileName = this.manifest && this.manifest[urlKey(value)];
       return fileName ? `saleskit-image://cache/${fileName}` : value;
     };
-    data.applicationLogoSourceUrl = data.applicationLogoUrl;
+    // Mapping may run twice on the same data (startup shares one download); keep the original address.
+    if (!data.applicationLogoSourceUrl) data.applicationLogoSourceUrl = data.applicationLogoUrl;
     data.applicationLogoUrl = map(data.applicationLogoUrl);
     Object.values(data.specsMap || {}).forEach((spec) => { spec.image = map(spec.image); });
     Object.entries(data.skuImageMap || {}).forEach(([key, value]) => { data.skuImageMap[key] = map(value); });
