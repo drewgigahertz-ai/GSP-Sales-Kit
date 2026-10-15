@@ -425,45 +425,27 @@
       text-align: center;
     }
 
-    /* BANNER PRICES details for the chosen laptop, small along the bottom of the banner: each title on a
-       blue tab like the QUICK SPECS labels, its value below. */
+    /* BANNER PRICES details for the chosen laptop: one line of small plain text along the bottom of the
+       banner, for the salesperson, kept quiet so customers hardly notice it. */
     .price-details {
-      right: 40px;
-      bottom: 10px;
+      bottom: 8px;
       left: 40px;
-      display: grid;
-      height: 56px;
-      grid-template-columns: repeat(9, minmax(0, 1fr));
-      gap: 10px;
+      display: flex;
+      align-items: baseline;
+      gap: 15px;
+      color: #475569;
+      font-family: Arial, 'Segoe UI', sans-serif;
+      font-size: 10px;
+      white-space: nowrap;
     }
 
-    .price-detail {
-      display: flex;
-      min-width: 0;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 4px;
+    .price-detail.group-start {
+      margin-left: 45px;
     }
 
     .price-detail-title {
-      padding: 2px 14px;
-      clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
-      background: var(--banner-blue);
-      color: #fff;
-      font-size: 13px;
+      margin-right: 4px;
       font-weight: 700;
-      letter-spacing: .5px;
-    }
-
-    .price-detail-value {
-      max-width: 100%;
-      overflow: hidden;
-      color: var(--banner-blue);
-      font-size: 17px;
-      font-weight: 700;
-      text-overflow: ellipsis;
-      white-space: nowrap;
     }
 
     .banner-tab {
@@ -984,18 +966,26 @@
       });
     }
 
+    // Numbers as 2,400.00 (no peso sign); text such as CF codes as written; blank when the sheet is empty.
+    function detailText(value) {
+      if (value === null || value === undefined || value === '') return '';
+      const number = typeof value === 'number' ? value : Number(String(value).replace(/,/g, ''));
+      return Number.isFinite(number) && String(value).trim() !== ''
+        ? number.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : String(value);
+    }
+
     function renderPriceDetails(details) {
       const container = $('priceDetails');
-      container.replaceChildren(...details.map(({ title, value, isPrice }) => {
-        const cell = document.createElement('div');
-        cell.className = 'price-detail';
-        const label = document.createElement('div');
+      container.replaceChildren(...details.map(({ title, value }) => {
+        const cell = document.createElement('span');
+        // The no-bundle prices (CNB, 3NB, HCNB) form a second group.
+        cell.className = `price-detail${title === 'CNB' ? ' group-start' : ''}`;
+        const label = document.createElement('span');
         label.className = 'price-detail-title';
         label.textContent = title;
-        const shown = document.createElement('div');
-        shown.className = 'price-detail-value';
-        shown.textContent = isPrice ? peso(value) : (value || 'N/A');
-        shown.title = shown.textContent;
+        const shown = document.createElement('span');
+        shown.textContent = detailText(value);
         cell.append(label, shown);
         return cell;
       }));
