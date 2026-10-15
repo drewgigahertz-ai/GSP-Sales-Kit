@@ -271,6 +271,42 @@
       background: #fff;
     }
 
+    /* BANNER PRICES details for the chosen laptop, under the banner (not part of the banner itself). */
+    #priceDetails {
+      display: grid;
+      grid-template-columns: repeat(9, minmax(0, 1fr));
+      border-top: 1px solid #d9e3f0;
+      background: #fff;
+    }
+
+    .price-detail {
+      min-width: 0;
+      padding: 7px 8px;
+      border-right: 1px solid #eef2f7;
+      text-align: center;
+    }
+
+    .price-detail:last-child {
+      border-right: 0;
+    }
+
+    .price-detail-title {
+      color: #0012b3;
+      font-family: Outfit, sans-serif;
+      font-size: .68rem;
+      font-weight: 800;
+      letter-spacing: .04em;
+    }
+
+    .price-detail-value {
+      overflow: hidden;
+      color: #0f172a;
+      font-size: .82rem;
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     #wrap {
       position: relative;
       flex: 1;
@@ -786,6 +822,7 @@
           <div class="abs feature" style="left:1327px" id="feature4"><img class="picture-slot" alt="" hidden><span></span></div>
         </div>
       </div>
+      <div id="priceDetails" aria-label="Price details"></div>
     </main>
   </div>
 
@@ -940,6 +977,23 @@
       });
     }
 
+    function renderPriceDetails(details) {
+      const container = $('priceDetails');
+      container.replaceChildren(...details.map(({ title, value, isPrice }) => {
+        const cell = document.createElement('div');
+        cell.className = 'price-detail';
+        const label = document.createElement('div');
+        label.className = 'price-detail-title';
+        label.textContent = title;
+        const shown = document.createElement('div');
+        shown.className = 'price-detail-value';
+        shown.textContent = isPrice ? peso(value) : (value || 'N/A');
+        shown.title = shown.textContent;
+        cell.append(label, shown);
+        return cell;
+      }));
+    }
+
     function setText(id, value) {
       $(id).textContent = value || 'N/A';
     }
@@ -968,6 +1022,7 @@
         setText(`spec-${key}`, (item.specs && item.specs[key]) || valueFromItemCode(item.itemCode, key));
       });
 
+      renderPriceDetails(item.priceDetails || []);
       setText('cashPrice', peso(item.cash));
       setText('twelveMonths', peso(item.twelveMonths));
       const monthlyPrice = item.twelveMonths

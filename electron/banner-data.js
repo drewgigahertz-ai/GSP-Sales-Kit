@@ -10,6 +10,28 @@ const BANNER_SHEETS = {
   banner_prices: 'BANNER PRICES'
 };
 
+// Shown under the banner, in this order: [title, BANNER PRICES column, is a price].
+const PRICE_DETAILS = [
+  ['CWB', 'CG', true],
+  ['3WB', 'CH', true],
+  ['HCB', 'CI', true],
+  ['CF', 'CO', false],
+  ['B1', 'CP', false],
+  ['B2', 'CQ', false],
+  ['CNB', 'CK', true],
+  ['3NB', 'CL', true],
+  ['HCNB', 'CM', true]
+];
+
+// 'A' → 0, 'CG' → 84.
+function columnIndex(letters) {
+  return [...letters].reduce((index, letter) => index * 26 + letter.charCodeAt(0) - 64, 0) - 1;
+}
+
+function detailColumn(title) {
+  return `detail_${title.toLowerCase()}`;
+}
+
 const SPEC_GUIDES = ['PROCESSOR', 'STORAGE', 'GRAPHICS', 'RESOLUTION', 'MEMORY', 'OS'];
 
 // BANNER PRICES: headers are on row 3, items start on row 4. Columns are found by their row-3 header,
@@ -142,10 +164,12 @@ function pricesCollection(values) {
       promo_title: text(row[1]).replace(/\s+/g, ' '),
       promo: text(row[promoIndex]),
       cash: cash === null ? '' : String(cash),
-      twelve_months: twelveMonths === null ? '' : String(twelveMonths)
+      twelve_months: twelveMonths === null ? '' : String(twelveMonths),
+      ...Object.fromEntries(PRICE_DETAILS.map(([title, letters]) => [detailColumn(title), text(row[columnIndex(letters)])]))
     });
   }
-  return collection('banner_prices', ['item_code', 'promo_title', 'promo', 'cash', 'twelve_months'], rows);
+  return collection('banner_prices', ['item_code', 'promo_title', 'promo', 'cash', 'twelve_months',
+    ...PRICE_DETAILS.map(([title]) => detailColumn(title))], rows);
 }
 
 const NORMALIZERS = {
@@ -208,6 +232,11 @@ function buildBannerData(rows, imageUrl = (value) => value) {
       cash: price ? number(price.cash) : null,
       twelveMonths: price ? number(price.twelve_months) : null,
       hasPrice: Boolean(price),
+      // { title, value, isPrice } for the strip under the banner.
+      priceDetails: PRICE_DETAILS.map(([title, , isPrice]) => {
+        const raw = price ? text(price[detailColumn(title)]) : '';
+        return { title, value: isPrice ? number(raw) : raw, isPrice };
+      }),
       promo,
       features: [1, 2, 3, 4]
         .map((n) => ({ name: text(laptop[`uksp${n}`]), picture: picture(laptop[`uksp${n}_pic`], 'spec', laptop[`uksp${n}`]) }))
