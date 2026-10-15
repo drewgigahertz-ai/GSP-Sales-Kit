@@ -13,6 +13,7 @@ const SHEET_TABLES = new Set([
   'banner_photos',
   'banner_prices',
   'features_banner',
+  'ageing_banner',
   'specs',
   'criteria_segment_application',
   'dv_transposed',
@@ -492,7 +493,8 @@ function getInitialData() {
       laptops: getRows('banner_laptops'),
       specs: getRows('banner_specs'),
       photos: getRows('banner_photos'),
-      prices: getRows('banner_prices')
+      prices: getRows('banner_prices'),
+      ageing: getRows('ageing_banner')
     }, normalizeImageUrl),
     sheetStatus: {
       skuCount: criteriaSegmentData.laptops.length,

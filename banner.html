@@ -271,6 +271,63 @@
       background: #fff;
     }
 
+    /* Ageing banner (AGEING BANNER sheet): a ready-made picture shown instead of the generated banner. */
+    #bannerViewSwitch {
+      display: inline-flex;
+      flex: 0 0 auto;
+      overflow: hidden;
+      border: 1px solid #003ecb;
+      border-radius: 6px;
+    }
+
+    #bannerViewSwitch[hidden] {
+      display: none;
+    }
+
+    #bannerViewSwitch button {
+      min-height: 30px;
+      padding: 4px 11px;
+      border: 0;
+      background: #fff;
+      color: #003ecb;
+      font: inherit;
+      font-size: .72rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    #bannerViewSwitch button.is-active {
+      background: #003ecb;
+      color: #fff;
+    }
+
+    #ageingBanner {
+      position: absolute;
+      inset: 0;
+      display: none;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    #wrap.show-ageing #ageingBanner {
+      display: block;
+    }
+
+    #wrap.show-ageing #stage {
+      display: none;
+    }
+
+    .ageing-tag {
+      margin-left: 6px;
+      padding: 1px 6px;
+      border-radius: 999px;
+      background: #fff1e6;
+      color: #c2410c;
+      font-size: .62rem;
+      font-weight: 800;
+    }
+
     #wrap {
       position: relative;
       flex: 1;
@@ -767,6 +824,10 @@
         <button id="refreshBannerButton" type="button" title="Load the latest data from the SalesKit server">
           <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh data
         </button>
+        <div id="bannerViewSwitch" role="group" aria-label="Banner shown" hidden>
+          <button type="button" data-view="ageing">Clearance banner</button>
+          <button type="button" data-view="generated">Generated banner</button>
+        </div>
         <button id="fullscreenButton" type="button" aria-label="Enter fullscreen">
           <i class="bi bi-fullscreen" aria-hidden="true"></i> Fullscreen
         </button>
@@ -811,6 +872,7 @@
 
           <div class="abs price-details" id="priceDetails" aria-label="Price details"></div>
         </div>
+        <img id="ageingBanner" alt="">
       </div>
     </main>
   </div>
@@ -917,7 +979,7 @@
     function matchingItems() {
       const query = $('productSearch').value.trim().replace(/\s+/g, ' ').toLowerCase();
       return bannerItems.filter((item) => {
-        if (showPricedOnly && !item.hasPrice) return false;
+        if (showPricedOnly && !item.hasPrice && !item.ageingOnly) return false;
         if (!query) return true;
         return [item.itemCode, item.brandModel, item.partNumber].some((value) => String(value || '').toLowerCase().includes(query));
       });
@@ -953,7 +1015,13 @@
         const code = document.createElement('small');
         code.textContent = row.itemCode;
         code.title = row.itemCode;
-        if (!row.hasPrice) {
+        if (row.ageingBanner) {
+          const tag = document.createElement('span');
+          tag.className = 'ageing-tag';
+          tag.textContent = 'clearance';
+          code.appendChild(tag);
+        }
+        if (!row.hasPrice && !row.ageingOnly) {
           const badge = document.createElement('span');
           badge.className = 'no-price-tag';
           badge.textContent = 'no price';
@@ -1003,12 +1071,37 @@
       else element.removeAttribute('src');
     }
 
+    // 'ageing' (the AGEING BANNER picture) or 'generated'. A newly chosen laptop starts on its ageing banner.
+    let bannerView = 'generated';
+
+    function showBannerView(item, view) {
+      bannerView = item.ageingBanner && (view === 'ageing' || item.ageingOnly) ? 'ageing' : 'generated';
+      $('wrap').classList.toggle('show-ageing', bannerView === 'ageing');
+      const choose = $('bannerViewSwitch');
+      choose.hidden = !item.ageingBanner || Boolean(item.ageingOnly);
+      choose.querySelectorAll('button').forEach((button) => {
+        const active = button.dataset.view === bannerView;
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-pressed', String(active));
+      });
+    }
+
+    $('bannerViewSwitch').addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-view]');
+      const item = bannerItems.find((row) => row.itemCode === currentItemCode);
+      if (button && item) showBannerView(item, button.dataset.view);
+    });
+
     async function selectItem(itemCode) {
       const item = bannerItems.find((row) => row.itemCode === itemCode);
       if (!item) return;
       const version = ++selectionVersion;
+      const sameItem = itemCode === currentItemCode;
       currentItemCode = itemCode;
       loadItemList();
+      // Refreshed data keeps the view the salesperson chose; another laptop starts on its ageing banner.
+      showBannerView(item, sameItem ? bannerView : 'ageing');
+      setPicture($('ageingBanner'), item.ageingBanner, `${item.itemCode} clearance banner`);
 
       $('selectedItem').textContent = item.itemCode;
       $('bannerTitle').textContent = item.brandModel || item.itemCode;

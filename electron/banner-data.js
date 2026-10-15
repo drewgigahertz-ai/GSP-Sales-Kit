@@ -205,6 +205,8 @@ function buildBannerData(rows, imageUrl = (value) => value) {
     const specs = specsByItem.get(key);
     if (SPEC_GUIDES.includes(spec.guide) && !specs[spec.guide]) specs[spec.guide] = spec.value;
   }
+  // Ready-made ageing banner per item code (AGEING BANNER sheet), shown instead of the generated banner.
+  const ageingByItem = new Map((rows.ageing || []).map((row) => [matchKey(row.item_code), row.banner]));
   const pricesByItem = new Map((rows.prices || []).map((price) => [matchKey(price.item_code), price]));
 
   const seen = new Set();
@@ -238,9 +240,32 @@ function buildBannerData(rows, imageUrl = (value) => value) {
         return { title, value: isPrice ? number(raw) : raw, isPrice };
       }),
       promo,
+      ageingBanner: ageingByItem.has(key) ? imageUrl(text(ageingByItem.get(key))) : '',
       features: [1, 2, 3, 4]
         .map((n) => ({ name: text(laptop[`uksp${n}`]), picture: picture(laptop[`uksp${n}_pic`], 'spec', laptop[`uksp${n}`]) }))
         .filter((feature) => feature.name)
+    });
+  }
+  // Laptops with an ageing banner but not in LAPTOP RAW: listed with the ageing banner only.
+  for (const row of rows.ageing || []) {
+    const key = matchKey(row.item_code);
+    if (seen.has(key) || !text(row.banner)) continue;
+    seen.add(key);
+    items.push({
+      itemCode: text(row.item_code),
+      brand: '',
+      brandModel: text(row.item_code),
+      partNumber: '',
+      brandPicture: '',
+      specs: {},
+      cash: null,
+      twelveMonths: null,
+      hasPrice: false,
+      priceDetails: [],
+      promo: null,
+      ageingBanner: imageUrl(text(row.banner)),
+      ageingOnly: true,
+      features: []
     });
   }
   items.sort((a, b) => a.itemCode.localeCompare(b.itemCode));

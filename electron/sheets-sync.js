@@ -12,6 +12,7 @@ const FIRST_COLUMN_HEADERS = {};
 const DEFAULT_SPREADSHEET_ID = '1qACk3I6yMwmIYauQFlcM3yryRcyIrx3bLYqmJZ2wVFE';
 const { BANNER_SHEETS, normalizeBannerSheets } = require('./banner-data');
 const { FEATURES_BANNER_SHEET, featuresBannerCollection } = require('./feature-banners');
+const { AGEING_BANNER_SHEET, ageingBannerCollection } = require('./ageing-banners');
 
 function collectionName(sheetName) {
   return sheetName.toLowerCase().trim().replace(/[\/\s]+/g, '_');
@@ -131,6 +132,17 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
       valueRenderOption: 'FORMATTED_VALUE'
     });
     result.features_banner = featuresBannerCollection(response.data.values || []);
+  }
+
+  // Ready-made ageing banners for the Banner page (see ageing-banners.js); skipped when the tab is missing.
+  const ageingBannerTitle = titles.find((name) => name.trim().toUpperCase() === AGEING_BANNER_SHEET);
+  if (ageingBannerTitle) {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `'${ageingBannerTitle.replace(/'/g, "''")}'!A:H`,
+      valueRenderOption: 'FORMATTED_VALUE'
+    });
+    result.ageing_banner = ageingBannerCollection(response.data.values || []);
   }
 
   return result;
