@@ -125,6 +125,7 @@ function imageUrlsFromData(data) {
   Object.values(data.appUkspData?.applications || []).forEach((app) => add(app.icon));
   (data.ukspBannerData?.skus || []).forEach((laptop) => {
     Object.values(laptop.features || {}).forEach(add);
+    Object.values(laptop.featureBanners || {}).forEach((banners) => banners.forEach((banner) => add(banner.url)));
   });
   return [...urls];
 }

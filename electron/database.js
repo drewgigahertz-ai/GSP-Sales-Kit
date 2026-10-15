@@ -5,12 +5,14 @@ const Database = require('better-sqlite3');
 let connection = null;
 let activePath = null;
 const { buildBannerData } = require('./banner-data');
+const { createFeatureBannerResolver } = require('./feature-banners');
 
 const SHEET_TABLES = new Set([
   'banner_laptops',
   'banner_specs',
   'banner_photos',
   'banner_prices',
+  'features_banner',
   'specs',
   'criteria_segment_application',
   'dv_transposed',
@@ -406,7 +408,10 @@ function makeUkspData(rows, modelBySku = {}) {
   };
 }
 
-function makeUkspBannerData(rows) {
+// UKSP BANNER cells hold short names from FEATURES BANNER (comma-separated for several banners) or a Drive link.
+// features[feature] is the first banner (what SalesKit 1.0.8 and older show); featureBanners[feature] lists all.
+function makeUkspBannerData(rows, featureBannerRows = []) {
+  const resolve = createFeatureBannerResolver(featureBannerRows, normalizeImageUrl);
   const excludedColumns = new Set(['id', 'sku', 'model', 'order_index']);
   const features = rows.length
     ? Object.keys(rows[0]).filter((column) => !excludedColumns.has(column.toLowerCase()))
@@ -414,14 +419,15 @@ function makeUkspBannerData(rows) {
 
   return {
     features,
-    skus: rows.map((row) => ({
-      sku: text(row.SKU),
-      model: text(row.Model),
-      features: Object.fromEntries(features.map((feature) => [
-        feature,
-        normalizeImageUrl(row[feature])
-      ]))
-    })).filter((laptop) => laptop.sku)
+    skus: rows.map((row) => {
+      const banners = Object.fromEntries(features.map((feature) => [feature, resolve(row[feature])]));
+      return {
+        sku: text(row.SKU),
+        model: text(row.Model),
+        features: Object.fromEntries(features.map((feature) => [feature, banners[feature][0] ? banners[feature][0].url : ''])),
+        featureBanners: Object.fromEntries(features.filter((feature) => banners[feature].length).map((feature) => [feature, banners[feature]]))
+      };
+    }).filter((laptop) => laptop.sku)
   };
 }
 
@@ -445,7 +451,8 @@ function getInitialData() {
     specsBySku,
     Object.fromEntries(applicationMatrix.applications.map(({ name, hierarchy }) => [name.toLowerCase(), hierarchy]))
   );
-  const ukspBannerData = makeUkspBannerData(getRows('uksp_banner'));  const modelBySku = Object.fromEntries(Object.entries(specsBySku).map(([sku, spec]) => [sku, spec.title]));
+  const ukspBannerData = makeUkspBannerData(getRows('uksp_banner'), getRows('features_banner'));
+  const modelBySku = Object.fromEntries(Object.entries(specsBySku).map(([sku, spec]) => [sku, spec.title]));
   ukspBannerData.skus.forEach(({ sku, model }) => {
     if (model) modelBySku[canonicalSku(sku)] = model;
   });

@@ -71,6 +71,9 @@ class ImageCache {
       Object.entries(laptop.features || {}).forEach(([feature, url]) => {
         laptop.features[feature] = map(url);
       });
+      Object.values(laptop.featureBanners || {}).forEach((banners) => {
+        banners.forEach((banner) => { banner.url = map(banner.url); });
+      });
     });
     Object.values(data.criteriaSegmentData?.laptops || []).forEach((laptop) => {
       laptop.image = map(laptop.image);

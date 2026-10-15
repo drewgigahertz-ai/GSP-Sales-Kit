@@ -11,6 +11,7 @@ const SHEETS = [
 const FIRST_COLUMN_HEADERS = {};
 const DEFAULT_SPREADSHEET_ID = '1qACk3I6yMwmIYauQFlcM3yryRcyIrx3bLYqmJZ2wVFE';
 const { BANNER_SHEETS, normalizeBannerSheets } = require('./banner-data');
+const { FEATURES_BANNER_SHEET, featuresBannerCollection } = require('./feature-banners');
 
 function collectionName(sheetName) {
   return sheetName.toLowerCase().trim().replace(/[\/\s]+/g, '_');
@@ -23,7 +24,15 @@ function normalizeSheetValues(sheetName, values = []) {
     values = [[firstColumnHeader, ...values[0].slice(1)], ...values.slice(1)];
   }
 
-  const columns = [...new Set(values[0].map((value) => String(value ?? '').trim()).filter(Boolean))];
+  // Database column names ignore case, so "Pre-Installed Software" and "Pre-installed Software" would clash
+  // and fail the whole sync; the first of such columns is kept.
+  const seen = new Set();
+  const columns = values[0].map((value) => String(value ?? '').trim()).filter((column) => {
+    const key = column.toLowerCase();
+    if (!column || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
   const headerIndexes = columns.map((column) => values[0].findIndex((value) => String(value ?? '').trim() === column));
   const rows = values.slice(1).flatMap((cells, index) => {
     const data = Object.fromEntries(columns.map((column, columnIndex) => [
@@ -112,6 +121,17 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
     onProgress({ phase: 'sheets', completed: SHEETS.length, total: SHEETS.length, sheet: sheetName });
   }
   Object.assign(result, normalizeBannerSheets(bannerValues));
+
+  // Feature banners by short name (see feature-banners.js); skipped like the Banner sheets when missing.
+  const featuresBannerTitle = titles.find((name) => name.trim().toUpperCase() === FEATURES_BANNER_SHEET);
+  if (featuresBannerTitle) {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `'${featuresBannerTitle.replace(/'/g, "''")}'!A:C`,
+      valueRenderOption: 'FORMATTED_VALUE'
+    });
+    result.features_banner = featuresBannerCollection(response.data.values || []);
+  }
 
   return result;
 }

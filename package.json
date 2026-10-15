@@ -1,6 +1,6 @@
 {
   "name": "saleskit-desktop",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "private": true,
   "description": "GigaHertz SalesKit desktop application",
   "main": "electron/main.js",
@@ -42,6 +42,7 @@
       "!electron/sheets-sync.js",
       "!electron/local-api.js",
       "!electron/banner-data.js",
+      "!electron/feature-banners.js",
       "!node_modules/googleapis{,/**/*}",
       "!node_modules/better-sqlite3{,/**/*}",
       "saleskit.html",

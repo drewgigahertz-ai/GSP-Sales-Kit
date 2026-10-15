@@ -1745,6 +1745,42 @@
       padding: 0;
     }
 
+    /* Switch between a feature's banners (one shown at a time). */
+    .banner-choices {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .banner-choice {
+      padding: 6px 16px;
+      border: 1px solid #93c5fd;
+      border-radius: 999px;
+      background: #eff6ff;
+      color: #0012b3;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .banner-choice.is-active {
+      border-color: #0012b3;
+      background: #0012b3;
+      color: #fff;
+    }
+
+    .saleskit-presentation-banner-choices {
+      position: absolute;
+      top: 70px;
+      left: 50%;
+      z-index: 3;
+      transform: translateX(-50%);
+    }
+
+    .saleskit-presentation.is-banner-open .saleskit-presentation-banner-viewer:has(.saleskit-presentation-banner-choices) {
+      padding-top: 116px;
+    }
+
     .search-no-match {
       display: none !important;
     }
@@ -6842,6 +6878,42 @@
       return featureKey ? String(laptop.features[featureKey] || '').trim() : '';
     }
 
+    // All banners of a laptop's feature, [{ name, url }]: several when UKSP BANNER names more than one
+    // short name (FEATURES BANNER). Older servers send only the single banner in features.
+    function getUkspBanners(sku, feature) {
+      const bannerData = window.UKSP_BANNER_DATA;
+      const laptop = bannerData && Array.isArray(bannerData.skus)
+        ? bannerData.skus.find(item => normalizeSmtSku(item.sku) === normalizeSmtSku(sku))
+        : null;
+      const wanted = String(feature).trim().toLowerCase();
+      const featureKey = laptop && laptop.featureBanners
+        ? Object.keys(laptop.featureBanners).find(name => name.trim().toLowerCase() === wanted)
+        : null;
+      const banners = featureKey ? laptop.featureBanners[featureKey].filter(banner => banner && banner.url) : [];
+      if (banners.length) return banners;
+      const url = getUkspBannerUrl(sku, feature);
+      return url ? [{ name: '', url }] : [];
+    }
+
+    // Buttons to switch between a feature's banners (one is shown at a time). Nothing when there is only one.
+    function createBannerChoices(banners, activeIndex, onChoose, className) {
+      if (!banners || banners.length < 2) return null;
+      const choices = document.createElement('div');
+      choices.className = className;
+      choices.setAttribute('role', 'group');
+      choices.setAttribute('aria-label', 'Banners');
+      banners.forEach((banner, index) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `banner-choice${index === activeIndex ? ' is-active' : ''}`;
+        button.textContent = banner.name || `Banner ${index + 1}`;
+        button.setAttribute('aria-pressed', String(index === activeIndex));
+        button.addEventListener('click', () => onChoose(index));
+        choices.appendChild(button);
+      });
+      return choices;
+    }
+
     function createFeatureBannerPreview(url) {
       const preview = document.createElement('span');
       preview.className = 'saleskit-feature-banner-preview';
@@ -6906,13 +6978,18 @@
 
       if (!activeTab) return;
 
+      const tabBanners = activeTab.banners && activeTab.banners.length ? activeTab.banners : [{ name: '', url: activeTab.image }];
+      const bannerIndex = Math.min(activeTab.bannerIndex || 0, tabBanners.length - 1);
+      const currentBanner = tabBanners[bannerIndex];
+      const bannerName = `${activeTab.model} - ${activeTab.feature}${currentBanner.name ? ` - ${currentBanner.name}` : ''}`;
+
       const header = document.createElement('div');
       header.className = 'd-flex align-items-center justify-content-between gap-3 mb-3';
       const title = document.createElement('h5');
       title.className = 'fw-bold text-primary mb-0';
       title.textContent = `${activeTab.model} - ${activeTab.feature}`;
       const downloadButton = createBannerDownloadButton();
-      downloadButton.addEventListener('click', () => downloadBannerImage(activeTab.image, `${activeTab.model} - ${activeTab.feature}`, downloadButton));
+      downloadButton.addEventListener('click', () => downloadBannerImage(currentBanner.url, bannerName, downloadButton));
       const backButton = document.createElement('button');
       backButton.type = 'button';
       backButton.className = 'btn btn-light btn-sm rounded-pill px-3 border';
@@ -6922,9 +6999,13 @@
       actions.className = 'd-flex gap-2 flex-shrink-0';
       actions.append(downloadButton, backButton);
       header.append(title, actions);
+      const choices = createBannerChoices(tabBanners, bannerIndex, index => {
+        activeTab.bannerIndex = index;
+        renderSalesKitFeatureBannerTabs();
+      }, 'banner-choices mb-3');
       const image = document.createElement('img');
-      image.src = activeTab.image;
-      image.alt = `${activeTab.model} ${activeTab.feature} banner`;
+      image.src = currentBanner.url;
+      image.alt = `${bannerName} banner`;
       image.referrerPolicy = 'no-referrer';
       const error = document.createElement('p');
       error.className = 'text-danger text-center small mt-3 mb-0';
@@ -6935,7 +7016,7 @@
         error.hidden = false;
         downloadButton.disabled = true;
       }, { once: true });
-      panelElement.append(header, image, error);
+      panelElement.append(...[header, choices, image, error].filter(Boolean));
     }
 
     function createBannerDownloadButton() {
@@ -6985,11 +7066,15 @@
           sku: laptop.sku,
           model: laptop.title || laptop.model || laptop.sku,
           feature,
-          image
+          image,
+          banners: getUkspBanners(laptop.sku, feature),
+          bannerIndex: 0
         };
         salesKitFeatureBannerTabs.push(tab);
       } else {
         tab.image = image;
+        tab.banners = getUkspBanners(laptop.sku, feature);
+        tab.bannerIndex = Math.min(tab.bannerIndex || 0, Math.max(0, tab.banners.length - 1));
       }
       activeSalesKitFeatureBannerTabId = id;
       renderSalesKitFeatureBannerTabs();
@@ -7074,7 +7159,8 @@
                     id: `${tier}:${normalizeSmtSku(laptop.sku)}`,
                     model: laptop.title || laptop.sku || 'Selected laptop',
                     sku: laptop.sku,
-                    url: getUkspBannerUrl(laptop.sku, rowTitle)
+                    url: getUkspBannerUrl(laptop.sku, rowTitle),
+                    banners: getUkspBanners(laptop.sku, rowTitle)
                   };
                 })
               : []
@@ -7160,7 +7246,7 @@
           showAppNotification('A presentation slide can have up to three banner tabs.', 'info', 3500);
           return;
         }
-        tab = { ...banner };
+        tab = { ...banner, bannerIndex: 0 };
         slide.bannerTabs.push(tab);
       }
       slide.activeBannerTabId = tab.id;
@@ -7252,12 +7338,26 @@
 
       errorElement.hidden = true;
       const downloadButton = document.getElementById('salesKitPresentationBannerDownload');
+      const tabBanners = activeTab.banners && activeTab.banners.length ? activeTab.banners : [{ name: '', url: activeTab.url }];
+      const bannerIndex = Math.min(activeTab.bannerIndex || 0, tabBanners.length - 1);
+      const currentBanner = tabBanners[bannerIndex];
+      const bannerName = `${activeTab.model} - ${slide.title}${currentBanner.name ? ` - ${currentBanner.name}` : ''}`;
+      const oldChoices = document.getElementById('salesKitPresentationBannerChoices');
+      if (oldChoices) oldChoices.remove();
+      const choices = createBannerChoices(tabBanners, bannerIndex, index => {
+        activeTab.bannerIndex = index;
+        renderSalesKitPresentationBannerTabs(slide);
+      }, 'banner-choices saleskit-presentation-banner-choices');
+      if (choices) {
+        choices.id = 'salesKitPresentationBannerChoices';
+        viewer.appendChild(choices);
+      }
       image.hidden = false;
-      image.src = activeTab.url;
-      image.alt = `${activeTab.model} ${slide.title} banner`;
+      image.src = currentBanner.url;
+      image.alt = `${bannerName} banner`;
       if (downloadButton) {
         downloadButton.disabled = false;
-        downloadButton.onclick = () => downloadBannerImage(activeTab.url, `${activeTab.model} - ${slide.title}`, downloadButton);
+        downloadButton.onclick = () => downloadBannerImage(currentBanner.url, bannerName, downloadButton);
       }
       image.onerror = () => {
         image.hidden = true;
