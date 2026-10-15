@@ -1086,7 +1086,8 @@
     }
 
     function showBannerView(item, view) {
-      bannerView = item.ageingBanner && (view === 'ageing' || item.ageingOnly) ? 'ageing' : 'generated';
+      // AGEING promo laptops (and ageing laptops not in LAPTOP RAW) only have the clearance banner.
+      bannerView = item.ageingOnly || (item.ageingBanner && view === 'ageing') ? 'ageing' : 'generated';
       $('wrap').classList.toggle('show-ageing', bannerView === 'ageing');
       const choose = $('bannerViewSwitch');
       choose.hidden = !item.ageingBanner || Boolean(item.ageingOnly);

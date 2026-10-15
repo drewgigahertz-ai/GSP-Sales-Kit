@@ -216,12 +216,13 @@ function buildBannerData(rows, imageUrl = (value) => value) {
     if (seen.has(key)) continue;
     seen.add(key);
     const price = pricesByItem.get(key);
-    // Promo picture: by PROMO TITLE first (a blank title means "NO PROMO", which has its own picture in
-    // DB PHOTOS), then by the promo column (CS) when the title has no picture.
+    // Promo picture: by the promo column (CS) of BANNER PRICES. A blank promo means "NO PROMO", which has
+    // its own picture in DB PHOTOS; a promo without a picture there also shows the NO PROMO picture.
     let promo = null;
+    // An AGEING promo (e.g. "ACER - AGEING PROMO") is sold with its clearance banner only (AGEING BANNER).
+    const ageingPromo = Boolean(price && /\bag(e)?ing\b/i.test(text(price.promo)));
     if (price) {
-      // When neither has a picture in DB PHOTOS, the NO PROMO picture is shown.
-      const candidates = [price.promo_title || 'NO PROMO', price.promo, 'NO PROMO'].filter(Boolean);
+      const candidates = [text(price.promo) || 'NO PROMO', 'NO PROMO'];
       const match = candidates.map((name) => photo('promo', name)).find((row) => row && row.link);
       if (match) promo = { name: match.name, picture: imageUrl(match.link), trigger: match.trigger || '' };
       else if (candidates.length) promo = { name: candidates[0], picture: '', trigger: '' };
@@ -243,6 +244,9 @@ function buildBannerData(rows, imageUrl = (value) => value) {
       }),
       promo,
       ageingBanner: ageingByItem.has(key) ? imageUrl(text(ageingByItem.get(key))) : '',
+      ageingPromo,
+      // Clearance banner only (no generated banner, no switch).
+      ageingOnly: ageingPromo,
       features: [1, 2, 3, 4]
         .map((n) => ({ name: text(laptop[`uksp${n}`]), picture: picture(laptop[`uksp${n}_pic`], 'spec', laptop[`uksp${n}`]) }))
         .filter((feature) => feature.name)
