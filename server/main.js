@@ -186,7 +186,12 @@ function pushDevices() {
 // ---------- Logos (from the LOGO sheet, like SalesKit) ----------
 
 // Downloads a logo, keeping a copy so it still shows when the server is offline.
-async function fetchLogo(url, cacheName) {
+// Logos from the LOGO sheet. When they cannot be downloaded (e.g. Windows started the server before the
+// internet was connected), the last downloaded copy is used, and on a new server the logos built into the app.
+// The download is tried again after every sync until it works (logosDownloaded).
+let logosDownloaded = false;
+
+async function fetchLogo(url, cacheName, bundledName) {
   const cachePath = path.join(app.getPath('userData'), 'logos', cacheName);
   if (/^https?:\/\//i.test(url || '')) {
     try {
@@ -197,13 +202,16 @@ async function fetchLogo(url, cacheName) {
         if (!image.isEmpty()) {
           fs.mkdirSync(path.dirname(cachePath), { recursive: true });
           fs.writeFileSync(cachePath, image.toPNG());
-          return image;
+          return { image, downloaded: true };
         }
       }
     } catch {}
   }
-  const cached = fs.existsSync(cachePath) ? nativeImage.createFromPath(cachePath) : null;
-  return cached && !cached.isEmpty() ? cached : null;
+  for (const file of [cachePath, path.join(__dirname, 'assets', bundledName)]) {
+    const saved = fs.existsSync(file) ? nativeImage.createFromPath(file) : null;
+    if (saved && !saved.isEmpty()) return { image: saved, downloaded: false };
+  }
+  return { image: null, downloaded: false };
 }
 
 async function loadLogos() {
@@ -211,10 +219,13 @@ async function loadLogos() {
   try {
     urls = database.getInitialData();
   } catch {}
-  const [appLogo, header] = await Promise.all([
-    fetchLogo(urls.applicationLogoUrl, 'application.png'),
-    fetchLogo(urls.headerLogoUrl, 'header.png')
+  const [appResult, headerResult] = await Promise.all([
+    fetchLogo(urls.applicationLogoUrl, 'application.png', 'app-logo.png'),
+    fetchLogo(urls.headerLogoUrl, 'header.png', 'header-logo.png')
   ]);
+  logosDownloaded = appResult.downloaded && headerResult.downloaded;
+  const appLogo = appResult.image;
+  const header = headerResult.image;
   if (appLogo) {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setIcon(appLogo);
     if (tray) tray.setImage(appLogo.resize({ width: 16, height: 16, quality: 'best' }));
@@ -364,10 +375,10 @@ async function runSync(reason) {
     if (summary.changed) {
       backup.keep();
       bumpDataVersion();
-      loadLogos();
     } else {
       backup.discard();
     }
+    if (summary.changed || !logosDownloaded) loadLogos();
     log('success', summary.changed
       ? `Sync finished: ${summary.updatedCount} rows updated, ${summary.deletedCount} removed`
       : 'Sync finished: no changes');
