@@ -1943,9 +1943,10 @@
       display: flex;
       flex: 1;
       flex-direction: column;
-      justify-content: center;
+      /* "safe": content taller than the screen starts at the top instead of spilling over the header. */
+      justify-content: safe center;
       min-height: 0;
-      gap: clamp(14px, 2vh, 24px);
+      gap: calc(clamp(14px, 2vh, 24px) * var(--pres-fit, 1));
     }
 
     .saleskit-presentation-laptops {
@@ -1961,7 +1962,7 @@
 
     .saleskit-presentation-laptop {
       display: flex;
-      height: clamp(190px, 34vh, 320px);
+      height: calc(clamp(190px, 34vh, 320px) * var(--pres-fit, 1));
       flex-direction: column;
       align-items: center;
       justify-content: flex-end;
@@ -1972,7 +1973,7 @@
     .saleskit-presentation-laptop img {
       display: block;
       width: 100%;
-      height: clamp(150px, 29vh, 270px);
+      height: calc(clamp(150px, 29vh, 270px) * var(--pres-fit, 1));
       object-fit: contain;
     }
 
@@ -1984,7 +1985,7 @@
       justify-content: center;
       color: #0012b3;
       font-family: 'Outfit', sans-serif;
-      font-size: clamp(0.9rem, 1.7vw, 1.45rem);
+      font-size: calc(clamp(0.9rem, 1.7vw, 1.45rem) * max(var(--pres-fit, 1), 0.75));
       font-weight: 800;
       line-height: 1.15;
     }
@@ -2230,8 +2231,8 @@
     }
 
     .saleskit-presentation-row .saleskit-row > * {
-      min-height: clamp(150px, 25vh, 280px);
-      padding: clamp(12px, 2vw, 28px);
+      min-height: calc(clamp(150px, 25vh, 280px) * var(--pres-fit, 1));
+      padding: calc(clamp(12px, 2vw, 28px) * var(--pres-fit, 1));
       border-width: 2px;
       border-radius: 14px;
     }
@@ -2243,13 +2244,17 @@
     }
 
     .saleskit-presentation-row .saleskit-app-name {
-      font-size: clamp(0.85rem, 1.8vw, 1.45rem);
+      font-size: calc(clamp(0.85rem, 1.8vw, 1.45rem) * max(var(--pres-fit, 1), 0.75));
     }
 
     .saleskit-presentation-row .saleskit-feature-main-spec,
     .saleskit-presentation-row .saleskit-metric-val {
-      font-size: clamp(1rem, 2vw, 1.7rem);
+      font-size: calc(clamp(1rem, 2vw, 1.7rem) * var(--pres-fit, 1));
       line-height: 1.35;
+    }
+
+    .saleskit-presentation-row .saleskit-metric-key {
+      font-size: calc(clamp(0.8rem, 1vw, 1rem) * max(var(--pres-fit, 1), 0.8));
     }
 
     .saleskit-presentation-row .saleskit-feature-benefit {
@@ -7496,7 +7501,28 @@
         });
       }
 
+      fitSalesKitPresentationSlide();
     }
+
+    // Long rows (e.g. a game with a dozen values) are shrunk step by step until the slide fits the screen,
+    // so the laptops never cover the title and the last lines never hide behind the slideshow controls.
+    function fitSalesKitPresentationSlide() {
+      const overlay = document.getElementById('salesKitPresentation');
+      const stage = overlay && overlay.querySelector('.saleskit-presentation-stage');
+      if (!overlay || !stage || !overlay.classList.contains('is-open')) return;
+      let fit = 1;
+      overlay.style.setProperty('--pres-fit', '1');
+      while (fit > 0.45 && stage.scrollHeight > stage.clientHeight + 1) {
+        fit = Math.round((fit - 0.05) * 100) / 100;
+        overlay.style.setProperty('--pres-fit', String(fit));
+      }
+    }
+
+    window.addEventListener('resize', () => {
+      clearTimeout(window.__presentationFitTimer);
+      window.__presentationFitTimer = setTimeout(fitSalesKitPresentationSlide, 150);
+    });
+    document.addEventListener('fullscreenchange', () => setTimeout(fitSalesKitPresentationSlide, 150));
 
     function moveSalesKitPresentation(direction) {
       if (!salesKitPresentationSlides.length) return;
