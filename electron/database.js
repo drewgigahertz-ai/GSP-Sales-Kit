@@ -233,9 +233,10 @@ function makeSpecsMap(rows) {
       specRanks: {
         cpu: Number(row['CPU HIERARCHY']) || 0,
         graphics: Number(row['GRAPHICS HIERARCHY']) || 0,
-        storage: Number(row.STORAGE) || 0,
-        memory: Number(row.MEMORY) || 0,
-        resolution: Number(row.RESOLUTION) || 0
+        // Columns O-Q repeat the headers of H-J (specs), so the sync names them "STORAGE (2)" and so on.
+        storage: Number(row['STORAGE (2)']) || Number(row.STORAGE) || 0,
+        memory: Number(row['MEMORY (2)']) || Number(row.MEMORY) || 0,
+        resolution: Number(row['RESOLUTION (2)']) || Number(row.RESOLUTION) || 0
       }
     };
 

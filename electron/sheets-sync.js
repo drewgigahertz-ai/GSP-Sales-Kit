@@ -7,6 +7,8 @@ const SHEETS = [
   'RECO TABLE',
   'LOGO'
 ];
+// Sheets whose repeated headers are separate columns (see normalizeSheetValues).
+const KEEP_REPEATED_HEADERS = new Set(['SPECS']);
 // Sheets whose first header cell is left blank in the spreadsheet.
 const FIRST_COLUMN_HEADERS = {};
 const DEFAULT_SPREADSHEET_ID = '1qACk3I6yMwmIYauQFlcM3yryRcyIrx3bLYqmJZ2wVFE';
@@ -25,16 +27,32 @@ function normalizeSheetValues(sheetName, values = []) {
     values = [[firstColumnHeader, ...values[0].slice(1)], ...values.slice(1)];
   }
 
-  // Database column names ignore case, so "Pre-Installed Software" and "Pre-installed Software" would clash
-  // and fail the whole sync; the first of such columns is kept.
-  const seen = new Set();
-  const columns = values[0].map((value) => String(value ?? '').trim()).filter((column) => {
+  // Database column names ignore case, so a header used twice would clash and fail the whole sync; the first
+  // one is kept. In SPECS the same header again is real data (STORAGE, MEMORY and RESOLUTION are specs in
+  // H-J and ranks in O-Q), so there it is kept as "STORAGE (2)", "STORAGE (3)", ...
+  const firstSpelling = new Map();
+  const repeats = new Map();
+  const taken = new Set();
+  const columns = [];
+  const headerIndexes = [];
+  values[0].forEach((value, index) => {
+    const column = String(value ?? '').trim();
+    if (!column) return;
     const key = column.toLowerCase();
-    if (!column || seen.has(key)) return false;
-    seen.add(key);
-    return true;
+    let name = column;
+    if (firstSpelling.has(key)) {
+      if (!KEEP_REPEATED_HEADERS.has(sheetName) || firstSpelling.get(key) !== column) return;
+      const count = (repeats.get(key) || 1) + 1;
+      repeats.set(key, count);
+      name = `${column} (${count})`;
+      if (taken.has(name.toLowerCase())) return;
+    } else {
+      firstSpelling.set(key, column);
+    }
+    taken.add(name.toLowerCase());
+    columns.push(name);
+    headerIndexes.push(index);
   });
-  const headerIndexes = columns.map((column) => values[0].findIndex((value) => String(value ?? '').trim() === column));
   const rows = values.slice(1).flatMap((cells, index) => {
     const data = Object.fromEntries(columns.map((column, columnIndex) => [
       column,
