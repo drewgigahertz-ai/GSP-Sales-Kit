@@ -3,7 +3,8 @@
 //   Ctrl+Shift+A Application selection · Ctrl+Shift+R Recommendation selection · Ctrl+Shift+P Present
 //   Ctrl+D or Ctrl+Shift+D Download (Result on the Reco Table, Image on Sales Kit)
 //   Reco Table only: Ctrl+Shift+L Location selection · Ctrl+Shift+C Copy Details · Ctrl+R Refresh Data
-// They are ignored while the presentation is open (it has its own keys).
+// In the presentation, Ctrl+1 / Ctrl+2 / Ctrl+3 switch to its Reco Table / Applications / Features tab instead;
+// the other shortcuts are paused there (it has its own keys).
 (function () {
   function page() {
     try {
@@ -71,7 +72,13 @@
 
   // Runs the shortcut for this key press; true when one matched.
   window.runSalesKitHotkey = function ({ ctrl, shift, alt, code }) {
-    if (!ctrl || alt || presentationOpen()) return false;
+    if (!ctrl || alt) return false;
+    if (presentationOpen()) {
+      const tab = { Digit1: 'reco', Digit2: 'apps', Digit3: 'features' }[code];
+      if (!tab || shift || typeof switchSalesKitPresentationMode !== 'function') return false;
+      switchSalesKitPresentationMode(tab);
+      return true;
+    }
     const shortcut = SHORTCUTS.find((item) => item.code === code && item.shift === Boolean(shift)
       && (!item.pages || item.pages.includes(page())));
     if (!shortcut) return false;
