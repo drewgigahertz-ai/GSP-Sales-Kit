@@ -27,6 +27,7 @@
   <script src="./activity-tracker.js" defer></script>
   <script src="./branch-mode.js" defer></script>
   <script src="./hotkeys.js" defer></script>
+  <script src="./presentation-jump.js" defer></script>
   <script>
     // If image fails or is missing, do not generate fallback dummy image
     function handleLaptopImgFallback(img, tier) {
@@ -899,6 +900,12 @@
 
     .laptop-part-number:empty {
       display: none;
+    }
+
+    .saleskit-presentation-laptop-name .laptop-part-number,
+    .saleskit-presentation-laptop-name .laptop-part-number:empty {
+      display: block;
+      min-height: 1.2em;
     }
 
     /* The line is kept even when empty, so the three cards' prices stay level. */

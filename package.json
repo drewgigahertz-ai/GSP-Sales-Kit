@@ -52,6 +52,7 @@
       "activity-tracker.js",
       "branch-mode.js",
       "hotkeys.js",
+      "presentation-jump.js",
       "package.json"
     ],
     "publish": {
