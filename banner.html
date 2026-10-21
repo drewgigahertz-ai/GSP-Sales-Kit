@@ -147,8 +147,7 @@
       box-shadow: 0 0 0 3px rgba(0, 62, 203, .12);
     }
 
-    #productSearch,
-    #promoSearch {
+    #productSearch {
       width: 100%;
       min-width: 0;
       padding: 6px 0;
@@ -160,8 +159,7 @@
       font-size: .74rem;
     }
 
-    #productSearch::placeholder,
-    #promoSearch::placeholder {
+    #productSearch::placeholder {
       color: #94a3b8;
     }
 
@@ -471,8 +469,78 @@
       object-fit: contain;
     }
 
-    .branch-filter {
-      margin-top: 9px;
+    /* Customer Profiling steps: 1 Branch, 2 Laptop. */
+    .filter-step + .filter-step {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #d9e3f0;
+    }
+
+    .step-number {
+      display: inline-flex;
+      width: 17px;
+      height: 17px;
+      align-items: center;
+      justify-content: center;
+      margin-right: 6px;
+      border-radius: 50%;
+      background: #003ecb;
+      color: #fff;
+      font-size: .62rem;
+      letter-spacing: 0;
+      vertical-align: 1px;
+    }
+
+    .filter-step .price-filter {
+      margin-top: 7px;
+    }
+
+    /* Promo title of the selected laptop (its BANNER PRICES rows), in the bar above the banner. */
+    .promo-select {
+      display: inline-flex;
+      flex: 0 1 380px;
+      min-width: 180px;
+      align-items: center;
+      gap: 6px;
+      margin: 0;
+      color: #334155;
+      font-size: .68rem;
+      font-weight: 800;
+      letter-spacing: .045em;
+      text-transform: uppercase;
+    }
+
+    .promo-select[hidden] {
+      display: none;
+    }
+
+    #promoSelect {
+      width: 100%;
+      min-width: 0;
+      min-height: 32px;
+      padding: 0 8px;
+      border: 1px solid #cbd8eb;
+      border-radius: 7px;
+      background: #fff;
+      color: #1e293b;
+      font: inherit;
+      font-size: .74rem;
+      font-weight: 600;
+      letter-spacing: 0;
+      text-transform: none;
+      cursor: pointer;
+    }
+
+    #promoSelect:focus {
+      border-color: #003ecb;
+      outline: 0;
+      box-shadow: 0 0 0 3px rgba(0, 62, 203, .12);
+    }
+
+    #promoSelect.is-manual {
+      border-color: #003ecb;
+      background: #eef3fb;
+      color: #0012b3;
     }
 
     #branchSelect {
@@ -525,142 +593,6 @@
       font-size: .58rem;
       font-weight: 800;
       text-transform: uppercase;
-    }
-
-    .promo-picker {
-      padding: 10px 12px;
-      border-bottom: 1px solid #d9e3f0;
-      background: #f4f8fd;
-    }
-
-    .promo-combo {
-      position: relative;
-    }
-
-    .promo-combo .search-field.disabled {
-      background: #f1f5f9;
-      cursor: not-allowed;
-    }
-
-    .promo-options {
-      position: absolute;
-      z-index: 20;
-      top: calc(100% + 4px);
-      right: 0;
-      left: 0;
-      max-height: 260px;
-      overflow-y: auto;
-      padding: 4px;
-      border: 1px solid #cbd8eb;
-      border-radius: 7px;
-      background: #fff;
-      box-shadow: 0 10px 24px rgba(15, 23, 42, .14);
-    }
-
-    .promo-option {
-      display: flex;
-      width: 100%;
-      align-items: flex-start;
-      gap: 8px;
-      padding: 6px 8px;
-      border: 0;
-      border-radius: 5px;
-      background: transparent;
-      color: #1e293b;
-      font: inherit;
-      font-size: .72rem;
-      text-align: left;
-      cursor: pointer;
-    }
-
-    .promo-option:hover,
-    .promo-option:focus-visible {
-      background: #eef3fb;
-      outline: 0;
-    }
-
-    .promo-option[aria-selected="true"] {
-      color: #0012b3;
-      font-weight: 700;
-    }
-
-    .promo-option .bi {
-      flex: 0 0 auto;
-      color: #94a3b8;
-    }
-
-    .promo-option[aria-selected="true"] .bi {
-      color: #003ecb;
-    }
-
-    .promo-option small {
-      display: block;
-      margin-top: 1px;
-      color: #64748b;
-      font-size: .64rem;
-      font-weight: 400;
-    }
-
-    .promo-options .empty-message {
-      padding: 10px 8px;
-    }
-
-    .promo-chips {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 5px;
-      margin-top: 7px;
-      color: #64748b;
-      font-size: .66rem;
-    }
-
-    .promo-chip {
-      display: inline-flex;
-      max-width: 100%;
-      align-items: center;
-      gap: 3px;
-      padding: 2px 3px 2px 8px;
-      border-radius: 999px;
-      background: #e8ecff;
-      color: #0012b3;
-      font-weight: 700;
-    }
-
-    .promo-chip span {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .promo-chip button,
-    .promo-reset {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0;
-      border: 0;
-      background: transparent;
-      color: inherit;
-      font: inherit;
-      cursor: pointer;
-    }
-
-    .promo-chip button {
-      width: 16px;
-      height: 16px;
-      flex: 0 0 16px;
-      border-radius: 50%;
-    }
-
-    .promo-chip button:hover {
-      background: #c7d2fe;
-    }
-
-    .promo-reset {
-      color: #003ecb;
-      font-weight: 700;
-      text-decoration: underline;
     }
 
     .banner-title {
@@ -1004,16 +936,8 @@
         </div>
       </div>
       <div class="search-panel">
-        <label class="search-label" for="productSearch">Item code</label>
-        <div class="search-field">
-          <i class="bi bi-search" aria-hidden="true"></i>
-          <input id="productSearch" type="search" placeholder="Search item code or model..." autocomplete="off">
-          <button id="clearSearch" type="button" aria-label="Clear search" title="Clear search">
-            <i class="bi bi-x-lg" aria-hidden="true"></i>
-          </button>
-        </div>
-        <div class="branch-filter">
-          <label class="search-label" for="branchSelect">Branch</label>
+        <div class="filter-step">
+          <label class="search-label" for="branchSelect"><span class="step-number">1</span>Branch</label>
           <select id="branchSelect">
             <option value="">All branches · regular price</option>
           </select>
@@ -1022,18 +946,17 @@
             <span>Show this branch's promos only</span>
           </label>
         </div>
-        <div id="count" aria-live="polite"></div>
-      </div>
-      <div id="promoPicker" class="promo-picker">
-        <label class="search-label" for="promoSearch">Promo title</label>
-        <div class="promo-combo">
-          <div class="search-field disabled">
-            <i class="bi bi-images" aria-hidden="true"></i>
-            <input id="promoSearch" type="search" placeholder="Select a laptop first" autocomplete="off" role="combobox" aria-controls="promoOptions" aria-expanded="false" disabled>
+        <div class="filter-step">
+          <label class="search-label" for="productSearch"><span class="step-number">2</span>Laptop</label>
+          <div class="search-field">
+            <i class="bi bi-search" aria-hidden="true"></i>
+            <input id="productSearch" type="search" placeholder="Search item code, model or part number..." autocomplete="off">
+            <button id="clearSearch" type="button" aria-label="Clear search" title="Clear search">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
           </div>
-          <div id="promoOptions" class="promo-options" role="listbox" hidden></div>
+          <div id="count" aria-live="polite"></div>
         </div>
-        <div id="promoChips" class="promo-chips" aria-live="polite">Automatic · from price sheet</div>
       </div>
       <div id="list" class="list-group list-group-flush" role="listbox" aria-label="Matching item codes"></div>
     </aside>
@@ -1041,7 +964,11 @@
     <main id="main">
       <div id="bar">
         <i class="bi bi-laptop" aria-hidden="true"></i>
-        <span id="selectedItem" class="small flex-grow-1 text-muted text-truncate">Select an item code to generate its banner</span>
+        <span id="selectedItem" class="small flex-grow-1 text-muted text-truncate">Select a laptop to generate its banner</span>
+        <label class="promo-select" id="promoSelectWrap" for="promoSelect" hidden>
+          Promo
+          <select id="promoSelect" title="Promo title for this laptop (BANNER PRICES rows)"></select>
+        </label>
         <span id="bannerStatus" class="small text-muted" aria-live="polite"></span>
         <button id="refreshBannerButton" type="button" title="Load the latest data from the SalesKit server">
           <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh data
@@ -1131,8 +1058,7 @@
         const data = event.data.data || {};
         bannerItems = Array.isArray(data.items) ? data.items : [];
         loadBranches(Array.isArray(data.branches) ? data.branches : [], event.data.homeBranch);
-        renderPromoPicker();
-        loadItemList();
+        loadItemList({ keepScroll: true });
         if (currentItemCode) selectItem(currentItemCode);
       } else if (channel === 'saleskit-banner-image') {
         const pending = pendingImages.get(event.data.requestId);
@@ -1234,11 +1160,16 @@
       return selectedBranch ? [...rows.filter(branchPrice), ...rows.filter((item) => !branchPrice(item))] : rows;
     }
 
-    function loadItemList() {
+    // keepScroll: the list stays where it was (selecting a laptop or refreshed data); a new search or
+    // filter starts from the top.
+    function loadItemList({ keepScroll = false } = {}) {
       const visibleRows = matchingItems();
       $('count').textContent = `${visibleRows.length} item code${visibleRows.length === 1 ? '' : 's'}`;
       const list = $('list');
+      const scrollTop = keepScroll ? list.scrollTop : 0;
       list.replaceChildren();
+      // Restored once the rows below are added.
+      requestAnimationFrame(() => { list.scrollTop = scrollTop; });
 
       if (!visibleRows.length) {
         const empty = document.createElement('div');
@@ -1376,9 +1307,8 @@
       currentItemCode = itemCode;
       // A promo title picked by hand is for one laptop; another laptop starts on its automatic row.
       if (!sameItem || !(item.promoRows || [])[chosenPromoRow]) chosenPromoRow = null;
-      renderPromoPicker();
-      setPromoPickerEnabled(true);
-      loadItemList();
+      renderPromoSelect();
+      loadItemList({ keepScroll: true });
       // Refreshed data keeps the view the salesperson chose; another laptop starts on its ageing banner.
       showBannerView(item, sameItem ? bannerView : 'ageing');
       setPicture($('ageingBanner'), item.ageingBanner, `${item.itemCode} clearance banner`);
@@ -1453,107 +1383,30 @@
       return bannerItems.find((row) => row.itemCode === currentItemCode) || null;
     }
 
-    function setPromoPickerEnabled(enabled) {
-      $('promoSearch').disabled = !enabled;
-      $('promoSearch').placeholder = enabled ? "Search this laptop's promo titles..." : 'Select a laptop first';
-      $('promoSearch').closest('.search-field').classList.toggle('disabled', !enabled);
-    }
-
-    function setPromoOptionsOpen(open) {
-      $('promoOptions').hidden = !open;
-      $('promoSearch').setAttribute('aria-expanded', String(open));
-      if (open) renderPromoOptions();
-    }
-
-    // Branch, promo dates and cash price under each title.
+    // Branch, promo dates and cash price after each title.
     function promoRowNote(row) {
       return [row.branch, row.dates, row.hasPrice ? peso(row.cash) : 'no price'].filter(Boolean).join(' · ');
     }
 
-    // The laptop's own BANNER PRICES rows (every branch and date), in sheet order.
-    function renderPromoOptions() {
+    // "Automatic" (today's row for the selected branch) plus the laptop's own BANNER PRICES rows, in sheet order.
+    function renderPromoSelect() {
       const item = currentItem();
       const rows = (item && item.promoRows) || [];
-      const query = $('promoSearch').value.trim().toLowerCase();
-      const matches = rows.map((row, index) => ({ row, index }))
-        .filter(({ row }) => `${promoLabel(row.title)} ${row.branch}`.toLowerCase().includes(query));
-      const options = $('promoOptions');
-      options.replaceChildren();
-      if (!matches.length) {
-        const empty = document.createElement('div');
-        empty.className = 'empty-message';
-        empty.textContent = rows.length ? 'No matching promo titles.' : 'This laptop has no rows in BANNER PRICES.';
-        options.appendChild(empty);
-        return;
-      }
-      matches.forEach(({ row, index }) => {
-        const selected = index === chosenPromoRow;
-        const option = document.createElement('button');
-        option.type = 'button';
-        option.role = 'option';
-        option.className = 'promo-option';
-        option.setAttribute('aria-selected', String(selected));
-        const icon = document.createElement('i');
-        icon.className = `bi ${selected ? 'bi-record-circle-fill' : 'bi-circle'}`;
-        icon.setAttribute('aria-hidden', 'true');
-        const label = document.createElement('span');
-        label.textContent = promoLabel(row.title);
-        const note = document.createElement('small');
-        note.textContent = promoRowNote(row);
-        label.appendChild(note);
-        option.append(icon, label);
-        option.addEventListener('mousedown', (event) => event.preventDefault());
-        option.addEventListener('click', () => choosePromoRow(index));
-        options.appendChild(option);
-      });
-    }
-
-    function renderPromoPicker() {
-      const chips = $('promoChips');
-      chips.replaceChildren();
-      const item = currentItem();
-      const row = item && chosenPromoRow !== null ? (item.promoRows || [])[chosenPromoRow] : null;
-      if (!row) {
-        chips.textContent = 'Automatic · from price sheet';
-      } else {
-        const chip = document.createElement('span');
-        chip.className = 'promo-chip';
-        const label = document.createElement('span');
-        label.textContent = promoLabel(row.title);
-        label.title = `${promoLabel(row.title)} · ${promoRowNote(row)}`;
-        const remove = document.createElement('button');
-        remove.type = 'button';
-        remove.setAttribute('aria-label', 'Back to the automatic promo');
-        remove.innerHTML = '<i class="bi bi-x" aria-hidden="true"></i>';
-        remove.addEventListener('click', () => choosePromoRow(null));
-        chip.append(label, remove);
-        const reset = document.createElement('button');
-        reset.type = 'button';
-        reset.className = 'promo-reset';
-        reset.textContent = 'Reset to automatic';
-        reset.addEventListener('click', () => choosePromoRow(null));
-        chips.append(chip, reset);
-      }
-      if (!$('promoOptions').hidden) renderPromoOptions();
+      const select = $('promoSelect');
+      const automatic = new Option('Automatic · today\'s price', '');
+      select.replaceChildren(automatic, ...rows.map((row, index) => {
+        const note = promoRowNote(row);
+        return new Option(`${promoLabel(row.title)}${note ? ` — ${note}` : ''}`, String(index));
+      }));
+      select.value = chosenPromoRow === null ? '' : String(chosenPromoRow);
+      select.classList.toggle('is-manual', chosenPromoRow !== null);
+      $('promoSelectWrap').hidden = !item || !rows.length || Boolean(item.ageingOnly);
     }
 
     // Picking a promo title shows that row's promo picture, prices and price details.
-    function choosePromoRow(index) {
-      chosenPromoRow = index === chosenPromoRow ? null : index;
-      setPromoOptionsOpen(false);
+    $('promoSelect').addEventListener('change', (event) => {
+      chosenPromoRow = event.target.value === '' ? null : Number(event.target.value);
       if (currentItemCode) selectItem(currentItemCode);
-    }
-
-    $('promoSearch').addEventListener('focus', () => setPromoOptionsOpen(true));
-    $('promoSearch').addEventListener('input', () => setPromoOptionsOpen(true));
-    $('promoSearch').addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') {
-        setPromoOptionsOpen(false);
-        $('promoSearch').blur();
-      }
-    });
-    document.addEventListener('mousedown', (event) => {
-      if (!$('promoPicker').contains(event.target)) setPromoOptionsOpen(false);
     });
 
     // Branches with promos today. A branch account starts on its own branch (when it has promos) and
