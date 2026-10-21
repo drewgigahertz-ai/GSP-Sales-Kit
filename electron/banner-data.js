@@ -110,13 +110,15 @@ function laptopsCollection(values) {
       model: at(row, 'MODEL'),
       part_number: at(row, 'PART NUMBER'),
       brand_model: at(row, 'BRAND AND MODEL'),
+      // Optional: the laptop's segment (banner colour). Without it, RECO TABLE's TARGET MARKET is used.
+      segment: at(row, 'SEGMENT'),
       ...Object.fromEntries([1, 2, 3, 4].flatMap((n) => [
         [`uksp${n}`, at(row, `UKSP ${n} NAME`)],
         [`uksp${n}_pic`, at(row, `UKSP ${n} PIC`)]
       ]))
     }];
   });
-  return collection('banner_laptops', ['item_code', 'brand', 'brand_pic', 'model', 'part_number', 'brand_model',
+  return collection('banner_laptops', ['item_code', 'brand', 'brand_pic', 'model', 'part_number', 'brand_model', 'segment',
     'uksp1', 'uksp1_pic', 'uksp2', 'uksp2_pic', 'uksp3', 'uksp3_pic', 'uksp4', 'uksp4_pic'], rows);
 }
 
@@ -220,7 +222,18 @@ function normalizeBannerSheets(valuesBySheet) {
   return result;
 }
 
-// rows: { laptops, specs, photos, prices, ageing } from the banner tables. imageUrl turns a Drive link into an
+// Banner colour by segment: LAPTOP RAW SEGMENT or RECO TABLE TARGET MARKET → one of these keys ('' = default blue).
+function segmentKey(value) {
+  const name = text(value).toUpperCase();
+  if (/PRODUCTIV/.test(name)) return 'productivity';
+  if (/PERFORM/.test(name)) return 'performance';
+  if (/ENTRY/.test(name)) return 'entry';
+  if (/AAA/.test(name)) return 'aaa';
+  if (/CASUAL/.test(name)) return 'casual';
+  return '';
+}
+
+// rows: { laptops, specs, photos, prices, ageing, reco } from the banner tables (reco: RECO TABLE rows). imageUrl turns a Drive link into an
 // image address. now: the day whose promos apply.
 function buildBannerData(rows, imageUrl = (value) => value, now = new Date()) {
   const photos = new Map();
@@ -240,6 +253,20 @@ function buildBannerData(rows, imageUrl = (value) => value, now = new Date()) {
   }
   // Ready-made ageing banner per item code (AGEING BANNER sheet), shown instead of the generated banner.
   const ageingByItem = new Map((rows.ageing || []).map((row) => [matchKey(row.item_code), row.banner]));
+  // RECO TABLE: a laptop listed under several target markets takes the one it appears in most often
+  // (the first listed on a tie).
+  const recoSegments = new Map();
+  for (const row of rows.reco || []) {
+    const key = matchKey(row['ITEM DESCRIPTION']);
+    const segment = segmentKey(row['TARGET MARKET']);
+    if (!key || !segment) continue;
+    if (!recoSegments.has(key)) recoSegments.set(key, new Map());
+    const counts = recoSegments.get(key);
+    counts.set(segment, (counts.get(segment) || 0) + 1);
+  }
+  const segmentOf = (laptop, key) => segmentKey(laptop.segment)
+    || [...(recoSegments.get(key) || new Map())].reduce((best, entry) => (!best || entry[1] > best[1] ? entry : best), null)?.[0]
+    || '';
 
   // One price per laptop, and per branch + laptop: rows outside their promo dates are left out; then a row
   // with dates beats one without, a later start date beats an earlier one, and otherwise the upper row wins.
@@ -330,6 +357,7 @@ function buildBannerData(rows, imageUrl = (value) => value, now = new Date()) {
       brand: laptop.brand,
       brandModel: laptop.brand_model || [laptop.brand, laptop.model].filter(Boolean).join(' '),
       partNumber: laptop.part_number,
+      segment: segmentOf(laptop, key),
       brandPicture: picture(laptop.brand_pic, 'brand', laptop.brand),
       specs: specsByItem.get(key) || {},
       // Regular price (all branches); SalesKit 1.0.11 and older only know these fields.

@@ -667,15 +667,23 @@
       width: 613px;
       height: 172px;
       clip-path: polygon(66px 0, 100% 0, calc(100% - 67px) 100%, 0 100%);
-      background: var(--banner-blue);
+      background: var(--segment-color, var(--banner-blue));
     }
+
+    /* Cash price colour by the laptop's segment (LAPTOP RAW SEGMENT, else RECO TABLE TARGET MARKET).
+       Yellow and green take dark text so the price stays readable. */
+    #stage[data-segment="productivity"] { --segment-color: #e9479a; }
+    #stage[data-segment="performance"] { --segment-color: #ff8a00; }
+    #stage[data-segment="entry"] { --segment-color: #fff200; --segment-ink: #0a0a0a; }
+    #stage[data-segment="aaa"] { --segment-color: #0a96e0; }
+    #stage[data-segment="casual"] { --segment-color: #b5e21b; --segment-ink: #0a0a0a; }
 
     .cash-value {
       z-index: 3;
       top: 360px;
       left: 124px;
       width: 600px;
-      color: #fff;
+      color: var(--segment-ink, #fff);
       font-size: 76px;
       font-weight: 700;
       line-height: 1.1;
@@ -1314,6 +1322,7 @@
       setPicture($('ageingBanner'), item.ageingBanner, `${item.itemCode} clearance banner`);
 
       $('selectedItem').textContent = item.itemCode;
+      $('stage').dataset.segment = item.segment || '';
       $('bannerTitle').textContent = item.brandModel || item.itemCode;
       setText('brandName', item.brand);
       setText('partNumber', item.partNumber);

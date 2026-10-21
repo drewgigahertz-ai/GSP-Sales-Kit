@@ -495,7 +495,8 @@ function getInitialData() {
       specs: getRows('banner_specs'),
       photos: getRows('banner_photos'),
       prices: getRows('banner_prices'),
-      ageing: getRows('ageing_banner')
+      ageing: getRows('ageing_banner'),
+      reco: recoTableData
     }, normalizeImageUrl),
     sheetStatus: {
       skuCount: criteriaSegmentData.laptops.length,
