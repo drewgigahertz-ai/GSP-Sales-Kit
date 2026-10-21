@@ -1010,10 +1010,6 @@
             <span>Show this branch's promos only</span>
           </label>
         </div>
-        <label class="price-filter" for="pricedOnly">
-          <input id="pricedOnly" type="checkbox" checked>
-          <span>Show laptops with prices only</span>
-        </label>
         <div id="count" aria-live="polite"></div>
       </div>
       <div id="promoPicker" class="promo-picker">
@@ -1099,7 +1095,6 @@
     let currentItemCode = '';
     let searchTimer;
     let selectionVersion = 0;
-    let showPricedOnly = true;
     // Branch promos (BANNER PRICES "SPECIFIC BRANCH"): '' shows the regular price for all branches.
     let bannerBranches = [];
     let selectedBranch = '';
@@ -1218,7 +1213,8 @@
       const query = $('productSearch').value.trim().replace(/\s+/g, ' ').toLowerCase();
       const rows = bannerItems.filter((item) => {
         const price = priceFor(item);
-        if (showPricedOnly && !price.hasPrice && !price.ageingOnly) return false;
+        // Only laptops with a price (or a clearance banner) are listed.
+        if (!price.hasPrice && !price.ageingOnly) return false;
         if (selectedBranch && showPromoOnly && !branchPrice(item)) return false;
         if (!query) return true;
         return [item.itemCode, item.brandModel, item.partNumber].some((value) => String(value || '').toLowerCase().includes(query));
@@ -1238,7 +1234,7 @@
         empty.textContent = !bannerItems.length
           ? 'No Banner data yet. It comes from the LAPTOP RAW, BANNER SPECS, DB PHOTOS and BANNER PRICES sheets through the SalesKit server.'
           : selectedBranch && showPromoOnly ? `No matching item codes with a ${selectedBranch} promo.`
-            : showPricedOnly ? 'No matching item codes with prices.' : 'No matching item codes.';
+            : 'No matching item codes with prices.';
         list.appendChild(empty);
         return;
       }
@@ -1612,10 +1608,6 @@
       loadItemList();
     });
 
-    $('pricedOnly').addEventListener('change', (event) => {
-      showPricedOnly = event.target.checked;
-      loadItemList();
-    });
 
     function updateFullscreenButton() {
       const isFullscreen = document.fullscreenElement === wrap;
