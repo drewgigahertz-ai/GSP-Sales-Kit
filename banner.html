@@ -147,7 +147,8 @@
       box-shadow: 0 0 0 3px rgba(0, 62, 203, .12);
     }
 
-    #productSearch {
+    #productSearch,
+    #promoSearch {
       width: 100%;
       min-width: 0;
       padding: 6px 0;
@@ -159,7 +160,8 @@
       font-size: .74rem;
     }
 
-    #productSearch::placeholder {
+    #productSearch::placeholder,
+    #promoSearch::placeholder {
       color: #94a3b8;
     }
 
@@ -450,12 +452,195 @@
       object-fit: contain;
     }
 
-    .promo-picture {
+    /* One or more promo pictures (automatic from the price sheet, or picked by hand). */
+    .promo-pictures {
       top: 505px;
       left: 265px;
       width: 280px;
       height: 220px;
+      display: grid;
+      gap: 6px;
+      place-items: center;
+    }
+
+    .promo-pictures img {
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      min-height: 0;
       object-fit: contain;
+    }
+
+    .branch-filter {
+      margin-top: 9px;
+    }
+
+    #branchSelect {
+      width: 100%;
+      min-height: 34px;
+      padding: 0 9px;
+      border: 1px solid #cbd8eb;
+      border-radius: 7px;
+      outline: 0;
+      background: #fff;
+      color: #1e293b;
+      font: inherit;
+      font-size: .74rem;
+      cursor: pointer;
+    }
+
+    #branchSelect:focus {
+      border-color: #003ecb;
+      box-shadow: 0 0 0 3px rgba(0, 62, 203, .12);
+    }
+
+    .price-filter.disabled {
+      color: #94a3b8;
+      cursor: not-allowed;
+    }
+
+    .price-filter.disabled input {
+      cursor: not-allowed;
+    }
+
+    .branch-promo-tag {
+      display: inline-block;
+      margin-right: 6px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: #e8ecff;
+      color: #0012b3;
+      font-size: .58rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .promo-picker {
+      padding: 10px 12px;
+      border-bottom: 1px solid #d9e3f0;
+      background: #f4f8fd;
+    }
+
+    .promo-combo {
+      position: relative;
+    }
+
+    .promo-combo .search-field.disabled {
+      background: #f1f5f9;
+      cursor: not-allowed;
+    }
+
+    .promo-options {
+      position: absolute;
+      z-index: 20;
+      top: calc(100% + 4px);
+      right: 0;
+      left: 0;
+      max-height: 260px;
+      overflow-y: auto;
+      padding: 4px;
+      border: 1px solid #cbd8eb;
+      border-radius: 7px;
+      background: #fff;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, .14);
+    }
+
+    .promo-option {
+      display: flex;
+      width: 100%;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 6px 8px;
+      border: 0;
+      border-radius: 5px;
+      background: transparent;
+      color: #1e293b;
+      font: inherit;
+      font-size: .72rem;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .promo-option:hover,
+    .promo-option:focus-visible {
+      background: #eef3fb;
+      outline: 0;
+    }
+
+    .promo-option[aria-selected="true"] {
+      color: #0012b3;
+      font-weight: 700;
+    }
+
+    .promo-option .bi {
+      flex: 0 0 auto;
+      color: #94a3b8;
+    }
+
+    .promo-option[aria-selected="true"] .bi {
+      color: #003ecb;
+    }
+
+    .promo-options .empty-message {
+      padding: 10px 8px;
+    }
+
+    .promo-chips {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 5px;
+      margin-top: 7px;
+      color: #64748b;
+      font-size: .66rem;
+    }
+
+    .promo-chip {
+      display: inline-flex;
+      max-width: 100%;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 3px 2px 8px;
+      border-radius: 999px;
+      background: #e8ecff;
+      color: #0012b3;
+      font-weight: 700;
+    }
+
+    .promo-chip span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .promo-chip button,
+    .promo-reset {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .promo-chip button {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 16px;
+      border-radius: 50%;
+    }
+
+    .promo-chip button:hover {
+      background: #c7d2fe;
+    }
+
+    .promo-reset {
+      color: #003ecb;
+      font-weight: 700;
+      text-decoration: underline;
     }
 
     .banner-title {
@@ -807,11 +992,32 @@
             <i class="bi bi-x-lg" aria-hidden="true"></i>
           </button>
         </div>
+        <div class="branch-filter">
+          <label class="search-label" for="branchSelect">Branch</label>
+          <select id="branchSelect">
+            <option value="">All branches · regular price</option>
+          </select>
+          <label class="price-filter disabled" for="promoOnly">
+            <input id="promoOnly" type="checkbox" disabled>
+            <span>Show this branch's promos only</span>
+          </label>
+        </div>
         <label class="price-filter" for="pricedOnly">
           <input id="pricedOnly" type="checkbox" checked>
           <span>Show laptops with prices only</span>
         </label>
         <div id="count" aria-live="polite"></div>
+      </div>
+      <div id="promoPicker" class="promo-picker">
+        <label class="search-label" for="promoSearch">Promo picture</label>
+        <div class="promo-combo">
+          <div class="search-field disabled">
+            <i class="bi bi-images" aria-hidden="true"></i>
+            <input id="promoSearch" type="search" placeholder="Select a laptop first" autocomplete="off" role="combobox" aria-controls="promoOptions" aria-expanded="false" disabled>
+          </div>
+          <div id="promoOptions" class="promo-options" role="listbox" aria-multiselectable="true" hidden></div>
+        </div>
+        <div id="promoChips" class="promo-chips" aria-live="polite">Automatic · from price sheet</div>
       </div>
       <div id="list" class="list-group list-group-flush" role="listbox" aria-label="Matching item codes"></div>
     </aside>
@@ -851,7 +1057,7 @@
             <i class="bi bi-gift-fill gift-icon" aria-hidden="true"></i>
             <div class="freebies-band">FREEBIES<span>PROMO</span></div>
           </div>
-          <img id="promoPicture" class="abs promo-picture picture-slot" alt="" hidden>
+          <div id="promoPictures" class="abs promo-pictures"></div>
 
           <div class="abs monthly-label"><b>AS LOW AS</b><small>(for 12 Months Installment)</small></div>
           <div class="abs monthly-value"><span id="monthlyPrice">N/A</span><i>/month</i></div>
@@ -878,7 +1084,7 @@
   </div>
 
   <script>
-    // The SalesKit window (banner-bridge.js) sends the banner list ({ items }) and saves pictures on this
+    // The SalesKit window (banner-bridge.js) sends the banner list ({ items, branches, promos }) and saves pictures on this
     // laptop when they are first shown. Messages are only accepted from that window.
     const $ = (id) => document.getElementById(id);
     let bannerItems = [];
@@ -886,6 +1092,16 @@
     let searchTimer;
     let selectionVersion = 0;
     let showPricedOnly = true;
+    // Branch promos (BANNER PRICES "SPECIFIC BRANCH"): '' shows the regular price for all branches.
+    let bannerBranches = [];
+    let selectedBranch = '';
+    let branchChosen = false;
+    let showPromoOnly = false;
+    // DB PHOTOS promo pictures; the ones picked by hand replace the automatic picture (prices are untouched).
+    let promoCatalog = [];
+    let manualPromos = [];
+    let autoPromoPictures = [];
+    let promoRenderVersion = 0;
     let imageRequestSequence = 0;
     const pendingImages = new Map();
 
@@ -898,7 +1114,12 @@
       const { channel } = event.data;
       if (channel === 'saleskit-banner-data') {
         showLogo(event.data.logo);
-        bannerItems = Array.isArray(event.data.data && event.data.data.items) ? event.data.data.items : [];
+        const data = event.data.data || {};
+        bannerItems = Array.isArray(data.items) ? data.items : [];
+        promoCatalog = Array.isArray(data.promos) ? data.promos : [];
+        manualPromos = manualPromos.filter((name) => promoCatalog.some((promo) => promo.name === name));
+        loadBranches(Array.isArray(data.branches) ? data.branches : [], event.data.homeBranch);
+        renderPromoPicker();
         loadItemList();
         if (currentItemCode) selectItem(currentItemCode);
       } else if (channel === 'saleskit-banner-image') {
@@ -976,13 +1197,26 @@
       return '';
     }
 
+    // The selected branch's promo price for this laptop, if it has one; otherwise the regular price.
+    function branchPrice(item) {
+      return (selectedBranch && item.branchPrices && item.branchPrices[selectedBranch]) || null;
+    }
+
+    function priceFor(item) {
+      return branchPrice(item) || item;
+    }
+
+    // Laptops with a promo for the selected branch are listed first.
     function matchingItems() {
       const query = $('productSearch').value.trim().replace(/\s+/g, ' ').toLowerCase();
-      return bannerItems.filter((item) => {
-        if (showPricedOnly && !item.hasPrice && !item.ageingOnly) return false;
+      const rows = bannerItems.filter((item) => {
+        const price = priceFor(item);
+        if (showPricedOnly && !price.hasPrice && !price.ageingOnly) return false;
+        if (selectedBranch && showPromoOnly && !branchPrice(item)) return false;
         if (!query) return true;
         return [item.itemCode, item.brandModel, item.partNumber].some((value) => String(value || '').toLowerCase().includes(query));
       });
+      return selectedBranch ? [...rows.filter(branchPrice), ...rows.filter((item) => !branchPrice(item))] : rows;
     }
 
     function loadItemList() {
@@ -996,7 +1230,8 @@
         empty.className = 'empty-message';
         empty.textContent = !bannerItems.length
           ? 'No Banner data yet. It comes from the LAPTOP RAW, BANNER SPECS, DB PHOTOS and BANNER PRICES sheets through the SalesKit server.'
-          : showPricedOnly ? 'No matching item codes with prices.' : 'No matching item codes.';
+          : selectedBranch && showPromoOnly ? `No matching item codes with a ${selectedBranch} promo.`
+            : showPricedOnly ? 'No matching item codes with prices.' : 'No matching item codes.';
         list.appendChild(empty);
         return;
       }
@@ -1021,7 +1256,15 @@
           tag.textContent = 'clearance';
           code.appendChild(tag);
         }
-        if (!row.hasPrice && !row.ageingOnly) {
+        if (branchPrice(row)) {
+          const tag = document.createElement('span');
+          tag.className = 'branch-promo-tag';
+          tag.textContent = `${selectedBranch} promo`;
+          // First on the line, so long item codes do not hide it.
+          code.prepend(tag);
+        }
+        const price = priceFor(row);
+        if (!price.hasPrice && !price.ageingOnly) {
           const badge = document.createElement('span');
           badge.className = 'no-price-tag';
           badge.textContent = 'no price';
@@ -1087,10 +1330,11 @@
 
     function showBannerView(item, view) {
       // AGEING promo laptops (and ageing laptops not in LAPTOP RAW) only have the clearance banner.
-      bannerView = item.ageingOnly || (item.ageingBanner && view === 'ageing') ? 'ageing' : 'generated';
+      const ageingOnly = Boolean(item.ageingOnly || priceFor(item).ageingOnly);
+      bannerView = ageingOnly || (item.ageingBanner && view === 'ageing') ? 'ageing' : 'generated';
       $('wrap').classList.toggle('show-ageing', bannerView === 'ageing');
       const choose = $('bannerViewSwitch');
-      choose.hidden = !item.ageingBanner || Boolean(item.ageingOnly);
+      choose.hidden = !item.ageingBanner || ageingOnly;
       choose.querySelectorAll('button').forEach((button) => {
         const active = button.dataset.view === bannerView;
         button.classList.toggle('is-active', active);
@@ -1111,6 +1355,12 @@
       const version = ++selectionVersion;
       const sameItem = itemCode === currentItemCode;
       currentItemCode = itemCode;
+      // Promo pictures picked by hand are for one laptop; another laptop starts on its automatic picture.
+      if (!sameItem && manualPromos.length) {
+        manualPromos = [];
+        renderPromoPicker();
+      }
+      setPromoPickerEnabled(true);
       loadItemList();
       // Refreshed data keeps the view the salesperson chose; another laptop starts on its ageing banner.
       showBannerView(item, sameItem ? bannerView : 'ageing');
@@ -1125,11 +1375,12 @@
         setText(`spec-${key}`, (item.specs && item.specs[key]) || valueFromItemCode(item.itemCode, key));
       });
 
-      renderPriceDetails(item.priceDetails || []);
-      setText('cashPrice', peso(item.cash));
-      setText('twelveMonths', peso(item.twelveMonths));
-      const monthlyPrice = item.twelveMonths
-        ? `₱${(Number(item.twelveMonths) / 12).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      const price = priceFor(item);
+      renderPriceDetails(price.priceDetails || []);
+      setText('cashPrice', peso(price.cash));
+      setText('twelveMonths', peso(price.twelveMonths));
+      const monthlyPrice = price.twelveMonths
+        ? `₱${(Number(price.twelveMonths) / 12).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
         : 'N/A';
       setText('monthlyPrice', monthlyPrice);
       $('monthlyPrice').parentElement.classList.toggle('compact', monthlyPrice.length >= 9);
@@ -1152,9 +1403,10 @@
       });
 
       // Pictures last: the text is already shown while they load.
+      autoPromoPictures = price.promo && price.promo.picture ? [price.promo] : [];
       const pictures = [
         setPicture($('brandLogo'), item.brandPicture, item.brand),
-        setPicture($('promoPicture'), item.promo && item.promo.picture, item.promo && item.promo.name),
+        renderPromoPictures(),
         ...Array.from({ length: 4 }, (_, index) => {
           const itemFeature = (item.features || [])[index];
           return setPicture($(`feature${index + 1}`).querySelector('img'), itemFeature && itemFeature.picture, itemFeature && itemFeature.name);
@@ -1164,6 +1416,163 @@
       await Promise.all(pictures);
       if (version !== selectionVersion) return;
     }
+
+    // Picked promos replace the price sheet's promo picture; several are shown as a grid.
+    async function renderPromoPictures() {
+      const version = ++promoRenderVersion;
+      const pictures = manualPromos.length
+        ? manualPromos.map((name) => promoCatalog.find((promo) => promo.name === name)).filter(Boolean)
+        : autoPromoPictures;
+      const images = pictures.map(() => {
+        const image = document.createElement('img');
+        image.className = 'picture-slot';
+        return image;
+      });
+      await Promise.all(images.map((image, index) => setPicture(image, pictures[index].picture, promoLabel(pictures[index].name))));
+      if (version !== promoRenderVersion) return;
+      const shown = images.filter((image) => !image.hidden);
+      const columns = Math.max(1, Math.ceil(Math.sqrt(shown.length)));
+      const box = $('promoPictures');
+      box.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
+      box.style.gridTemplateRows = `repeat(${Math.max(1, Math.ceil(shown.length / columns))}, minmax(0, 1fr))`;
+      box.replaceChildren(...shown);
+    }
+
+    function promoLabel(name) {
+      return String(name || '').replace(/\s*[\r\n]+\s*/g, ' ').trim();
+    }
+
+    function setPromoPickerEnabled(enabled) {
+      $('promoSearch').disabled = !enabled;
+      $('promoSearch').placeholder = enabled ? 'Search promo titles...' : 'Select a laptop first';
+      $('promoSearch').closest('.search-field').classList.toggle('disabled', !enabled);
+    }
+
+    function setPromoOptionsOpen(open) {
+      $('promoOptions').hidden = !open;
+      $('promoSearch').setAttribute('aria-expanded', String(open));
+      if (open) renderPromoOptions();
+    }
+
+    function renderPromoOptions() {
+      const query = $('promoSearch').value.trim().toLowerCase();
+      const matches = promoCatalog.filter((promo) => promoLabel(promo.name).toLowerCase().includes(query));
+      const options = $('promoOptions');
+      options.replaceChildren();
+      if (!matches.length) {
+        const empty = document.createElement('div');
+        empty.className = 'empty-message';
+        empty.textContent = promoCatalog.length ? 'No matching promo titles.' : 'No promo pictures yet. Refresh data.';
+        options.appendChild(empty);
+        return;
+      }
+      matches.forEach((promo) => {
+        const selected = manualPromos.includes(promo.name);
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.role = 'option';
+        option.className = 'promo-option';
+        option.setAttribute('aria-selected', String(selected));
+        const icon = document.createElement('i');
+        icon.className = `bi ${selected ? 'bi-check-square-fill' : 'bi-square'}`;
+        icon.setAttribute('aria-hidden', 'true');
+        const label = document.createElement('span');
+        label.textContent = promoLabel(promo.name);
+        option.append(icon, label);
+        option.addEventListener('mousedown', (event) => event.preventDefault());
+        option.addEventListener('click', () => togglePromo(promo.name));
+        options.appendChild(option);
+      });
+    }
+
+    function renderPromoPicker() {
+      const chips = $('promoChips');
+      chips.replaceChildren();
+      if (!manualPromos.length) {
+        chips.textContent = 'Automatic · from price sheet';
+      } else {
+        manualPromos.forEach((name) => {
+          const chip = document.createElement('span');
+          chip.className = 'promo-chip';
+          const label = document.createElement('span');
+          label.textContent = promoLabel(name);
+          label.title = promoLabel(name);
+          const remove = document.createElement('button');
+          remove.type = 'button';
+          remove.setAttribute('aria-label', `Remove ${promoLabel(name)}`);
+          remove.innerHTML = '<i class="bi bi-x" aria-hidden="true"></i>';
+          remove.addEventListener('click', () => togglePromo(name));
+          chip.append(label, remove);
+          chips.appendChild(chip);
+        });
+        const reset = document.createElement('button');
+        reset.type = 'button';
+        reset.className = 'promo-reset';
+        reset.textContent = 'Reset to automatic';
+        reset.addEventListener('click', () => {
+          manualPromos = [];
+          renderPromoPicker();
+          renderPromoPictures();
+        });
+        chips.appendChild(reset);
+      }
+      if (!$('promoOptions').hidden) renderPromoOptions();
+    }
+
+    function togglePromo(name) {
+      manualPromos = manualPromos.includes(name)
+        ? manualPromos.filter((selected) => selected !== name)
+        : [...manualPromos, name];
+      renderPromoPicker();
+      renderPromoPictures();
+    }
+
+    $('promoSearch').addEventListener('focus', () => setPromoOptionsOpen(true));
+    $('promoSearch').addEventListener('input', () => setPromoOptionsOpen(true));
+    $('promoSearch').addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        setPromoOptionsOpen(false);
+        $('promoSearch').blur();
+      }
+    });
+    document.addEventListener('mousedown', (event) => {
+      if (!$('promoPicker').contains(event.target)) setPromoOptionsOpen(false);
+    });
+
+    // Branches with promos today. A branch account starts on its own branch (when it has promos) and
+    // can switch to any other; HO and ALL accounts start on the regular price.
+    function loadBranches(branches, homeBranch) {
+      bannerBranches = branches;
+      const select = $('branchSelect');
+      select.replaceChildren(select.options[0]);
+      branches.forEach((branch) => select.add(new Option(branch, branch)));
+      const home = String(homeBranch || '').trim().toUpperCase();
+      if (!branchChosen) setBranch(branches.includes(home) ? home : '');
+      else if (!branches.includes(selectedBranch)) setBranch('');
+      select.value = selectedBranch;
+    }
+
+    function setBranch(branch) {
+      selectedBranch = branch;
+      $('promoOnly').disabled = !branch;
+      $('promoOnly').closest('label').classList.toggle('disabled', !branch);
+      if (!branch) {
+        showPromoOnly = false;
+        $('promoOnly').checked = false;
+      }
+    }
+
+    $('branchSelect').addEventListener('change', (event) => {
+      branchChosen = true;
+      setBranch(event.target.value);
+      loadItemList();
+      if (currentItemCode) selectItem(currentItemCode);
+    });
+
+    $('promoOnly').addEventListener('change', (event) => {
+      showPromoOnly = event.target.checked;
+      loadItemList();
+    });
 
     const wrap = $('wrap');
     const stage = $('stage');

@@ -8775,7 +8775,7 @@
       if (!data) return;
       if (fromSaved && window._desktopCurrentDataApplied) return;
       if (!fromSaved) window._desktopCurrentDataApplied = true;
-      if (typeof window.updateBannerPage === 'function') window.updateBannerPage(data.bannerData);
+      if (typeof window.updateBannerPage === 'function') window.updateBannerPage(data.bannerData, data.homeBranch);
       window.SERVER_INITIAL_DATA = data;
       window.sheetData = data;
       window.UKSP_BANNER_DATA = data.ukspBannerData || { features: [], skus: [] };

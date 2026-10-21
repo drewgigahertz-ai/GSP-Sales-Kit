@@ -10,7 +10,8 @@ const BANNER_SHEETS = {
   banner_prices: 'BANNER PRICES'
 };
 
-// Shown under the banner, in this order: [title, BANNER PRICES column, is a price].
+// Shown under the banner, in this order: [title, BANNER PRICES column, is a price]. The letters are for the
+// layout without the SPECIFIC BRANCH column; columns inserted on the left are added automatically (see priceColumns).
 const PRICE_DETAILS = [
   ['CWB', 'CG', true],
   ['3WB', 'CH', true],
@@ -34,14 +35,39 @@ function detailColumn(title) {
 
 const SPEC_GUIDES = ['PROCESSOR', 'STORAGE', 'GRAPHICS', 'RESOLUTION', 'MEMORY', 'OS'];
 
-// BANNER PRICES: headers are on row 3, items start on row 4. Columns are found by their row-3 header,
-// with the sheet's current positions (CE, CG, CS) as a fallback.
+// BANNER PRICES: headers are on row 3, items start on row 4. The item code column is found by its header
+// (ITEM DESCRIPTION); the column to its left, when there is one, is SPECIFIC BRANCH (one or more branches,
+// comma-separated, whose promo and prices that row is). Other columns are found by header, with their usual
+// positions (shifted by any inserted column) as a fallback.
 const PRICE_HEADER_ROW = 2;
 const PRICE_COLUMNS = {
+  promoTitle: { header: 'PROMO TITLE', fallback: 1 },
+  start: { header: 'SUPPORT START DATE', fallback: 3 },
+  end: { header: 'SUPPORT END DATE', fallback: 4 },
   twelveMonths: { header: '12 MONTHS', fallback: 82 },
   cash: { header: 'CASH', fallback: 84 }, // first "cash" column: the "with bundle" set
   promo: { header: 'PROMO', fallback: 96 }
 };
+
+// Google Sheets day number (days since 1899-12-30) for a date cell (a number, or M/D/YYYY text); null if blank.
+const SHEETS_EPOCH_MS = Date.UTC(1899, 11, 30);
+function sheetDay(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return Math.floor(value);
+  const raw = String(value ?? '').trim();
+  if (/^\d+(\.\d+)?$/.test(raw)) return Math.floor(Number(raw));
+  const match = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (!match) return null;
+  return Math.round((Date.UTC(Number(match[3]), Number(match[1]) - 1, Number(match[2])) - SHEETS_EPOCH_MS) / 864e5);
+}
+
+function todayDay(now = new Date()) {
+  return Math.round((Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) - SHEETS_EPOCH_MS) / 864e5);
+}
+
+function branchList(value) {
+  return [...new Set(text(value).split(',').map((branch) => branch.trim().replace(/\s+/g, ' ').toUpperCase())
+    .filter((branch) => branch && !branch.startsWith('#')))];
+}
 
 function text(value) {
   const result = value === null || value === undefined ? '' : String(value).trim();
@@ -141,34 +167,40 @@ function photosCollection(values) {
   return collection('banner_photos', ['kind', 'name', 'link', 'trigger'], rows);
 }
 
+// Every priced row is kept (with its branches and promo dates); which one applies is decided when the
+// banner data is built, so promos start and end on their dates without a sheet change.
 function pricesCollection(values) {
   const headers = (values[PRICE_HEADER_ROW] || []).map(header);
+  const itemHeader = headers.indexOf('ITEM DESCRIPTION');
+  const shift = itemHeader >= 0 ? itemHeader : 0;
+  const itemIndex = shift;
+  const branchIndex = shift > 0 ? shift - 1 : -1;
   const column = ({ header: name, fallback }) => {
     const index = headers.indexOf(name);
-    return index >= 0 ? index : fallback;
+    return index >= 0 ? index : fallback + shift;
   };
-  const twelveIndex = column(PRICE_COLUMNS.twelveMonths);
-  const cashIndex = column(PRICE_COLUMNS.cash);
-  const promoIndex = column(PRICE_COLUMNS.promo);
-  const seen = new Set();
+  const index = Object.fromEntries(Object.entries(PRICE_COLUMNS).map(([name, spec]) => [name, column(spec)]));
   const rows = [];
   for (const row of values.slice(PRICE_HEADER_ROW + 1)) {
-    const itemCode = text(row[0]).replace(/\s+/g, ' ');
-    const cash = number(row[cashIndex]);
-    const twelveMonths = number(row[twelveIndex]);
-    // A laptop can appear under several promo sections; the first row with a price is used.
-    if (!itemCode || (cash === null && twelveMonths === null) || seen.has(matchKey(itemCode))) continue;
-    seen.add(matchKey(itemCode));
+    const itemCode = text(row[itemIndex]).replace(/\s+/g, ' ');
+    const cash = number(row[index.cash]);
+    const twelveMonths = number(row[index.twelveMonths]);
+    if (!itemCode || (cash === null && twelveMonths === null)) continue;
+    const start = sheetDay(row[index.start]);
+    const end = sheetDay(row[index.end]);
     rows.push({
       item_code: itemCode,
-      promo_title: text(row[1]).replace(/\s+/g, ' '),
-      promo: text(row[promoIndex]),
+      branch: branchIndex >= 0 ? branchList(row[branchIndex]).join(', ') : '',
+      promo_title: text(row[index.promoTitle]).replace(/\s+/g, ' '),
+      promo: text(row[index.promo]),
+      start: start === null ? '' : String(start),
+      end: end === null ? '' : String(end),
       cash: cash === null ? '' : String(cash),
       twelve_months: twelveMonths === null ? '' : String(twelveMonths),
-      ...Object.fromEntries(PRICE_DETAILS.map(([title, letters]) => [detailColumn(title), text(row[columnIndex(letters)])]))
+      ...Object.fromEntries(PRICE_DETAILS.map(([title, letters]) => [detailColumn(title), text(row[columnIndex(letters) + shift])]))
     });
   }
-  return collection('banner_prices', ['item_code', 'promo_title', 'promo', 'cash', 'twelve_months',
+  return collection('banner_prices', ['item_code', 'branch', 'promo_title', 'promo', 'start', 'end', 'cash', 'twelve_months',
     ...PRICE_DETAILS.map(([title]) => detailColumn(title))], rows);
 }
 
@@ -188,8 +220,9 @@ function normalizeBannerSheets(valuesBySheet) {
   return result;
 }
 
-// rows: { laptops, specs, photos, prices } from the banner tables. imageUrl turns a Drive link into an image address.
-function buildBannerData(rows, imageUrl = (value) => value) {
+// rows: { laptops, specs, photos, prices, ageing } from the banner tables. imageUrl turns a Drive link into an
+// image address. now: the day whose promos apply.
+function buildBannerData(rows, imageUrl = (value) => value, now = new Date()) {
   const photos = new Map();
   for (const photo of rows.photos || []) {
     const key = `${photo.kind}|${matchKey(photo.name)}`;
@@ -207,7 +240,60 @@ function buildBannerData(rows, imageUrl = (value) => value) {
   }
   // Ready-made ageing banner per item code (AGEING BANNER sheet), shown instead of the generated banner.
   const ageingByItem = new Map((rows.ageing || []).map((row) => [matchKey(row.item_code), row.banner]));
-  const pricesByItem = new Map((rows.prices || []).map((price) => [matchKey(price.item_code), price]));
+
+  // One price per laptop, and per branch + laptop: rows outside their promo dates are left out; then a row
+  // with dates beats one without, a later start date beats an earlier one, and otherwise the upper row wins.
+  const today = todayDay(now);
+  const regularPrices = new Map();
+  const branchPrices = new Map();
+  const choose = (chosen, key, candidate) => {
+    const current = chosen.get(key);
+    const better = !current
+      || (candidate.dated !== current.dated ? candidate.dated : candidate.start > current.start);
+    if (better) chosen.set(key, candidate);
+  };
+  for (const price of rows.prices || []) {
+    const start = price.start === '' || price.start === undefined ? null : Number(price.start);
+    const end = price.end === '' || price.end === undefined ? null : Number(price.end);
+    if (end !== null && today > end) continue;
+    if (start !== null && today < start) continue;
+    const candidate = { price, dated: start !== null || end !== null, start: start ?? -Infinity };
+    const key = matchKey(price.item_code);
+    const branches = branchList(price.branch);
+    if (!branches.length) choose(regularPrices, key, candidate);
+    for (const branch of branches) choose(branchPrices, `${branch}|${key}`, candidate);
+  }
+
+  // Promo picture: by the promo column (CS) of BANNER PRICES. A blank promo means "NO PROMO", which has
+  // its own picture in DB PHOTOS; a promo without a picture there also shows the NO PROMO picture.
+  // An AGEING promo (e.g. "ACER - AGEING PROMO") is sold with its clearance banner only (AGEING BANNER).
+  const priceView = (price) => {
+    if (!price) {
+      return {
+        cash: null, twelveMonths: null, hasPrice: false, promo: null, ageingPromo: false, ageingOnly: false,
+        priceDetails: PRICE_DETAILS.map(([title, , isPrice]) => ({ title, value: isPrice ? null : '', isPrice }))
+      };
+    }
+    const match = [text(price.promo) || 'NO PROMO', 'NO PROMO'].map((name) => photo('promo', name)).find((row) => row && row.link);
+    const ageingPromo = /\bag(e)?ing\b/i.test(text(price.promo));
+    return {
+      cash: number(price.cash),
+      twelveMonths: number(price.twelve_months),
+      hasPrice: true,
+      promo: match
+        ? { name: match.name, picture: imageUrl(match.link), trigger: match.trigger || '' }
+        : { name: text(price.promo) || 'NO PROMO', picture: '', trigger: '' },
+      ageingPromo,
+      // Clearance banner only (no generated banner, no switch).
+      ageingOnly: ageingPromo,
+      // { title, value, isPrice } for the strip under the banner.
+      priceDetails: PRICE_DETAILS.map(([title, , isPrice]) => {
+        const raw = text(price[detailColumn(title)]);
+        return { title, value: isPrice ? number(raw) : raw, isPrice };
+      })
+    };
+  };
+  const branchesWithPrices = new Set();
 
   const seen = new Set();
   const items = [];
@@ -215,17 +301,13 @@ function buildBannerData(rows, imageUrl = (value) => value) {
     const key = matchKey(laptop.item_code);
     if (seen.has(key)) continue;
     seen.add(key);
-    const price = pricesByItem.get(key);
-    // Promo picture: by the promo column (CS) of BANNER PRICES. A blank promo means "NO PROMO", which has
-    // its own picture in DB PHOTOS; a promo without a picture there also shows the NO PROMO picture.
-    let promo = null;
-    // An AGEING promo (e.g. "ACER - AGEING PROMO") is sold with its clearance banner only (AGEING BANNER).
-    const ageingPromo = Boolean(price && /\bag(e)?ing\b/i.test(text(price.promo)));
-    if (price) {
-      const candidates = [text(price.promo) || 'NO PROMO', 'NO PROMO'];
-      const match = candidates.map((name) => photo('promo', name)).find((row) => row && row.link);
-      if (match) promo = { name: match.name, picture: imageUrl(match.link), trigger: match.trigger || '' };
-      else if (candidates.length) promo = { name: candidates[0], picture: '', trigger: '' };
+    // Branch promos (SPECIFIC BRANCH) for this laptop: { ALB: { cash, twelveMonths, promo, ... } }.
+    const byBranch = {};
+    for (const [branchKey, candidate] of branchPrices) {
+      const [branch, itemKey] = branchKey.split('|');
+      if (itemKey !== key) continue;
+      byBranch[branch] = priceView(candidate.price);
+      branchesWithPrices.add(branch);
     }
     items.push({
       itemCode: laptop.item_code,
@@ -234,19 +316,10 @@ function buildBannerData(rows, imageUrl = (value) => value) {
       partNumber: laptop.part_number,
       brandPicture: picture(laptop.brand_pic, 'brand', laptop.brand),
       specs: specsByItem.get(key) || {},
-      cash: price ? number(price.cash) : null,
-      twelveMonths: price ? number(price.twelve_months) : null,
-      hasPrice: Boolean(price),
-      // { title, value, isPrice } for the strip under the banner.
-      priceDetails: PRICE_DETAILS.map(([title, , isPrice]) => {
-        const raw = price ? text(price[detailColumn(title)]) : '';
-        return { title, value: isPrice ? number(raw) : raw, isPrice };
-      }),
-      promo,
+      // Regular price (all branches); SalesKit 1.0.11 and older only know these fields.
+      ...priceView((regularPrices.get(key) || {}).price),
+      branchPrices: byBranch,
       ageingBanner: ageingByItem.has(key) ? imageUrl(text(ageingByItem.get(key))) : '',
-      ageingPromo,
-      // Clearance banner only (no generated banner, no switch).
-      ageingOnly: ageingPromo,
       features: [1, 2, 3, 4]
         .map((n) => ({ name: text(laptop[`uksp${n}`]), picture: picture(laptop[`uksp${n}_pic`], 'spec', laptop[`uksp${n}`]) }))
         .filter((feature) => feature.name)
@@ -275,7 +348,10 @@ function buildBannerData(rows, imageUrl = (value) => value) {
     });
   }
   items.sort((a, b) => a.itemCode.localeCompare(b.itemCode));
-  return { items };
+  // Promo pictures in DB PHOTOS order, for the Banner page's promo picker.
+  const promos = (rows.photos || []).filter((row) => row.kind === 'promo' && row.link)
+    .map((row) => ({ name: row.name, picture: imageUrl(row.link) }));
+  return { items, branches: [...branchesWithPrices].sort(), promos };
 }
 
 module.exports = { BANNER_SHEETS, normalizeBannerSheets, buildBannerData, matchKey };

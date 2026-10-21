@@ -3,6 +3,7 @@
 // itself, so everything goes through window messages, which are only accepted from that frame.
 (function () {
   let latestBannerData = null;
+  let homeBranch = '';
   let refreshTimer = null;
 
   function frame() {
@@ -21,10 +22,12 @@
     if (target && target.contentWindow) target.contentWindow.postMessage(message, '*');
   }
 
-  // Called by the page whenever SalesKit data is loaded or refreshed.
-  window.updateBannerPage = function (bannerData) {
+  // Called by the page whenever SalesKit data is loaded or refreshed. branch: the account's home branch
+  // (empty for HO and ALL accounts).
+  window.updateBannerPage = function (bannerData, branch) {
     latestBannerData = bannerData || { items: [] };
-    send({ channel: 'saleskit-banner-data', data: latestBannerData, logo: logo() });
+    homeBranch = branch || '';
+    send({ channel: 'saleskit-banner-data', data: latestBannerData, logo: logo(), homeBranch });
     if (refreshTimer) {
       clearTimeout(refreshTimer);
       refreshTimer = null;
@@ -56,7 +59,7 @@
     if (!target || event.source !== target.contentWindow || !event.data) return;
     const { channel } = event.data;
     if (channel === 'saleskit-banner-ready') {
-      if (latestBannerData) send({ channel: 'saleskit-banner-data', data: latestBannerData, logo: logo() });
+      if (latestBannerData) send({ channel: 'saleskit-banner-data', data: latestBannerData, logo: logo(), homeBranch });
     } else if (channel === 'saleskit-banner-hotkey') {
       // Ctrl+1 / Ctrl+2 pressed while the Banner page has the keyboard (see hotkeys.js).
       if (typeof window.runSalesKitHotkey === 'function') window.runSalesKitHotkey(event.data.keys || {});

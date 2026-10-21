@@ -245,16 +245,19 @@ function pushState() {
 async function startApi() {
   await stopApi();
   apiError = '';
-  // One full data object per data version; each branch's (compressed) copy is made from it.
+  // One full data object per data version and day (Banner promos start and end on their dates); each
+  // branch's (compressed) copy is made from it. Unchanged data keeps its fingerprint, so laptops download
+  // again only when a promo really started or ended.
   let fullData = null;
   let fullDataVersion = null;
+  const dataDay = () => `${settings.dataVersion}|${new Date().toDateString()}`;
   const payloads = createCompressedData({
-    getDataVersion: () => settings.dataVersion,
+    getDataVersion: dataDay,
     scopeOf: (user) => (!user || hasFullAccess(user.branch) ? 'ALL' : String(user.branch).trim().toUpperCase()),
     build: (scope, { branchModes } = {}) => {
-      if (fullDataVersion !== settings.dataVersion || !fullData) {
+      if (fullDataVersion !== dataDay() || !fullData) {
         fullData = database.getInitialData();
-        fullDataVersion = settings.dataVersion;
+        fullDataVersion = dataDay();
       }
       if (scope === 'ALL') return fullData;
       // 1.0.11+ locks the branch inside the app; older SalesKit only gets its own branch's stock.
