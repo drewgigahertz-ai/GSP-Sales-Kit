@@ -581,6 +581,14 @@
       color: #003ecb;
     }
 
+    .promo-option small {
+      display: block;
+      margin-top: 1px;
+      color: #64748b;
+      font-size: .64rem;
+      font-weight: 400;
+    }
+
     .promo-options .empty-message {
       padding: 10px 8px;
     }
@@ -1009,13 +1017,13 @@
         <div id="count" aria-live="polite"></div>
       </div>
       <div id="promoPicker" class="promo-picker">
-        <label class="search-label" for="promoSearch">Promo picture</label>
+        <label class="search-label" for="promoSearch">Promo title</label>
         <div class="promo-combo">
           <div class="search-field disabled">
             <i class="bi bi-images" aria-hidden="true"></i>
             <input id="promoSearch" type="search" placeholder="Select a laptop first" autocomplete="off" role="combobox" aria-controls="promoOptions" aria-expanded="false" disabled>
           </div>
-          <div id="promoOptions" class="promo-options" role="listbox" aria-multiselectable="true" hidden></div>
+          <div id="promoOptions" class="promo-options" role="listbox" hidden></div>
         </div>
         <div id="promoChips" class="promo-chips" aria-live="polite">Automatic · from price sheet</div>
       </div>
@@ -1097,10 +1105,9 @@
     let selectedBranch = '';
     let branchChosen = false;
     let showPromoOnly = false;
-    // DB PHOTOS promo pictures; the ones picked by hand replace the automatic picture (prices are untouched).
-    let promoCatalog = [];
-    let manualPromos = [];
-    let autoPromoPictures = [];
+    // The laptop's BANNER PRICES row picked from the promo title dropdown (its index in item.promoRows);
+    // null = automatic (the row for today and the selected branch).
+    let chosenPromoRow = null;
     let promoRenderVersion = 0;
     let imageRequestSequence = 0;
     const pendingImages = new Map();
@@ -1116,8 +1123,6 @@
         showLogo(event.data.logo);
         const data = event.data.data || {};
         bannerItems = Array.isArray(data.items) ? data.items : [];
-        promoCatalog = Array.isArray(data.promos) ? data.promos : [];
-        manualPromos = manualPromos.filter((name) => promoCatalog.some((promo) => promo.name === name));
         loadBranches(Array.isArray(data.branches) ? data.branches : [], event.data.homeBranch);
         renderPromoPicker();
         loadItemList();
@@ -1202,8 +1207,10 @@
       return (selectedBranch && item.branchPrices && item.branchPrices[selectedBranch]) || null;
     }
 
+    // A promo title picked for the laptop on screen; otherwise its branch promo or regular price.
     function priceFor(item) {
-      return branchPrice(item) || item;
+      const chosen = item.itemCode === currentItemCode && chosenPromoRow !== null && (item.promoRows || [])[chosenPromoRow];
+      return chosen || branchPrice(item) || item;
     }
 
     // Laptops with a promo for the selected branch are listed first.
@@ -1355,11 +1362,9 @@
       const version = ++selectionVersion;
       const sameItem = itemCode === currentItemCode;
       currentItemCode = itemCode;
-      // Promo pictures picked by hand are for one laptop; another laptop starts on its automatic picture.
-      if (!sameItem && manualPromos.length) {
-        manualPromos = [];
-        renderPromoPicker();
-      }
+      // A promo title picked by hand is for one laptop; another laptop starts on its automatic row.
+      if (!sameItem || !(item.promoRows || [])[chosenPromoRow]) chosenPromoRow = null;
+      renderPromoPicker();
       setPromoPickerEnabled(true);
       loadItemList();
       // Refreshed data keeps the view the salesperson chose; another laptop starts on its ageing banner.
@@ -1403,10 +1408,9 @@
       });
 
       // Pictures last: the text is already shown while they load.
-      autoPromoPictures = price.promo && price.promo.picture ? [price.promo] : [];
       const pictures = [
         setPicture($('brandLogo'), item.brandPicture, item.brand),
-        renderPromoPictures(),
+        renderPromoPictures(price.promo),
         ...Array.from({ length: 4 }, (_, index) => {
           const itemFeature = (item.features || [])[index];
           return setPicture($(`feature${index + 1}`).querySelector('img'), itemFeature && itemFeature.picture, itemFeature && itemFeature.name);
@@ -1417,34 +1421,29 @@
       if (version !== selectionVersion) return;
     }
 
-    // Picked promos replace the price sheet's promo picture; several are shown as a grid.
-    async function renderPromoPictures() {
+    async function renderPromoPictures(promo) {
       const version = ++promoRenderVersion;
-      const pictures = manualPromos.length
-        ? manualPromos.map((name) => promoCatalog.find((promo) => promo.name === name)).filter(Boolean)
-        : autoPromoPictures;
-      const images = pictures.map(() => {
-        const image = document.createElement('img');
-        image.className = 'picture-slot';
-        return image;
-      });
-      await Promise.all(images.map((image, index) => setPicture(image, pictures[index].picture, promoLabel(pictures[index].name))));
+      const image = document.createElement('img');
+      image.className = 'picture-slot';
+      await setPicture(image, promo && promo.picture, promoLabel(promo && promo.name));
       if (version !== promoRenderVersion) return;
-      const shown = images.filter((image) => !image.hidden);
-      const columns = Math.max(1, Math.ceil(Math.sqrt(shown.length)));
       const box = $('promoPictures');
-      box.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
-      box.style.gridTemplateRows = `repeat(${Math.max(1, Math.ceil(shown.length / columns))}, minmax(0, 1fr))`;
-      box.replaceChildren(...shown);
+      box.style.gridTemplateColumns = 'minmax(0, 1fr)';
+      box.style.gridTemplateRows = 'minmax(0, 1fr)';
+      box.replaceChildren(...(image.hidden ? [] : [image]));
     }
 
     function promoLabel(name) {
       return String(name || '').replace(/\s*[\r\n]+\s*/g, ' ').trim();
     }
 
+    function currentItem() {
+      return bannerItems.find((row) => row.itemCode === currentItemCode) || null;
+    }
+
     function setPromoPickerEnabled(enabled) {
       $('promoSearch').disabled = !enabled;
-      $('promoSearch').placeholder = enabled ? 'Search promo titles...' : 'Select a laptop first';
+      $('promoSearch').placeholder = enabled ? "Search this laptop's promo titles..." : 'Select a laptop first';
       $('promoSearch').closest('.search-field').classList.toggle('disabled', !enabled);
     }
 
@@ -1454,33 +1453,45 @@
       if (open) renderPromoOptions();
     }
 
+    // Branch, promo dates and cash price under each title.
+    function promoRowNote(row) {
+      return [row.branch, row.dates, row.hasPrice ? peso(row.cash) : 'no price'].filter(Boolean).join(' · ');
+    }
+
+    // The laptop's own BANNER PRICES rows (every branch and date), in sheet order.
     function renderPromoOptions() {
+      const item = currentItem();
+      const rows = (item && item.promoRows) || [];
       const query = $('promoSearch').value.trim().toLowerCase();
-      const matches = promoCatalog.filter((promo) => promoLabel(promo.name).toLowerCase().includes(query));
+      const matches = rows.map((row, index) => ({ row, index }))
+        .filter(({ row }) => `${promoLabel(row.title)} ${row.branch}`.toLowerCase().includes(query));
       const options = $('promoOptions');
       options.replaceChildren();
       if (!matches.length) {
         const empty = document.createElement('div');
         empty.className = 'empty-message';
-        empty.textContent = promoCatalog.length ? 'No matching promo titles.' : 'No promo pictures yet. Refresh data.';
+        empty.textContent = rows.length ? 'No matching promo titles.' : 'This laptop has no rows in BANNER PRICES.';
         options.appendChild(empty);
         return;
       }
-      matches.forEach((promo) => {
-        const selected = manualPromos.includes(promo.name);
+      matches.forEach(({ row, index }) => {
+        const selected = index === chosenPromoRow;
         const option = document.createElement('button');
         option.type = 'button';
         option.role = 'option';
         option.className = 'promo-option';
         option.setAttribute('aria-selected', String(selected));
         const icon = document.createElement('i');
-        icon.className = `bi ${selected ? 'bi-check-square-fill' : 'bi-square'}`;
+        icon.className = `bi ${selected ? 'bi-record-circle-fill' : 'bi-circle'}`;
         icon.setAttribute('aria-hidden', 'true');
         const label = document.createElement('span');
-        label.textContent = promoLabel(promo.name);
+        label.textContent = promoLabel(row.title);
+        const note = document.createElement('small');
+        note.textContent = promoRowNote(row);
+        label.appendChild(note);
         option.append(icon, label);
         option.addEventListener('mousedown', (event) => event.preventDefault());
-        option.addEventListener('click', () => togglePromo(promo.name));
+        option.addEventListener('click', () => choosePromoRow(index));
         options.appendChild(option);
       });
     }
@@ -1488,43 +1499,37 @@
     function renderPromoPicker() {
       const chips = $('promoChips');
       chips.replaceChildren();
-      if (!manualPromos.length) {
+      const item = currentItem();
+      const row = item && chosenPromoRow !== null ? (item.promoRows || [])[chosenPromoRow] : null;
+      if (!row) {
         chips.textContent = 'Automatic · from price sheet';
       } else {
-        manualPromos.forEach((name) => {
-          const chip = document.createElement('span');
-          chip.className = 'promo-chip';
-          const label = document.createElement('span');
-          label.textContent = promoLabel(name);
-          label.title = promoLabel(name);
-          const remove = document.createElement('button');
-          remove.type = 'button';
-          remove.setAttribute('aria-label', `Remove ${promoLabel(name)}`);
-          remove.innerHTML = '<i class="bi bi-x" aria-hidden="true"></i>';
-          remove.addEventListener('click', () => togglePromo(name));
-          chip.append(label, remove);
-          chips.appendChild(chip);
-        });
+        const chip = document.createElement('span');
+        chip.className = 'promo-chip';
+        const label = document.createElement('span');
+        label.textContent = promoLabel(row.title);
+        label.title = `${promoLabel(row.title)} · ${promoRowNote(row)}`;
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.setAttribute('aria-label', 'Back to the automatic promo');
+        remove.innerHTML = '<i class="bi bi-x" aria-hidden="true"></i>';
+        remove.addEventListener('click', () => choosePromoRow(null));
+        chip.append(label, remove);
         const reset = document.createElement('button');
         reset.type = 'button';
         reset.className = 'promo-reset';
         reset.textContent = 'Reset to automatic';
-        reset.addEventListener('click', () => {
-          manualPromos = [];
-          renderPromoPicker();
-          renderPromoPictures();
-        });
-        chips.appendChild(reset);
+        reset.addEventListener('click', () => choosePromoRow(null));
+        chips.append(chip, reset);
       }
       if (!$('promoOptions').hidden) renderPromoOptions();
     }
 
-    function togglePromo(name) {
-      manualPromos = manualPromos.includes(name)
-        ? manualPromos.filter((selected) => selected !== name)
-        : [...manualPromos, name];
-      renderPromoPicker();
-      renderPromoPictures();
+    // Picking a promo title shows that row's promo picture, prices and price details.
+    function choosePromoRow(index) {
+      chosenPromoRow = index === chosenPromoRow ? null : index;
+      setPromoOptionsOpen(false);
+      if (currentItemCode) selectItem(currentItemCode);
     }
 
     $('promoSearch').addEventListener('focus', () => setPromoOptionsOpen(true));

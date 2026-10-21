@@ -252,13 +252,17 @@ function buildBannerData(rows, imageUrl = (value) => value, now = new Date()) {
       || (candidate.dated !== current.dated ? candidate.dated : candidate.start > current.start);
     if (better) chosen.set(key, candidate);
   };
+  // Every row per laptop, in sheet order, for the Banner page's promo title dropdown.
+  const pricesByItem = new Map();
   for (const price of rows.prices || []) {
+    const key = matchKey(price.item_code);
+    if (!pricesByItem.has(key)) pricesByItem.set(key, []);
+    pricesByItem.get(key).push(price);
     const start = price.start === '' || price.start === undefined ? null : Number(price.start);
     const end = price.end === '' || price.end === undefined ? null : Number(price.end);
     if (end !== null && today > end) continue;
     if (start !== null && today < start) continue;
     const candidate = { price, dated: start !== null || end !== null, start: start ?? -Infinity };
-    const key = matchKey(price.item_code);
     const branches = branchList(price.branch);
     if (!branches.length) choose(regularPrices, key, candidate);
     for (const branch of branches) choose(branchPrices, `${branch}|${key}`, candidate);
@@ -294,6 +298,18 @@ function buildBannerData(rows, imageUrl = (value) => value, now = new Date()) {
     };
   };
   const branchesWithPrices = new Set();
+  const dayLabel = (day) => new Date(SHEETS_EPOCH_MS + Number(day) * 864e5)
+    .toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  // { title, branch, dates, ...prices } for each of the laptop's BANNER PRICES rows (any branch, any date).
+  const promoRow = (price) => {
+    const dates = [price.start, price.end].map((day) => (day === '' || day === undefined || day === null ? '' : dayLabel(day)));
+    return {
+      title: text(price.promo_title) || 'NO PROMO',
+      branch: branchList(price.branch).join(', '),
+      dates: dates[0] || dates[1] ? `${dates[0] || '…'} – ${dates[1] || '…'}` : '',
+      ...priceView(price)
+    };
+  };
 
   const seen = new Set();
   const items = [];
@@ -319,6 +335,7 @@ function buildBannerData(rows, imageUrl = (value) => value, now = new Date()) {
       // Regular price (all branches); SalesKit 1.0.11 and older only know these fields.
       ...priceView((regularPrices.get(key) || {}).price),
       branchPrices: byBranch,
+      promoRows: (pricesByItem.get(key) || []).map(promoRow),
       ageingBanner: ageingByItem.has(key) ? imageUrl(text(ageingByItem.get(key))) : '',
       features: [1, 2, 3, 4]
         .map((n) => ({ name: text(laptop[`uksp${n}`]), picture: picture(laptop[`uksp${n}_pic`], 'spec', laptop[`uksp${n}`]) }))
@@ -348,10 +365,7 @@ function buildBannerData(rows, imageUrl = (value) => value, now = new Date()) {
     });
   }
   items.sort((a, b) => a.itemCode.localeCompare(b.itemCode));
-  // Promo pictures in DB PHOTOS order, for the Banner page's promo picker.
-  const promos = (rows.photos || []).filter((row) => row.kind === 'promo' && row.link)
-    .map((row) => ({ name: row.name, picture: imageUrl(row.link) }));
-  return { items, branches: [...branchesWithPrices].sort(), promos };
+  return { items, branches: [...branchesWithPrices].sort() };
 }
 
 module.exports = { BANNER_SHEETS, normalizeBannerSheets, buildBannerData, matchKey };
