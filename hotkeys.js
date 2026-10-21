@@ -1,8 +1,8 @@
 // Keyboard shortcuts, as proposed by the sales team (GST hotkeys):
-//   Ctrl+1 Reco Table · Ctrl+2 Sales Kit
+//   Ctrl+1 Reco Table · Ctrl+2 Sales Kit · Ctrl+3 Banner
 //   Ctrl+Shift+A Application selection · Ctrl+Shift+R Recommendation selection · Ctrl+Shift+P Present
-//   Reco Table only: Ctrl+Shift+L Location selection · Ctrl+Shift+C Copy Details · Ctrl+D Download Result · Ctrl+R Refresh Data
-//   Sales Kit only: Ctrl+Shift+D Download Image
+//   Ctrl+D or Ctrl+Shift+D Download (Result on the Reco Table, Image on Sales Kit)
+//   Reco Table only: Ctrl+Shift+L Location selection · Ctrl+Shift+C Copy Details · Ctrl+R Refresh Data
 // They are ignored while the presentation is open (it has its own keys).
 (function () {
   function page() {
@@ -41,6 +41,11 @@
     openMenu('locationDropdownMenu', 'toggleLocationMenu', 'locationSearchInput');
   }
 
+  // Download Result (Reco Table) or Download Image (Sales Kit).
+  function download() {
+    click(page() === 'saleskit' ? 'btnDownloadSalesKit' : 'btnDownloadReco');
+  }
+
   const RECO = ['recotable'];
   const BOTH = ['recotable', 'saleskit'];
 
@@ -48,13 +53,14 @@
   const SHORTCUTS = [
     { ctrl: true, shift: false, code: 'Digit1', pages: null, label: 'Reco Table', run: () => navigateTo('recotable') },
     { ctrl: true, shift: false, code: 'Digit2', pages: null, label: 'Sales Kit', run: () => navigateTo('saleskit') },
+    { ctrl: true, shift: false, code: 'Digit3', pages: null, label: 'Banner', run: () => navigateTo('banner') },
     { ctrl: true, shift: true, code: 'KeyA', pages: BOTH, label: 'Application selection', run: () => openMenu('appsDropdownMenu', 'toggleAppsMenu', 'appsSearchInput') },
     { ctrl: true, shift: true, code: 'KeyL', pages: RECO, label: 'Location selection', run: openLocation },
     { ctrl: true, shift: true, code: 'KeyR', pages: BOTH, label: 'Recommendation selection', run: () => openMenu('recoForDropdownMenu', 'toggleRecoForMenu') },
     { ctrl: true, shift: true, code: 'KeyC', pages: RECO, label: 'Copy Details', run: () => click('btnCopyReco') },
     { ctrl: true, shift: true, code: 'KeyP', pages: BOTH, label: 'Present', run: () => click(page() === 'saleskit' ? 'btnPresentSalesKit' : 'btnPresentReco') },
-    { ctrl: true, shift: false, code: 'KeyD', pages: RECO, label: 'Download Result', run: () => click('btnDownloadReco') },
-    { ctrl: true, shift: true, code: 'KeyD', pages: ['saleskit'], label: 'Download Image', run: () => click('btnDownloadSalesKit') },
+    { ctrl: true, shift: false, code: 'KeyD', pages: BOTH, label: 'Download', run: download },
+    { ctrl: true, shift: true, code: 'KeyD', pages: BOTH, label: 'Download', run: download },
     { ctrl: true, shift: false, code: 'KeyR', pages: RECO, label: 'Refresh Data', run: () => click('btnRefreshData') }
   ];
 
@@ -91,7 +97,7 @@
   const TIPS = {
     btnCopyReco: 'Ctrl+Shift+C', btnPresentReco: 'Ctrl+Shift+P', btnDownloadReco: 'Ctrl+D', btnRefreshData: 'Ctrl+R',
     btnPresentSalesKit: 'Ctrl+Shift+P', btnDownloadSalesKit: 'Ctrl+Shift+D',
-    tabRecoTable: 'Ctrl+1', tabSalesKit: 'Ctrl+2',
+    tabRecoTable: 'Ctrl+1', tabSalesKit: 'Ctrl+2', tabBanner: 'Ctrl+3',
     appsDisplayInput: 'Ctrl+Shift+A', locationDisplayInput: 'Ctrl+Shift+L', recoForDisplayInput: 'Ctrl+Shift+R'
   };
   Object.entries(TIPS).forEach(([id, keys]) => {

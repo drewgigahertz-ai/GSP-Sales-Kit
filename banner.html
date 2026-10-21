@@ -1228,10 +1228,10 @@
       toParent({ channel: 'saleskit-banner-refresh' });
     });
 
-    // Ctrl+1 / Ctrl+2 switch SalesKit tabs from here too (SalesKit's hotkeys.js runs them).
+    // Ctrl+1 / Ctrl+2 / Ctrl+3 switch SalesKit tabs from here too (SalesKit's hotkeys.js runs them).
     document.addEventListener('keydown', (event) => {
       if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
-      if (event.code !== 'Digit1' && event.code !== 'Digit2') return;
+      if (event.code !== 'Digit1' && event.code !== 'Digit2' && event.code !== 'Digit3') return;
       event.preventDefault();
       toParent({ channel: 'saleskit-banner-hotkey', keys: { ctrl: true, shift: false, alt: false, code: event.code } });
     });
