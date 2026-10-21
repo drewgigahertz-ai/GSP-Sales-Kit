@@ -320,7 +320,7 @@ function createWindow() {
     backgroundColor: '#f3f5f2',
     // The logo from last time, until the page applies the current one.
     icon: logoCache.loadWindowIcon() || undefined,
-    title: 'GigaHertz SalesKit',
+    title: 'Gigahertz Sales Tools',
     titleBarStyle: 'hidden',
     titleBarOverlay: {
       color: '#d5d9e0',

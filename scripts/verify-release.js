@@ -4,7 +4,8 @@ const { version } = require('../package.json');
 const { owner, repo } = require('../package.json').build.publish;
 
 const tag = `v${version}`;
-const installer = `GigaHertz-SalesKit-Setup-${version}.exe`;
+// The name electron-builder writes into latest.yml (spaces become hyphens).
+const installer = `${require('../package.json').build.productName} Setup ${version}.exe`.replace(/ /g, '-');
 const required = [installer, `${installer}.blockmap`, 'latest.yml'];
 
 (async () => {
