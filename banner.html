@@ -503,6 +503,18 @@
       cursor: not-allowed;
     }
 
+    .list-part-number {
+      display: block;
+      color: #475569;
+      font-size: .66rem;
+      font-weight: 600;
+      letter-spacing: .3px;
+    }
+
+    .list-part-number:empty {
+      display: none;
+    }
+
     .branch-promo-tag {
       display: inline-block;
       margin-right: 6px;
@@ -1217,7 +1229,7 @@
         if (!price.hasPrice && !price.ageingOnly) return false;
         if (selectedBranch && showPromoOnly && !branchPrice(item)) return false;
         if (!query) return true;
-        return [item.itemCode, item.brandModel, item.partNumber].some((value) => String(value || '').toLowerCase().includes(query));
+        return [item.itemCode, item.brandModel, item.partNumber, item.modelCode].some((value) => String(value || '').toLowerCase().includes(query));
       });
       return selectedBranch ? [...rows.filter(branchPrice), ...rows.filter((item) => !branchPrice(item))] : rows;
     }
@@ -1248,7 +1260,11 @@
 
         const model = document.createElement('span');
         model.className = 'd-block fw-semibold';
-        model.textContent = `${row.brandModel || ''} · ${row.partNumber || ''}`;
+        model.textContent = row.brandModel || '';
+        // Part number (SPECS column C, Model Code) under the name, smaller.
+        const partNumber = document.createElement('span');
+        partNumber.className = 'list-part-number';
+        partNumber.textContent = row.modelCode || row.partNumber || '';
 
         const code = document.createElement('small');
         code.textContent = row.itemCode;
@@ -1274,7 +1290,7 @@
           code.appendChild(badge);
         }
 
-        option.append(model, code);
+        option.append(model, partNumber, code);
         option.addEventListener('click', () => selectItem(row.itemCode));
         list.appendChild(option);
       });

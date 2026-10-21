@@ -17,6 +17,17 @@
     return { banner: data.bannerLogoUrl || '', header: data.headerLogoUrl || '' };
   }
 
+  function withModelCodes(bannerData, specsMap) {
+    const items = (bannerData.items || []).map((item) => {
+      const code = String(item.itemCode || '').trim().toLowerCase();
+      const spec = specsMap[code] || specsMap[code.replace(/^lap[-_\s]*/, '')];
+      const modelCode = spec ? String(spec.modelCode || '').trim() : '';
+      // Sheet errors such as "#N/A" are left out.
+      return modelCode && !modelCode.startsWith('#') ? { ...item, modelCode } : item;
+    });
+    return { ...bannerData, items };
+  }
+
   function send(message) {
     const target = frame();
     if (target && target.contentWindow) target.contentWindow.postMessage(message, '*');
@@ -24,8 +35,10 @@
 
   // Called by the page whenever SalesKit data is loaded or refreshed. branch: the account's home branch
   // (empty for HO and ALL accounts).
-  window.updateBannerPage = function (bannerData, branch) {
-    latestBannerData = bannerData || { items: [] };
+  // specsMap: the SPECS sheet by item description; its Model Code (column C) is the part number shown in
+  // the Banner page's laptop list.
+  window.updateBannerPage = function (bannerData, branch, specsMap) {
+    latestBannerData = withModelCodes(bannerData || { items: [] }, specsMap || {});
     homeBranch = branch || '';
     send({ channel: 'saleskit-banner-data', data: latestBannerData, logo: logo(), homeBranch });
     if (refreshTimer) {

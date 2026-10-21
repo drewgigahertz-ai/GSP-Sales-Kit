@@ -886,6 +886,30 @@
       line-height: 1.25;
     }
 
+    /* Part number (SPECS column C, Model Code) under a laptop's brand and model. */
+    .laptop-part-number {
+      display: block;
+      margin-top: 2px;
+      color: #475569;
+      font-size: .72em;
+      font-weight: 600;
+      letter-spacing: .3px;
+      line-height: 1.2;
+    }
+
+    .laptop-part-number:empty {
+      display: none;
+    }
+
+    /* The line is kept even when empty, so the three cards' prices stay level. */
+    .reco-model-title + .laptop-part-number,
+    .reco-model-title + .laptop-part-number:empty {
+      display: block;
+      min-height: 1.2em;
+      margin-top: -4px;
+      font-size: .85rem;
+    }
+
     .reco-price-tag {
       display: inline-flex;
       align-items: baseline;
@@ -2833,6 +2857,7 @@
                     </div>
                     <div class="reco-header-box">
                       <div class="reco-model-title" id="titleExceed"></div>
+                      <div class="laptop-part-number" id="partNumberExceed"></div>
                       <div class="reco-price-tag">
                         <span class="reco-currency" style="display:none;">PHP</span><span class="reco-price-val" id="priceExceed"></span>
                       </div>
@@ -2851,6 +2876,7 @@
                     </div>
                     <div class="reco-header-box">
                       <div class="reco-model-title" id="titleMeet"></div>
+                      <div class="laptop-part-number" id="partNumberMeet"></div>
                       <div class="reco-price-tag">
                         <span class="reco-currency" style="display:none;">PHP</span><span class="reco-price-val" id="priceMeet"></span>
                       </div>
@@ -2869,6 +2895,7 @@
                     </div>
                     <div class="reco-header-box">
                       <div class="reco-model-title" id="titleBudget"></div>
+                      <div class="laptop-part-number" id="partNumberBudget"></div>
                       <div class="reco-price-tag">
                         <span class="reco-currency" style="display:none;">PHP</span><span class="reco-price-val" id="priceBudget"></span>
                       </div>
@@ -6013,6 +6040,19 @@
       });
     }
 
+    // Part number (SPECS column C, Model Code) of a laptop; '' when the sheet has none.
+    function laptopPartNumber(laptop) {
+      if (!laptop) return '';
+      const value = String(laptop.modelCode || (laptop.rawSpecs && laptop.rawSpecs.modelCode) || '').trim();
+      // Sheet errors such as "#N/A (Did not find value … in XLOOKUP)" are left out.
+      return value.startsWith('#') ? '' : value;
+    }
+
+    function setLaptopPartNumber(elementId, laptop) {
+      const element = document.getElementById(elementId);
+      if (element) element.textContent = laptopPartNumber(laptop);
+    }
+
     function selectProduct(tier, prod) {
       const cap = tier.charAt(0).toUpperCase() + tier.slice(1);
       const displayInput = document.getElementById(tier + 'DisplayText');
@@ -6025,6 +6065,7 @@
       if (!prod) {
         if (displayInput) displayInput.textContent = `No ${tier.toUpperCase()} in stock for ${selectedLocation || 'branch'}`;
         if (titleEl) titleEl.textContent = `No In-Stock Unit`;
+        setLaptopPartNumber('partNumber' + cap, null);
         if (priceEl) {
           priceEl.textContent = '';
           const curEl = priceEl.parentElement?.querySelector('.reco-currency');
@@ -6058,6 +6099,7 @@
         titleEl.textContent = prod.title;
         titleEl.dataset.sku = prod.sku;
       }
+      setLaptopPartNumber('partNumber' + cap, prod);
       if (priceEl) {
         const rawP = (prod && prod.price !== undefined && prod.price !== null) ? String(prod.price).trim() : '';
         const curEl = priceEl.parentElement?.querySelector('.reco-currency');
@@ -7478,12 +7520,13 @@
         if (source && source.src && source.style.display !== 'none') {
           const image = document.createElement('img');
           image.src = source.src;
-          image.alt = document.getElementById(titleId)?.textContent || 'Recommended laptop';
+          image.alt = document.getElementById(titleId)?.dataset.title || 'Recommended laptop';
           card.appendChild(image);
         }
         const name = document.createElement('div');
         name.className = 'saleskit-presentation-laptop-name';
-        name.textContent = document.getElementById(titleId)?.textContent || '';
+        const header = document.getElementById(titleId);
+        if (header) name.replaceChildren(...Array.from(header.childNodes, (node) => node.cloneNode(true)));
         card.appendChild(name);
         laptopsElement.appendChild(card);
       });
@@ -8485,9 +8528,16 @@
       const skHeaderExceed = document.getElementById('skHeaderExceed');
       const skHeaderMeet = document.getElementById('skHeaderMeet');
       const skHeaderBudget = document.getElementById('skHeaderBudget');
-      if (skHeaderExceed) skHeaderExceed.textContent = exceedObj.title || 'Exceed Unit';
-      if (skHeaderMeet) skHeaderMeet.textContent = meetObj.title || 'Meet Unit';
-      if (skHeaderBudget) skHeaderBudget.textContent = budgetObj.title || 'Budget Unit';
+      [[skHeaderExceed, exceedObj, 'Exceed Unit'], [skHeaderMeet, meetObj, 'Meet Unit'], [skHeaderBudget, budgetObj, 'Budget Unit']]
+        .forEach(([header, laptop, fallback]) => {
+          if (!header) return;
+          const title = laptop.title || fallback;
+          header.dataset.title = title;
+          const partNumber = document.createElement('span');
+          partNumber.className = 'laptop-part-number';
+          partNumber.textContent = laptopPartNumber(laptop);
+          header.replaceChildren(document.createTextNode(title), partNumber);
+        });
 
       // Images
       const skImgExceed = document.getElementById('skImgExceed');
@@ -8775,7 +8825,7 @@
       if (!data) return;
       if (fromSaved && window._desktopCurrentDataApplied) return;
       if (!fromSaved) window._desktopCurrentDataApplied = true;
-      if (typeof window.updateBannerPage === 'function') window.updateBannerPage(data.bannerData, data.homeBranch);
+      if (typeof window.updateBannerPage === 'function') window.updateBannerPage(data.bannerData, data.homeBranch, data.specsMap);
       window.SERVER_INITIAL_DATA = data;
       window.sheetData = data;
       window.UKSP_BANNER_DATA = data.ukspBannerData || { features: [], skus: [] };
