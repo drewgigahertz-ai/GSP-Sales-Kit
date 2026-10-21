@@ -51,6 +51,7 @@
       "banner-bridge.js",
       "activity-tracker.js",
       "branch-mode.js",
+      "hotkeys.js",
       "package.json"
     ],
     "publish": {
