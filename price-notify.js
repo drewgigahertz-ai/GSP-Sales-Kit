@@ -1,6 +1,7 @@
-// Price-change notice: when NEW PRICING changes, the server pushes the changes (electron/price-stream.js) and
-// this modal opens with the time of the change and, for each laptop, CASH PRICE, SRP and 12MOS: old → new.
-// Changes that arrive while it is open are added to it.
+// Price-change notice: when NEW PRICING changes, the server pushes the changes (electron/price-stream.js) and a
+// small summary card appears under the header's "Price changes" button. Clicking it opens the modal with the time
+// of each change and, for each laptop, CASH PRICE, SRP and 12MOS: old → new. The button itself opens the last
+// 30 days of changes with a date filter.
 (function () {
   if (!window.saleskit || typeof window.saleskit.onPriceChanges !== 'function') return;
 
@@ -301,6 +302,127 @@
     .price-changes-button.has-unseen .price-changes-dot {
       display: block;
     }
+
+    .header-actions {
+      position: relative;
+    }
+
+    /* Summary card under the "Price changes" button. */
+    .price-changes-card {
+      position: absolute;
+      top: calc(100% + 12px);
+      right: 0;
+      z-index: 2500;
+      width: 360px;
+      padding: 12px 14px 12px;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 14px 34px rgba(15, 23, 42, .28);
+      color: #0f172a;
+      font-family: 'Outfit', sans-serif;
+      text-align: left;
+      cursor: pointer;
+      animation: price-card-in .18s ease-out;
+    }
+
+    .price-changes-card::before {
+      content: '';
+      position: absolute;
+      top: -7px;
+      right: var(--arrow-right, 40px);
+      width: 14px;
+      height: 14px;
+      background: #fff;
+      transform: rotate(45deg);
+    }
+
+    @keyframes price-card-in {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: none; }
+    }
+
+    .price-changes-card-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .price-changes-card-head .bi-tags-fill {
+      color: #003ecb;
+    }
+
+    .price-changes-card-head b {
+      flex: 1;
+      color: #0012b3;
+      font-size: .95rem;
+    }
+
+    .price-changes-card-head small {
+      color: #64748b;
+      font-weight: 600;
+    }
+
+    .price-changes-card-close {
+      padding: 0 4px;
+      border: 0;
+      background: transparent;
+      color: #64748b;
+      font-size: 1rem;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .price-changes-card ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .price-changes-card li {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 5px 0;
+      border-top: 1px solid #eef2f8;
+      font-size: .8rem;
+    }
+
+    .price-changes-card li span:first-child {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .price-changes-card li .price-notice-price {
+      flex: 0 0 auto;
+    }
+
+    .price-changes-card-more {
+      padding-top: 6px;
+      border-top: 1px solid #eef2f8;
+      color: #64748b;
+      font-size: .76rem;
+      font-weight: 600;
+    }
+
+    .price-changes-card-view {
+      display: block;
+      width: 100%;
+      margin-top: 10px;
+      padding: 7px 0;
+      border: 0;
+      border-radius: 999px;
+      background: #003ecb;
+      color: #fff;
+      font: inherit;
+      font-size: .85rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
   `;
   document.head.appendChild(style);
 
@@ -459,19 +581,109 @@
   // ---------- New changes (pushed) ----------
 
   // events: oldest first; the newest change is shown at the top.
-  window.saleskit.onPriceChanges((events) => {
-    if (!Array.isArray(events) || !events.length) return;
-    if (!backdrop || filterBar) open('new');
+  // Changes not opened yet (oldest first); shown in the card until it is opened or closed.
+  let pending = [];
+
+  function showNewChanges(events) {
+    open('new');
     [...events].reverse().forEach((event) => {
       const rows = changesBody();
       rows.insertBefore(eventRows(event), rows.firstChild);
       shownCount += event.changes.length;
     });
     summary.textContent = `${shownCount} laptop price${shownCount === 1 ? '' : 's'} changed in NEW PRICING. The banners and Reco Table now use the new prices.`;
-    body.scrollTop = 0;
-    // SalesKit was in the background: the dot stays on the button until the changes are opened.
-    if (!document.hasFocus()) setUnseen(true);
+  }
+
+  window.saleskit.onPriceChanges((events) => {
+    if (!Array.isArray(events) || !events.length) return;
+    pending = pending.concat(events);
+    // The modal is already showing new changes: add these to it too.
+    if (backdrop && !filterBar) {
+      showNewChanges(pending);
+      pending = [];
+      return;
+    }
+    showCard();
+    setUnseen(true);
   });
+
+  // ---------- Summary card under the button ----------
+
+  let card = null;
+  const CARD_ROWS = 3;
+
+  function closeCard() {
+    if (card) card.remove();
+    card = null;
+  }
+
+  function showCard() {
+    if (!button || !pending.length) return;
+    closeCard();
+    const changes = pending.flatMap((event) => event.changes.map((change) => ({ ...change, at: event.at }))).reverse();
+    const latest = new Date(pending[pending.length - 1].at);
+    card = element('div', 'price-changes-card');
+    card.setAttribute('role', 'button');
+    card.tabIndex = 0;
+    card.title = 'Open the price changes';
+
+    const head = element('div', 'price-changes-card-head');
+    head.innerHTML = '<i class="bi bi-tags-fill" aria-hidden="true"></i>';
+    head.append(
+      element('b', '', `${changes.length} price change${changes.length === 1 ? '' : 's'}`),
+      element('small', '', latest.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }))
+    );
+    const dismiss = element('button', 'price-changes-card-close', '×');
+    dismiss.type = 'button';
+    dismiss.title = 'Close';
+    dismiss.setAttribute('aria-label', 'Close');
+    dismiss.addEventListener('click', (event) => {
+      event.stopPropagation();
+      closeCard();
+    });
+    head.appendChild(dismiss);
+
+    // The first few laptops with their cash price, old → new.
+    const list = element('ul');
+    changes.slice(0, CARD_ROWS).forEach((change) => {
+      const item = element('li');
+      const name = element('span', '', change.itemCode.replace(/^LAP-/i, ''));
+      name.title = change.itemCode;
+      const price = priceCell(change, 'cash');
+      const cash = element('span', price.className);
+      cash.append(...price.childNodes);
+      item.append(name, cash);
+      list.appendChild(item);
+    });
+    card.append(head, list);
+    if (changes.length > CARD_ROWS) {
+      const more = changes.length - CARD_ROWS;
+      card.appendChild(element('div', 'price-changes-card-more', `+ ${more} more laptop${more === 1 ? '' : 's'}`));
+    }
+    const view = element('button', 'price-changes-card-view', 'View details');
+    view.type = 'button';
+    card.appendChild(view);
+
+    const openDetails = () => {
+      const events = pending;
+      pending = [];
+      closeCard();
+      showNewChanges(events);
+    };
+    card.addEventListener('click', openDetails);
+    card.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openDetails();
+      }
+    });
+    button.parentElement.appendChild(card);
+    // Under the button, with the arrow pointing at it.
+    const wrapBox = button.parentElement.getBoundingClientRect();
+    const buttonBox = button.getBoundingClientRect();
+    card.style.right = `${Math.round(wrapBox.right - buttonBox.right)}px`;
+    card.style.setProperty('--arrow-right', `${Math.round(buttonBox.width / 2 - 7)}px`);
+  }
 
   // ---------- History, with a date filter ----------
 
@@ -575,7 +787,11 @@
     button.id = 'btnPriceChanges';
     button.title = 'Price changes from NEW PRICING';
     button.innerHTML = '<i class="bi bi-tags-fill" aria-hidden="true"></i><span>Price changes</span><span class="price-changes-dot" aria-hidden="true"></span>';
-    button.addEventListener('click', openHistory);
+    button.addEventListener('click', () => {
+      closeCard();
+      pending = [];
+      openHistory();
+    });
     wrap.append(button, modes);
   }
 
