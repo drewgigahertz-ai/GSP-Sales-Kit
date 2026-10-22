@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('salesKitServer', {
   getState: () => ipcRenderer.invoke('server:get-state'),
   getLogs: () => ipcRenderer.invoke('server:get-logs'),
   syncNow: () => ipcRenderer.invoke('server:sync-now'),
+  clearPriceChanges: () => ipcRenderer.invoke('server:clear-price-changes'),
   checkClientRelease: () => ipcRenderer.invoke('server:check-client-release'),
   chooseKey: () => ipcRenderer.invoke('server:choose-key'),
   updateSettings: (changes) => ipcRenderer.invoke('server:update-settings', changes),

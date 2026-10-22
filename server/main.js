@@ -141,6 +141,7 @@ function getState() {
     serviceAccountPath: settings.serviceAccountPath,
     spreadsheetId: settings.spreadsheetId,
     pricingSpreadsheetId: settings.pricingSpreadsheetId,
+    priceChangeCount: priceWatch ? priceWatch.count() : 0,
     syncIntervalMinutes: settings.syncIntervalMinutes,
     autoStart: settings.autoStart,
     syncing: Boolean(activeSync),
@@ -568,6 +569,14 @@ ipcMain.handle('server:check-client-release', async () => {
   await clientRelease.checkNow();
   return getState();
 });
+// Clears the price-change history on every laptop (their Price changes list reads it from here).
+ipcMain.handle('server:clear-price-changes', async () => {
+  if (priceWatch) priceWatch.clear();
+  log('info', 'Price-change history cleared');
+  pushState();
+  return getState();
+});
+
 ipcMain.handle('server:sync-now', async () => {
   await syncNow();
   return getState();

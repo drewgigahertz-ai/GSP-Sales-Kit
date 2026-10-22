@@ -187,7 +187,16 @@ function renderData() {
   });
 }
 
+function renderPriceChanges() {
+  const count = state.priceChangeCount || 0;
+  $('priceChangesHeadline').textContent = count
+    ? `${count} price update${count === 1 ? '' : 's'} kept (last 30 days)`
+    : 'No price changes kept';
+  $('clearPriceChanges').disabled = !count;
+}
+
 function renderClientRelease() {
+  renderPriceChanges();
   const release = state.clientRelease;
   if (!release) return;
   $('clientReleaseHeadline').textContent = release.version
@@ -718,6 +727,10 @@ $('openBackups').addEventListener('click', (event) => run(event.currentTarget, a
 // ---------- Events ----------
 
 $('syncNow').addEventListener('click', () => run(null, api.syncNow));
+$('clearPriceChanges').addEventListener('click', (event) => {
+  if (!window.confirm('Clear the price-change history on every laptop?')) return;
+  run(event.currentTarget, api.clearPriceChanges, 'Price-change history cleared').then((next) => next && render(next));
+});
 $('checkClientRelease').addEventListener('click', (event) => run(event.currentTarget, api.checkClientRelease).then((next) => next && render(next)));
 $('chooseKey').addEventListener('click', (event) => run(event.currentTarget, api.chooseKey).then((next) => next && render(next)));
 $('copyToken').addEventListener('click', (event) => run(event.currentTarget, api.copyToken, 'Token copied'));

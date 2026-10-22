@@ -10,6 +10,13 @@ const CHECK_INTERVAL_MS = 60 * 1000;
 const KEEP_DAYS = 30;
 const MAX_EVENTS = 300;
 const PRICE_FIELDS = ['cash', 'srp', 'twelveMonths'];
+// While the sheet is being cleared, refilled or still loading, a read has fewer rows than before. Such a read is
+// ignored when it has under 90% of the known rows; a single row that disappears only counts as removed after it
+// has been missing for 15 minutes, so rows that come back with the same prices announce nothing.
+const MIN_ROWS_SHARE = 0.9;
+const REMOVE_AFTER_MS = 15 * 60 * 1000;
+// More than half the rows new (or removed) at once is the sheet being reloaded, not price changes: taken in silently.
+const BULK_SHARE = 0.5;
 
 // NEW PRICING rows → { key: { itemCode, branch, promoTitle, cash, srp, twelveMonths } }. key: item + branch + promo
 // title, so a laptop listed for several branches or promos is followed row by row.
@@ -81,18 +88,45 @@ function createPriceWatch({ filePath, readValues, onChange = () => {}, log = () 
     try {
       const snapshot = snapshotOf(await readValues());
       const count = Object.keys(snapshot).length;
-      const previousCount = state.snapshot ? Object.keys(state.snapshot).length : 0;
-      // A read that comes back mostly empty (the sheet is still loading its IMPORTRANGE, or failed) is not a
-      // price change; the next check tries again.
-      if (!count || (previousCount && count < previousCount / 2)) return null;
+      const known = state.snapshot ? Object.keys(state.snapshot).length : 0;
+      const now = Date.now();
+      if (!count) return null;
+      // The sheet is being cleared or is still loading: the known prices stay, the next check tries again. A sheet
+      // that stays this much smaller for 15 minutes really lost those rows, and is taken as it is.
+      if (known && count < known * MIN_ROWS_SHARE) {
+        state.shrunkSince = state.shrunkSince || now;
+        if (now - state.shrunkSince < REMOVE_AFTER_MS) return null;
+      } else {
+        state.shrunkSince = null;
+      }
       if (!state.snapshot) {
         // First check: remember the prices, nothing to announce.
         state.snapshot = snapshot;
+        state.missing = {};
         save();
         return null;
       }
-      const changes = diff(state.snapshot, snapshot);
-      state.snapshot = snapshot;
+      // Rows missing from this read stay known (with their last prices) until they have been gone for 15 minutes.
+      const missing = {};
+      const next = { ...snapshot };
+      for (const [key, row] of Object.entries(state.snapshot)) {
+        if (snapshot[key]) continue;
+        const since = (state.missing && state.missing[key]) || now;
+        if (now - since < REMOVE_AFTER_MS) {
+          next[key] = row;
+          missing[key] = since;
+        }
+      }
+      const changes = diff(state.snapshot, next);
+      state.snapshot = next;
+      state.missing = missing;
+      const added = changes.filter((change) => change.kind === 'added').length;
+      const removed = changes.filter((change) => change.kind === 'removed').length;
+      if (added > count * BULK_SHARE || removed > known * BULK_SHARE) {
+        save();
+        log('info', `Pricing sheet reloaded (${added} rows added, ${removed} removed at once); not announced as price changes`);
+        return null;
+      }
       if (!changes.length) {
         save();
         return null;
@@ -125,6 +159,13 @@ function createPriceWatch({ filePath, readValues, onChange = () => {}, log = () 
     },
     check,
     latestId: () => state.nextId - 1,
+    count: () => state.events.length,
+    // Clears the price-change history (every laptop's list). The current prices stay as the starting point, so
+    // nothing is announced again; ids keep counting up, so laptops do not mistake old changes for new ones.
+    clear() {
+      state.events = [];
+      save();
+    },
     // Events after the given id (newest last).
     since: (id) => state.events.filter((event) => event.id > Number(id || 0))
   };
