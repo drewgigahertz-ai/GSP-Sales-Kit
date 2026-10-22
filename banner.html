@@ -455,11 +455,12 @@
     }
 
     /* One or more promo pictures (automatic from the price sheet, or picked by hand). */
+    /* The whole space between the 12 MOS. bar and "AS LOW AS", so wide promo pictures show large. */
     .promo-pictures {
-      top: 505px;
-      left: 265px;
-      width: 280px;
-      height: 220px;
+      top: 528px;
+      left: 110px;
+      width: 700px;
+      height: 215px;
       display: grid;
       gap: 6px;
       place-items: center;
@@ -1363,7 +1364,8 @@
       setPicture($('ageingBanner'), item.ageingBanner, `${item.itemCode} clearance banner`);
 
       $('selectedItem').textContent = item.itemCode;
-      $('stage').dataset.segment = item.segment || '';
+      // A picked branch follows that branch's segment for the laptop (RECO TABLE TARGET MARKET).
+      $('stage').dataset.segment = (selectedBranch && item.segmentByBranch && item.segmentByBranch[selectedBranch]) || item.segment || '';
       $('bannerTitle').textContent = item.brandModel || item.itemCode;
       setText('brandName', item.brand);
       setText('partNumber', item.partNumber);

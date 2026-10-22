@@ -251,7 +251,10 @@ function buildBannerData(rows, imageUrl = (value) => value, now = new Date()) {
   const ageingByItem = new Map((rows.ageing || []).map((row) => [matchKey(row.item_code), row.banner]));
   // RECO TABLE: a laptop listed under several target markets takes the one it appears in most often
   // (the first listed on a tie).
+  // A laptop can be in different segments at different branches: segmentByBranch keeps each branch's
+  // (BR) target market, which the Banner page follows when that branch is picked.
   const recoSegments = new Map();
+  const branchSegments = new Map();
   for (const row of rows.reco || []) {
     const key = matchKey(row['ITEM DESCRIPTION']);
     const segment = segmentKey(row['TARGET MARKET']);
@@ -259,6 +262,11 @@ function buildBannerData(rows, imageUrl = (value) => value, now = new Date()) {
     if (!recoSegments.has(key)) recoSegments.set(key, new Map());
     const counts = recoSegments.get(key);
     counts.set(segment, (counts.get(segment) || 0) + 1);
+    const branch = text(row.BR).toUpperCase();
+    if (!branch) continue;
+    if (!branchSegments.has(key)) branchSegments.set(key, {});
+    const byBranch = branchSegments.get(key);
+    if (!byBranch[branch]) byBranch[branch] = segment;
   }
   const segmentOf = (laptop, key) => segmentKey(laptop.segment)
     || [...(recoSegments.get(key) || new Map())].reduce((best, entry) => (!best || entry[1] > best[1] ? entry : best), null)?.[0]
@@ -355,6 +363,7 @@ function buildBannerData(rows, imageUrl = (value) => value, now = new Date()) {
       brandModel: laptop.brand_model || [laptop.brand, laptop.model].filter(Boolean).join(' '),
       partNumber: laptop.part_number,
       segment: segmentOf(laptop, key),
+      segmentByBranch: branchSegments.get(key) || {},
       brandPicture: picture(laptop.brand_pic, 'brand', laptop.brand),
       specs: specsByItem.get(key) || {},
       // Regular price (all branches); SalesKit 1.0.11 and older only know these fields.
