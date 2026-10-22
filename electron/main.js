@@ -182,6 +182,10 @@ function startDataChangeChecks() {
 
 // ---------- Price changes ----------
 
+// Price-change notices are switched off while the NEW PRICING sheet is being fixed. To bring them back, set this
+// to true, put price-notify.js back in saleskit.html and turn PRICE_WATCH on in server/main.js.
+const PRICE_NOTICES = false;
+
 let priceStream = null;
 
 // A price change pushed by the server: the window reloads its data and shows what changed; when SalesKit is
@@ -437,7 +441,7 @@ app.whenReady().then(() => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update:status', status);
   }, { onBeforeInstall: () => updateResume.save(session) });
   startDataChangeChecks();
-  startPriceStream();
+  if (PRICE_NOTICES) startPriceStream();
   activityReporter = createActivityReporter({
     send: (report) => requestServer('/api/activity', { method: 'POST', body: report, timeoutMs: 5000 }),
     getWindow: () => mainWindow,
