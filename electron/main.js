@@ -11,7 +11,7 @@ const { createLogoCache } = require('./logo-cache');
 const { createDataLoader } = require('./data-loader');
 const { createActivityReporter } = require('./activity');
 const { getDeviceInfo } = require('./device-info');
-const { createPriceStream } = require('./price-stream');
+const { createPriceStream, changesForUser } = require('./price-stream');
 
 // SalesKit is a client: it loads its data from the SalesKit Server, which does the Google Sheets sync.
 
@@ -206,6 +206,15 @@ function showPriceChanges(events) {
   });
   notification.show();
 }
+
+// The "Price changes" button: the last 30 days of changes for this user's branch, oldest first.
+ipcMain.handle('prices:history', async () => {
+  const { events = [] } = await requestServer('/api/price-changes?since=0');
+  const user = session ? session.user : null;
+  return events
+    .map((event) => ({ ...event, changes: changesForUser(event.changes || [], user) }))
+    .filter((event) => event.changes.length);
+});
 
 function startPriceStream() {
   priceStream = createPriceStream({

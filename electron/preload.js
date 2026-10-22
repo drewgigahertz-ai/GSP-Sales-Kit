@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('saleskit', {
     return () => ipcRenderer.removeListener('update:status', listener);
   },
   // [{ id, at, changes: [{ kind, itemCode, branch, promoTitle, before, after }] }] (see electron/price-stream.js).
+  getPriceChanges: () => ipcRenderer.invoke('prices:history'),
   onPriceChanges: (callback) => {
     const listener = (_event, events) => callback(events);
     ipcRenderer.on('prices:changed', listener);
