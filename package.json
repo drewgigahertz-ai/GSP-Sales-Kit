@@ -54,6 +54,7 @@
       "hotkeys.js",
       "presentation-jump.js",
       "price-notify.js",
+      "updates.js",
       "package.json"
     ],
     "publish": {
