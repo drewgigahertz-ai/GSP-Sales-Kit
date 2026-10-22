@@ -998,7 +998,7 @@
         <span id="selectedItem" class="small flex-grow-1 text-muted text-truncate">Select a laptop to generate its banner</span>
         <label class="promo-select" id="promoSelectWrap" for="promoSelect" hidden>
           Promo
-          <select id="promoSelect" title="Promo title for this laptop (NEW PRICING rows)"></select>
+          <select id="promoSelect" title="Promo title for this laptop"></select>
         </label>
         <span id="bannerStatus" class="small text-muted" aria-live="polite"></span>
         <button id="refreshBannerButton" type="button" title="Load the latest data from the SalesKit server">
@@ -1217,7 +1217,7 @@
         const empty = document.createElement('div');
         empty.className = 'empty-message';
         empty.textContent = !bannerItems.length
-          ? 'No Banner data yet. It comes from the LAPTOP RAW, BANNER SPECS, DB PHOTOS and NEW PRICING sheets through the SalesKit server.'
+          ? 'No Banner data yet. Click Refresh data, or check the connection to the server.'
           : selectedBranch && showPromoOnly ? `No matching item codes with a ${selectedBranch} promo in stock there.`
             : selectedBranch ? `No matching item codes in stock at ${selectedBranch}.`
               : 'No matching item codes with prices.';

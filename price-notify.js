@@ -591,7 +591,7 @@
       rows.insertBefore(eventRows(event), rows.firstChild);
       shownCount += event.changes.length;
     });
-    summary.textContent = `${shownCount} laptop price${shownCount === 1 ? '' : 's'} changed in NEW PRICING. The banners and Reco Table now use the new prices.`;
+    summary.textContent = `${shownCount} laptop price${shownCount === 1 ? '' : 's'} changed. The banners and Reco Table now use the new prices.`;
   }
 
   window.saleskit.onPriceChanges((events) => {
@@ -785,7 +785,7 @@
     button = element('button', 'btn btn-sm price-changes-button');
     button.type = 'button';
     button.id = 'btnPriceChanges';
-    button.title = 'Price changes from NEW PRICING';
+    button.title = 'Recent price changes';
     button.innerHTML = '<i class="bi bi-tags-fill" aria-hidden="true"></i><span>Price changes</span><span class="price-changes-dot" aria-hidden="true"></span>';
     button.addEventListener('click', () => {
       closeCard();

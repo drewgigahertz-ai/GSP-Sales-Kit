@@ -11,21 +11,21 @@
         'Banner: the banner colour follows the picked branch\'s segment.',
         'Banner: bigger promo pictures.',
         'Price changes are back: a summary card under the Price changes button, and the full list with a date filter.',
-        'Prices are read from the GST PRICING spreadsheet, so syncing is faster.',
+        'Prices load faster.',
         'Updates button: this list.'
       ]
     },
     {
       version: '1.0.14',
       date: 'October 22, 2026',
-      changes: ['Price-change notices paused while the NEW PRICING sheet was being fixed.']
+      changes: ['Price-change notices paused for maintenance.']
     },
     {
       version: '1.0.13',
       date: 'October 22, 2026',
       changes: [
         'New name: Gigahertz Sales Tools.',
-        'All prices come from the NEW PRICING sheet (Banner, Reco Table and Sales Kit).',
+        'New pricing source for the Banner, Reco Table and Sales Kit.',
         'Price changes: a notice when prices change, and a Price changes button with the last 30 days.',
         'Banner: cash price colour by segment (Productivity, Performance, Entry, AAA Gamers, Casual Gamers).',
         'Banner: steps on the left (Branch, Laptop); the promo title dropdown above the banner switches the promo, prices and price details.',
@@ -49,7 +49,7 @@
       date: 'October 15, 2026',
       changes: [
         'Branch accounts start on SMT with their branch; OSD (all locations) asks first.',
-        'Banner: promo picture from the price sheet; ageing promos show the clearance banner.'
+        'Banner: the promo picture follows each laptop\'s promo; ageing promos show the clearance banner.'
       ]
     }
   ];
