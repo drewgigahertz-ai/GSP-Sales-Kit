@@ -3,25 +3,16 @@
 // onEvents. After (re)connecting, the changes this laptop missed are fetched from /api/price-changes.
 // The id of the last change shown is kept on the laptop, so a change is announced only once. A newly
 // installed SalesKit starts from the current change and does not show the history.
+// Every price change is shown to every branch (branch-only rows included).
 const fs = require('node:fs');
 const path = require('node:path');
 
 const RETRY_MIN_MS = 5 * 1000;
 const RETRY_MAX_MS = 60 * 1000;
-const FULL_ACCESS_BRANCHES = ['ALL', 'HO'];
-
-// The changes that matter to this user: every branch for ALL and HO accounts; otherwise regular prices
-// (no branch) and the user's own branch.
-function changesForUser(changes, user) {
-  const branch = String((user && user.branch) || '').trim().toUpperCase();
-  if (!branch || FULL_ACCESS_BRANCHES.includes(branch)) return changes;
-  return changes.filter((change) => !change.branch
-    || change.branch.split(',').map((name) => name.trim().toUpperCase()).includes(branch));
-}
 
 // getConnection(): { urls, headers } for the server, or null while nobody is signed in.
-// requestServer(pathname): a JSON request to the server (main.js). getUser(): the signed-in user.
-function createPriceStream({ filePath, getConnection, requestServer, getUser, onEvents }) {
+// requestServer(pathname): a JSON request to the server (main.js).
+function createPriceStream({ filePath, getConnection, requestServer, onEvents }) {
   let lastSeenId = null;
   try {
     lastSeenId = JSON.parse(fs.readFileSync(filePath, 'utf8')).lastSeenId ?? null;
@@ -40,10 +31,7 @@ function createPriceStream({ filePath, getConnection, requestServer, getUser, on
     const fresh = events.filter((event) => lastSeenId === null || event.id > lastSeenId);
     if (!fresh.length) return;
     remember(Math.max(...fresh.map((event) => event.id)));
-    const user = getUser();
-    const shown = fresh
-      .map((event) => ({ ...event, changes: changesForUser(event.changes || [], user) }))
-      .filter((event) => event.changes.length);
+    const shown = fresh.filter((event) => (event.changes || []).length);
     if (shown.length) onEvents(shown);
   }
 
@@ -141,4 +129,4 @@ function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-module.exports = { createPriceStream, changesForUser };
+module.exports = { createPriceStream };
