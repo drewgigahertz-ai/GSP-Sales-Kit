@@ -56,14 +56,34 @@
 
     .price-notice-body {
       overflow: auto;
-      padding: 6px 22px 10px;
+      padding: 0 22px 10px;
     }
 
-    .price-notice-time {
-      margin: 16px 0 8px;
+    /* Date and time on every row, so each change sits next to its laptop. */
+    .price-notice-table td.price-notice-time {
+      width: 120px;
+      color: #475569;
+      font-size: .78rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .price-notice-time b {
+      display: block;
       color: #0012b3;
       font-size: .9rem;
       font-weight: 800;
+    }
+
+    /* A new update (another time) starts with a stronger line. */
+    .price-notice-table tr.event-start td {
+      border-top: 2px solid #c7d4ea;
+    }
+
+    .price-notice-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
     }
 
     .price-notice-table {
@@ -336,31 +356,45 @@
     return cell;
   }
 
-  function eventSection(event) {
-    const section = document.createDocumentFragment();
-    section.appendChild(element('div', 'price-notice-time', `Price change · ${when(event.at)}`));
+  // One table for all changes: DATE & TIME, LAPTOP, then the prices.
+  function changesBody() {
+    const existing = body.querySelector('.price-notice-table tbody');
+    if (existing) return existing;
     const table = element('table', 'price-notice-table');
     const head = table.createTHead().insertRow();
-    head.appendChild(element('th', '', 'LAPTOP'));
+    head.append(element('th', '', 'DATE & TIME'), element('th', '', 'LAPTOP'));
     COLUMNS.forEach(({ title, note }) => {
       const th = element('th', '', title);
       if (note) th.appendChild(element('small', '', note));
       head.appendChild(th);
     });
-    const rows = table.createTBody();
-    event.changes.forEach((change) => {
-      const row = rows.insertRow();
+    body.appendChild(table);
+    return table.createTBody();
+  }
+
+  // The rows of one price change, each with its date and time.
+  function eventRows(event) {
+    const rows = document.createDocumentFragment();
+    const date = new Date(event.at);
+    event.changes.forEach((change, index) => {
+      const row = element('tr', index === 0 ? 'event-start' : '');
+      const time = element('td', 'price-notice-time');
+      time.title = `Changed ${when(event.at)}`;
+      time.append(
+        element('b', '', date.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })),
+        document.createTextNode(date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }))
+      );
       const item = element('td', 'price-notice-item');
       if (change.kind === 'added') item.appendChild(element('span', 'price-notice-tag', 'New'));
       if (change.kind === 'removed') item.appendChild(element('span', 'price-notice-tag removed', 'Removed'));
       item.appendChild(document.createTextNode(change.itemCode));
       const details = [change.promoTitle, change.branch ? `${change.branch} only` : ''].filter(Boolean).join(' · ');
       if (details) item.appendChild(element('small', '', details));
-      row.appendChild(item);
+      row.append(time, item);
       COLUMNS.forEach(({ field }) => row.appendChild(priceCell(change, field)));
+      rows.appendChild(row);
     });
-    section.appendChild(table);
-    return section;
+    return rows;
   }
 
   function close() {
@@ -429,7 +463,8 @@
     if (!Array.isArray(events) || !events.length) return;
     if (!backdrop || filterBar) open('new');
     [...events].reverse().forEach((event) => {
-      body.insertBefore(eventSection(event), body.firstChild);
+      const rows = changesBody();
+      rows.insertBefore(eventRows(event), rows.firstChild);
       shownCount += event.changes.length;
     });
     summary.textContent = `${shownCount} laptop price${shownCount === 1 ? '' : 's'} changed in NEW PRICING. The banners and Reco Table now use the new prices.`;
@@ -499,7 +534,10 @@
       return (!from || at >= from) && (!to || at < to);
     });
     body.replaceChildren();
-    shown.slice().reverse().forEach((event) => body.appendChild(eventSection(event)));
+    if (shown.length) {
+      const rows = changesBody();
+      shown.slice().reverse().forEach((event) => rows.appendChild(eventRows(event)));
+    }
     const count = shown.reduce((total, event) => total + event.changes.length, 0);
     summary.textContent = count
       ? `${count} laptop price${count === 1 ? '' : 's'} changed in ${shown.length} update${shown.length === 1 ? '' : 's'}.`
