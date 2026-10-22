@@ -12,6 +12,11 @@ const KEEP_REPEATED_HEADERS = new Set(['SPECS']);
 // Sheets whose first header cell is left blank in the spreadsheet.
 const FIRST_COLUMN_HEADERS = {};
 const DEFAULT_SPREADSHEET_ID = '1qACk3I6yMwmIYauQFlcM3yryRcyIrx3bLYqmJZ2wVFE';
+// NEW PRICING lives in its own spreadsheet ("GST PRICING"), which is much faster to read than the main one.
+const DEFAULT_PRICING_SPREADSHEET_ID = '1lUYiVdyuYMBZ0t3m0tkwxb35-2yyojI9Azu6CKJtuw0';
+// A Google request that takes longer fails (the sync is then retried on schedule) instead of waiting forever,
+// which happens while a slow spreadsheet is still recalculating its formulas.
+const REQUEST_TIMEOUT_MS = 3 * 60 * 1000;
 const { BANNER_SHEETS, normalizeBannerSheets } = require('./banner-data');
 const { FEATURES_BANNER_SHEET, featuresBannerCollection } = require('./feature-banners');
 const { AGEING_BANNER_SHEET, ageingBannerCollection } = require('./ageing-banners');
@@ -69,7 +74,9 @@ function normalizeSheetValues(sheetName, values = []) {
   return { collection: collectionName(sheetName), columns, rows };
 }
 
-async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_SPREADSHEET_ID }, onProgress = () => {}) {
+// pricingSpreadsheetId (optional): where the NEW PRICING tab is read from; the main spreadsheet is used when it
+// is empty or has no such tab.
+async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_SPREADSHEET_ID, pricingSpreadsheetId = '' }, onProgress = () => {}) {
   if (!credentialsPath) throw new Error('Set GOOGLE_APPLICATION_CREDENTIALS to a Sheets API service-account JSON file.');
   if (!spreadsheetId) throw new Error('Set SALESKIT_SPREADSHEET_ID to the source spreadsheet ID.');
 
@@ -78,7 +85,7 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
     keyFile: credentialsPath,
     scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
   });
-  const sheets = google.sheets({ version: 'v4', auth });
+  const sheets = google.sheets({ version: 'v4', auth, timeout: REQUEST_TIMEOUT_MS });
   const result = {};
 
   for (let index = 0; index < SHEETS.length; index++) {
@@ -126,12 +133,24 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
   // Banner page sheets. A missing tab is skipped (the Banner page then has no data) instead of failing the sync.
   const metadata = await sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets(properties(title))' });
   const titles = (metadata.data.sheets || []).map((sheet) => sheet.properties.title);
+  let pricingTitles = [];
+  if (pricingSpreadsheetId && pricingSpreadsheetId !== spreadsheetId) {
+    try {
+      const pricing = await sheets.spreadsheets.get({ spreadsheetId: pricingSpreadsheetId, fields: 'sheets(properties(title))' });
+      pricingTitles = (pricing.data.sheets || []).map((sheet) => sheet.properties.title);
+    } catch (error) {
+      onProgress({ phase: 'warning', message: `Pricing spreadsheet could not be read (${error.message}); using the main spreadsheet.` });
+    }
+  }
   const bannerValues = {};
   for (const sheetName of Object.values(BANNER_SHEETS)) {
-    const title = titles.find((name) => name.trim().toUpperCase() === sheetName);
+    const pricingTitle = sheetName === BANNER_SHEETS.banner_prices
+      ? pricingTitles.find((name) => name.trim().toUpperCase() === sheetName)
+      : null;
+    const title = pricingTitle || titles.find((name) => name.trim().toUpperCase() === sheetName);
     if (!title) continue;
     const response = await sheets.spreadsheets.values.get({
-      spreadsheetId,
+      spreadsheetId: pricingTitle ? pricingSpreadsheetId : spreadsheetId,
       range: `'${title.replace(/'/g, "''")}'!A:CZ`,
       valueRenderOption: 'UNFORMATTED_VALUE',
       dateTimeRenderOption: 'FORMATTED_STRING'
@@ -170,7 +189,7 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
 async function fetchSheetValues({ credentialsPath, spreadsheetId = DEFAULT_SPREADSHEET_ID }, sheetName) {
   const { google } = require('googleapis');
   const auth = new google.auth.GoogleAuth({ keyFile: credentialsPath, scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'] });
-  const sheets = google.sheets({ version: 'v4', auth });
+  const sheets = google.sheets({ version: 'v4', auth, timeout: REQUEST_TIMEOUT_MS });
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: `'${sheetName.replace(/'/g, "''")}'!A:Z`,
@@ -179,4 +198,4 @@ async function fetchSheetValues({ credentialsPath, spreadsheetId = DEFAULT_SPREA
   return response.data.values || [];
 }
 
-module.exports = { DEFAULT_SPREADSHEET_ID, SHEETS, fetchSpreadsheetData, fetchSheetValues, normalizeSheetValues };
+module.exports = { DEFAULT_SPREADSHEET_ID, DEFAULT_PRICING_SPREADSHEET_ID, SHEETS, fetchSpreadsheetData, fetchSheetValues, normalizeSheetValues };

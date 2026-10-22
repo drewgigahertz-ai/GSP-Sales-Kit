@@ -150,6 +150,7 @@ function renderSettings() {
   keyPath.classList.toggle('key-missing', !state.serviceAccountPath);
   if (settingsDirty) return;
   $('spreadsheetId').value = state.spreadsheetId;
+  $('pricingSpreadsheetId').value = state.pricingSpreadsheetId || '';
   const interval = $('syncInterval');
   if (![...interval.options].some((option) => Number(option.value) === state.syncIntervalMinutes)) {
     interval.add(new Option(`${state.syncIntervalMinutes} minutes`, state.syncIntervalMinutes));
@@ -732,6 +733,7 @@ $('settingsForm').addEventListener('submit', async (event) => {
   const button = event.submitter;
   const next = await run(button, () => api.updateSettings({
     spreadsheetId: $('spreadsheetId').value,
+    pricingSpreadsheetId: $('pricingSpreadsheetId').value,
     syncIntervalMinutes: Number($('syncInterval').value),
     port: Number($('port').value),
     autoStart: $('autoStart').checked,

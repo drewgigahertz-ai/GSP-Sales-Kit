@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const database = require('../electron/database');
-const { DEFAULT_SPREADSHEET_ID, fetchSpreadsheetData, fetchSheetValues } = require('../electron/sheets-sync');
+const { DEFAULT_SPREADSHEET_ID, DEFAULT_PRICING_SPREADSHEET_ID, fetchSpreadsheetData, fetchSheetValues } = require('../electron/sheets-sync');
 const { createLocalApi } = require('../electron/local-api');
 const { createDeviceRegistry, deviceKey } = require('./devices');
 const { createActivityLog } = require('./activity');
@@ -82,6 +82,8 @@ function loadSettings() {
   const loaded = {
     serviceAccountPath: saved?.serviceAccountPath || legacyServiceAccountPath(),
     spreadsheetId: saved?.spreadsheetId || process.env.SALESKIT_SPREADSHEET_ID || DEFAULT_SPREADSHEET_ID,
+    // NEW PRICING's own spreadsheet; blank = the NEW PRICING tab of the main spreadsheet.
+    pricingSpreadsheetId: typeof saved?.pricingSpreadsheetId === 'string' ? saved.pricingSpreadsheetId : DEFAULT_PRICING_SPREADSHEET_ID,
     syncIntervalMinutes: Number(saved?.syncIntervalMinutes) || 15,
     port: Number(saved?.port) || DEFAULT_PORT,
     token: saved?.token || embedded.serverToken || crypto.randomBytes(24).toString('hex'),
@@ -138,6 +140,7 @@ function getState() {
     tokenPreview: maskToken(settings.token),
     serviceAccountPath: settings.serviceAccountPath,
     spreadsheetId: settings.spreadsheetId,
+    pricingSpreadsheetId: settings.pricingSpreadsheetId,
     syncIntervalMinutes: settings.syncIntervalMinutes,
     autoStart: settings.autoStart,
     syncing: Boolean(activeSync),
@@ -374,8 +377,13 @@ async function runSync(reason) {
   try {
     const sheets = await fetchSpreadsheetData({
       credentialsPath: settings.serviceAccountPath,
-      spreadsheetId: settings.spreadsheetId
+      spreadsheetId: settings.spreadsheetId,
+      pricingSpreadsheetId: settings.pricingSpreadsheetId
     }, (progress) => {
+      if (progress.phase === 'warning') {
+        log('warning', progress.message);
+        return;
+      }
       syncProgress = progress;
       send('server:sync-progress', progress);
     });
@@ -428,7 +436,7 @@ function startPriceWatch() {
     filePath: path.join(app.getPath('userData'), 'price-changes.json'),
     readValues: async () => {
       if (!settings.serviceAccountPath || !fs.existsSync(settings.serviceAccountPath)) return [];
-      return fetchSheetValues({ credentialsPath: settings.serviceAccountPath, spreadsheetId: settings.spreadsheetId }, 'NEW PRICING');
+      return fetchSheetValues({ credentialsPath: settings.serviceAccountPath, spreadsheetId: settings.pricingSpreadsheetId || settings.spreadsheetId }, 'NEW PRICING');
     },
     onChange: announcePriceChange,
     log
@@ -591,12 +599,24 @@ ipcMain.handle('server:choose-key', async () => {
   return getState();
 });
 
+// A pasted Google Sheets link or a bare ID → the ID.
+function spreadsheetIdFrom(value) {
+  const text = String(value || '').trim();
+  const match = text.match(/\/spreadsheets\/d\/([\w-]+)/);
+  return match ? match[1] : text;
+}
+
 ipcMain.handle('server:update-settings', async (_event, changes = {}) => {
   const previous = { ...settings };
   if (changes.spreadsheetId !== undefined) {
-    const id = String(changes.spreadsheetId).trim();
+    const id = spreadsheetIdFrom(changes.spreadsheetId);
     if (!/^[\w-]{20,}$/.test(id)) throw new Error('Enter a valid spreadsheet ID.');
     settings.spreadsheetId = id;
+  }
+  if (changes.pricingSpreadsheetId !== undefined) {
+    const id = spreadsheetIdFrom(changes.pricingSpreadsheetId);
+    if (id && !/^[\w-]{20,}$/.test(id)) throw new Error('Enter a valid pricing spreadsheet link or ID, or leave it blank.');
+    settings.pricingSpreadsheetId = id;
   }
   if (changes.syncIntervalMinutes !== undefined) {
     const minutes = Number(changes.syncIntervalMinutes);
@@ -624,6 +644,7 @@ ipcMain.handle('server:update-settings', async (_event, changes = {}) => {
   if (settings.syncIntervalMinutes !== previous.syncIntervalMinutes) scheduleSync();
   if (settings.autoStart !== previous.autoStart) applyAutoStart();
   if (settings.spreadsheetId !== previous.spreadsheetId) log('info', 'Spreadsheet ID updated.');
+  if (settings.pricingSpreadsheetId !== previous.pricingSpreadsheetId) log('info', 'Pricing spreadsheet updated.');
   pushState();
   return getState();
 });
