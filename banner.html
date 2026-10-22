@@ -8,6 +8,7 @@
        so it also works offline. -->
   <link href="./node_modules/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="./node_modules/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+  <script src="./node_modules/html2canvas/dist/html2canvas.min.js"></script>
   <link href="./node_modules/@fontsource/outfit/400.css" rel="stylesheet">
   <link href="./node_modules/@fontsource/outfit/500.css" rel="stylesheet">
   <link href="./node_modules/@fontsource/outfit/600.css" rel="stylesheet">
@@ -52,6 +53,7 @@
     }
 
     #refreshBannerButton,
+    #downloadBannerButton,
     #fullscreenButton {
       display: inline-flex;
       min-height: 32px;
@@ -73,6 +75,7 @@
     }
 
     #refreshBannerButton:hover,
+    #downloadBannerButton:hover:not(:disabled),
     #fullscreenButton:hover {
       transform: translateY(-1px);
       border-color: #001a66;
@@ -81,6 +84,7 @@
     }
 
     #refreshBannerButton:focus-visible,
+    #downloadBannerButton:focus-visible,
     #fullscreenButton:focus-visible,
     #clearSearch:focus-visible {
       outline: 3px solid rgba(0, 62, 203, .28);
@@ -571,6 +575,24 @@
       cursor: not-allowed;
     }
 
+    #downloadBannerButton:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+
+    /* Stock at the selected branch, in the laptop list. */
+    .stock-tag {
+      display: inline-block;
+      margin-right: 6px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: #dcfce7;
+      color: #166534;
+      font-size: .58rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
     .list-part-number {
       display: block;
       color: #475569;
@@ -947,7 +969,7 @@
         <div class="filter-step">
           <label class="search-label" for="branchSelect"><span class="step-number">1</span>Branch</label>
           <select id="branchSelect">
-            <option value="">All branches · regular price</option>
+            <option value="">All branches</option>
           </select>
           <label class="price-filter disabled" for="promoOnly">
             <input id="promoOnly" type="checkbox" disabled>
@@ -985,6 +1007,9 @@
           <button type="button" data-view="ageing">Clearance banner</button>
           <button type="button" data-view="generated">Generated banner</button>
         </div>
+        <button id="downloadBannerButton" type="button" title="Download this banner (Ctrl+D)" disabled>
+          <i class="bi bi-download" aria-hidden="true"></i> Download
+        </button>
         <button id="fullscreenButton" type="button" aria-label="Enter fullscreen">
           <i class="bi bi-fullscreen" aria-hidden="true"></i> Fullscreen
         </button>
@@ -1065,7 +1090,8 @@
         showLogo(event.data.logo);
         const data = event.data.data || {};
         bannerItems = Array.isArray(data.items) ? data.items : [];
-        loadBranches(Array.isArray(data.branches) ? data.branches : [], event.data.homeBranch);
+        loadBranches(Array.isArray(data.branches) ? data.branches : [], event.data.homeBranch,
+          Array.isArray(data.stockBranches) ? data.stockBranches : []);
         loadItemList({ keepScroll: true });
         if (currentItemCode) selectItem(currentItemCode);
       } else if (channel === 'saleskit-banner-image') {
@@ -1154,6 +1180,11 @@
       return chosen || branchPrice(item) || item;
     }
 
+    // Units of this laptop at the selected branch (0 when none or unknown).
+    function stockAt(item) {
+      return (selectedBranch && item.stock && Number(item.stock[selectedBranch])) || 0;
+    }
+
     // Laptops with a promo for the selected branch are listed first.
     function matchingItems() {
       const query = $('productSearch').value.trim().replace(/\s+/g, ' ').toLowerCase();
@@ -1161,6 +1192,8 @@
         const price = priceFor(item);
         // Only laptops with a price (or a clearance banner) are listed.
         if (!price.hasPrice && !price.ageingOnly) return false;
+        // A branch shows only the laptops in stock there.
+        if (selectedBranch && !stockAt(item)) return false;
         if (selectedBranch && showPromoOnly && !branchPrice(item)) return false;
         if (!query) return true;
         return [item.itemCode, item.brandModel, item.partNumber, item.modelCode].some((value) => String(value || '').toLowerCase().includes(query));
@@ -1172,7 +1205,7 @@
     // filter starts from the top.
     function loadItemList({ keepScroll = false } = {}) {
       const visibleRows = matchingItems();
-      $('count').textContent = `${visibleRows.length} item code${visibleRows.length === 1 ? '' : 's'}`;
+      $('count').textContent = `${visibleRows.length} item code${visibleRows.length === 1 ? '' : 's'}${selectedBranch ? ` in stock at ${selectedBranch}` : ''}`;
       const list = $('list');
       const scrollTop = keepScroll ? list.scrollTop : 0;
       list.replaceChildren();
@@ -1184,8 +1217,9 @@
         empty.className = 'empty-message';
         empty.textContent = !bannerItems.length
           ? 'No Banner data yet. It comes from the LAPTOP RAW, BANNER SPECS, DB PHOTOS and NEW PRICING sheets through the SalesKit server.'
-          : selectedBranch && showPromoOnly ? `No matching item codes with a ${selectedBranch} promo.`
-            : 'No matching item codes with prices.';
+          : selectedBranch && showPromoOnly ? `No matching item codes with a ${selectedBranch} promo in stock there.`
+            : selectedBranch ? `No matching item codes in stock at ${selectedBranch}.`
+              : 'No matching item codes with prices.';
         list.appendChild(empty);
         return;
       }
@@ -1213,6 +1247,12 @@
           tag.className = 'ageing-tag';
           tag.textContent = 'clearance';
           code.appendChild(tag);
+        }
+        if (stockAt(row)) {
+          const stock = document.createElement('span');
+          stock.className = 'stock-tag';
+          stock.textContent = `${stockAt(row)} in stock`;
+          code.prepend(stock);
         }
         if (branchPrice(row)) {
           const tag = document.createElement('span');
@@ -1316,6 +1356,7 @@
       // A promo title picked by hand is for one laptop; another laptop starts on its automatic row.
       if (!sameItem || !(item.promoRows || [])[chosenPromoRow]) chosenPromoRow = null;
       renderPromoSelect();
+      $('downloadBannerButton').disabled = false;
       loadItemList({ keepScroll: true });
       // Refreshed data keeps the view the salesperson chose; another laptop starts on its ageing banner.
       showBannerView(item, sameItem ? bannerView : 'ageing');
@@ -1420,7 +1461,9 @@
 
     // Branches with promos today. A branch account starts on its own branch (when it has promos) and
     // can switch to any other; HO and ALL accounts start on the regular price.
-    function loadBranches(branches, homeBranch) {
+    // Every branch (stock, from the server) and the branches with their own prices in NEW PRICING.
+    function loadBranches(priceBranches, homeBranch, stockBranches = []) {
+      const branches = [...new Set([...stockBranches, ...priceBranches])].sort();
       bannerBranches = branches;
       const select = $('branchSelect');
       select.replaceChildren(select.options[0]);
@@ -1512,9 +1555,97 @@
       toParent({ channel: 'saleskit-banner-refresh' });
     });
 
-    // Ctrl+1 / Ctrl+2 / Ctrl+3 switch SalesKit tabs from here too (SalesKit's hotkeys.js runs them).
+    // ---------- Download ----------
+
+    // The banner on screen as a picture: the clearance banner as it is, the generated banner drawn at 2× its
+    // 1600 × 900 design size. SalesKit asks where to save it.
+    async function downloadBanner() {
+      const item = bannerItems.find((row) => row.itemCode === currentItemCode);
+      const button = $('downloadBannerButton');
+      if (!item || button.disabled) return;
+      const name = [item.brandModel, item.modelCode || item.partNumber, 'banner'].filter(Boolean).join(' ');
+      button.disabled = true;
+      $('bannerStatus').textContent = 'Preparing the banner…';
+      try {
+        let url;
+        if (bannerView === 'ageing' && item.ageingBanner) {
+          url = item.ageingBanner;
+        } else {
+          const shapes = markSlantedShapes($('stage'));
+          const canvas = await html2canvas($('stage'), {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: null,
+            logging: false,
+            onclone: (copy) => {
+              const shown = copy.getElementById('stage');
+              shown.style.transform = 'none';
+              shown.style.left = '0';
+              shown.style.top = '0';
+              drawSlantedShapes(shown, shapes);
+            }
+          });
+          url = canvas.toDataURL('image/png');
+        }
+        $('bannerStatus').textContent = '';
+        toParent({ channel: 'saleskit-banner-save', url, name });
+      } catch (error) {
+        $('bannerStatus').textContent = `Could not prepare the banner: ${error.message || error}`;
+      } finally {
+        $('stage').querySelectorAll('[data-shape]').forEach((element) => element.removeAttribute('data-shape'));
+        button.disabled = false;
+      }
+    }
+
+    // The picture library cannot cut shapes (CSS clip-path): the slanted boxes would come out as rectangles. Each
+    // slanted box with a plain colour is marked (data-shape) and, in the copy that is drawn, gets its shape as an SVG
+    // background instead. (The copy also holds the library's own extra elements, so boxes are found by the mark.)
+    function markSlantedShapes(stage) {
+      const shapes = [];
+      stage.querySelectorAll('*').forEach((element) => {
+        const style = getComputedStyle(element);
+        if (!style.clipPath.startsWith('polygon(') || style.backgroundImage !== 'none') return;
+        const width = element.offsetWidth;
+        const height = element.offsetHeight;
+        const length = (value, size) => {
+          const calc = value.match(/^calc\(([\d.]+)%\s*([+-])\s*([\d.]+)px\)$/);
+          if (calc) return size * Number(calc[1]) / 100 + (calc[2] === '-' ? -1 : 1) * Number(calc[3]);
+          return value.endsWith('%') ? size * parseFloat(value) / 100 : parseFloat(value) || 0;
+        };
+        const points = style.clipPath.slice(8, -1).split(/,(?![^(]*\))/).map((pair) => {
+          const [x, y] = pair.trim().match(/calc\([^)]*\)|[^\s]+/g);
+          return `${length(x, width)},${length(y, height)}`;
+        }).join(' ');
+        element.dataset.shape = String(shapes.length);
+        shapes.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><polygon points="${points}" fill="${style.backgroundColor}"/></svg>`);
+      });
+      return shapes;
+    }
+
+    function drawSlantedShapes(copy, shapes) {
+      copy.querySelectorAll('[data-shape]').forEach((target) => {
+        const svg = shapes[Number(target.dataset.shape)];
+        if (!svg) return;
+        target.style.clipPath = 'none';
+        target.style.backgroundColor = 'transparent';
+        target.style.backgroundImage = `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}")`;
+        target.style.backgroundSize = '100% 100%';
+        target.style.backgroundRepeat = 'no-repeat';
+      });
+    }
+
+    $('downloadBannerButton').addEventListener('click', downloadBanner);
+
+    // Ctrl+D (or Ctrl+Shift+D) downloads, as on the other pages. Ctrl+1 / Ctrl+2 / Ctrl+3 switch SalesKit tabs
+    // from here too (SalesKit's hotkeys.js runs them).
     document.addEventListener('keydown', (event) => {
-      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+      if (event.code === 'KeyD') {
+        event.preventDefault();
+        downloadBanner();
+        return;
+      }
+      if (event.shiftKey) return;
       if (event.code !== 'Digit1' && event.code !== 'Digit2' && event.code !== 'Digit3') return;
       event.preventDefault();
       toParent({ channel: 'saleskit-banner-hotkey', keys: { ctrl: true, shift: false, alt: false, code: event.code } });

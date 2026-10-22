@@ -182,9 +182,9 @@ function startDataChangeChecks() {
 
 // ---------- Price changes ----------
 
-// Price-change notices are switched off while the NEW PRICING sheet is being fixed. To bring them back, set this
-// to true, put price-notify.js back in saleskit.html and turn PRICE_WATCH on in server/main.js.
-const PRICE_NOTICES = false;
+// Price-change notices. To switch them off, set this to false, take price-notify.js out of saleskit.html and
+// turn PRICE_WATCH off in server/main.js.
+const PRICE_NOTICES = true;
 
 let priceStream = null;
 

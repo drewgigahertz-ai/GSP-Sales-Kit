@@ -427,9 +427,8 @@ function announcePriceChange(event) {
   });
 }
 
-// The every-minute NEW PRICING check is switched off while the sheet is being fixed (see PRICE_NOTICES in
-// electron/main.js). Set to true to bring the price-change notices back.
-const PRICE_WATCH = false;
+// The every-minute NEW PRICING check behind the price-change notices (see PRICE_NOTICES in electron/main.js).
+const PRICE_WATCH = true;
 
 function startPriceWatch() {
   priceWatch = createPriceWatch({

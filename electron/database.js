@@ -294,6 +294,34 @@ function makeCriteriaData(rows, specsBySku, appHierarchyMap) {
   return { laptops, appHierarchyMap, locations };
 }
 
+// Banner page branch filter: each laptop's stock per branch (Criteria Segment-Application; RECO TABLE's
+// BR STOCK for laptops not in it). item.stock lists only branches with stock; bannerData.stockBranches lists
+// every branch.
+function attachBranchStock(bannerData, criteriaSegmentData, recoRows) {
+  const stockByItem = new Map();
+  for (const laptop of criteriaSegmentData.laptops) {
+    const stock = {};
+    for (const [location, quantity] of Object.entries(laptop.stocksByLocation)) {
+      if (quantity > 0) stock[location.trim().toUpperCase()] = quantity;
+    }
+    stockByItem.set(canonicalSku(laptop.sku), stock);
+  }
+  const fromReco = new Map();
+  for (const row of recoRows) {
+    const key = canonicalSku(row['ITEM DESCRIPTION']);
+    const branch = text(row.BR).toUpperCase();
+    const quantity = Number.parseInt(text(row['BR STOCK']).replace(/[^\d-]/g, ''), 10) || 0;
+    if (!key || !branch || stockByItem.has(key) || quantity <= 0) continue;
+    if (!fromReco.has(key)) fromReco.set(key, {});
+    fromReco.get(key)[branch] = quantity;
+  }
+  for (const [key, stock] of fromReco) stockByItem.set(key, stock);
+  for (const item of bannerData.items) item.stock = stockByItem.get(canonicalSku(item.itemCode)) || {};
+  const branches = new Set(criteriaSegmentData.locations.map((location) => location.trim().toUpperCase()).filter(Boolean));
+  for (const row of recoRows) if (text(row.BR)) branches.add(text(row.BR).toUpperCase());
+  bannerData.stockBranches = [...branches].sort();
+}
+
 function makeApplicationMatrix(rows) {
   const excludedColumns = new Set(['id', 'applicationuse', 'orderindex']);
   const appColumnsByCanonicalName = new Map();
@@ -466,6 +494,7 @@ function getInitialData() {
     specsBySku,
     Object.fromEntries(applicationMatrix.applications.map(({ name, hierarchy }) => [name.toLowerCase(), hierarchy]))
   );
+  attachBranchStock(bannerData, criteriaSegmentData, recoTableData);
   const ukspBannerData = makeUkspBannerData(getRows('uksp_banner'), getRows('features_banner'));
   const modelBySku = Object.fromEntries(Object.entries(specsBySku).map(([sku, spec]) => [sku, spec.title]));
   ukspBannerData.skus.forEach(({ sku, model }) => {

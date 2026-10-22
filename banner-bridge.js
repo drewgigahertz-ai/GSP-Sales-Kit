@@ -83,6 +83,15 @@
     } else if (channel === 'saleskit-banner-image') {
       const url = await savedPicture(String(event.data.url || ''));
       send({ channel: 'saleskit-banner-image', requestId: event.data.requestId, url });
+    } else if (channel === 'saleskit-banner-save') {
+      // Download: the generated banner (a PNG data address) or the clearance banner's address.
+      if (!window.saleskit || typeof window.saleskit.saveBanner !== 'function') return;
+      try {
+        const result = await window.saleskit.saveBanner(String(event.data.url || ''), String(event.data.name || 'banner'));
+        if (!result.canceled) send({ channel: 'saleskit-banner-status', message: 'Banner saved', busy: false });
+      } catch (error) {
+        send({ channel: 'saleskit-banner-status', message: `Could not save the banner: ${error.message || error}`, busy: false });
+      }
     } else if (channel === 'saleskit-banner-refresh') {
       if (typeof window.refreshAllData !== 'function') return;
       send({ channel: 'saleskit-banner-status', message: 'Refreshing…', busy: true });
