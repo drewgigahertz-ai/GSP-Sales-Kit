@@ -495,7 +495,7 @@
       margin-top: 7px;
     }
 
-    /* Promo title of the selected laptop (its BANNER PRICES rows), in the bar above the banner. */
+    /* Promo title of the selected laptop (its NEW PRICING rows), in the bar above the banner. */
     .promo-select {
       display: inline-flex;
       flex: 0 1 380px;
@@ -619,7 +619,7 @@
       text-align: center;
     }
 
-    /* BANNER PRICES details for the chosen laptop: one line of small plain text along the bottom of the
+    /* NEW PRICING details for the chosen laptop: one line of small plain text along the bottom of the
        banner, for the salesperson, kept quiet so customers hardly notice it. */
     .price-details {
       bottom: 8px;
@@ -975,7 +975,7 @@
         <span id="selectedItem" class="small flex-grow-1 text-muted text-truncate">Select a laptop to generate its banner</span>
         <label class="promo-select" id="promoSelectWrap" for="promoSelect" hidden>
           Promo
-          <select id="promoSelect" title="Promo title for this laptop (BANNER PRICES rows)"></select>
+          <select id="promoSelect" title="Promo title for this laptop (NEW PRICING rows)"></select>
         </label>
         <span id="bannerStatus" class="small text-muted" aria-live="polite"></span>
         <button id="refreshBannerButton" type="button" title="Load the latest data from the SalesKit server">
@@ -1042,12 +1042,12 @@
     let currentItemCode = '';
     let searchTimer;
     let selectionVersion = 0;
-    // Branch promos (BANNER PRICES "SPECIFIC BRANCH"): '' shows the regular price for all branches.
+    // Branch promos (NEW PRICING column A, BRANCH): '' shows the regular price for all branches.
     let bannerBranches = [];
     let selectedBranch = '';
     let branchChosen = false;
     let showPromoOnly = false;
-    // The laptop's BANNER PRICES row picked from the promo title dropdown (its index in item.promoRows);
+    // The laptop's NEW PRICING row picked from the promo title dropdown (its index in item.promoRows);
     // null = automatic (the row for today and the selected branch).
     let chosenPromoRow = null;
     let promoRenderVersion = 0;
@@ -1183,7 +1183,7 @@
         const empty = document.createElement('div');
         empty.className = 'empty-message';
         empty.textContent = !bannerItems.length
-          ? 'No Banner data yet. It comes from the LAPTOP RAW, BANNER SPECS, DB PHOTOS and BANNER PRICES sheets through the SalesKit server.'
+          ? 'No Banner data yet. It comes from the LAPTOP RAW, BANNER SPECS, DB PHOTOS and NEW PRICING sheets through the SalesKit server.'
           : selectedBranch && showPromoOnly ? `No matching item codes with a ${selectedBranch} promo.`
             : 'No matching item codes with prices.';
         list.appendChild(empty);
@@ -1397,7 +1397,7 @@
       return [row.branch, row.dates, row.hasPrice ? peso(row.cash) : 'no price'].filter(Boolean).join(' · ');
     }
 
-    // "Automatic" (today's row for the selected branch) plus the laptop's own BANNER PRICES rows, in sheet order.
+    // "Automatic" (today's row for the selected branch) plus the laptop's own NEW PRICING rows, in sheet order.
     function renderPromoSelect() {
       const item = currentItem();
       const rows = (item && item.promoRows) || [];

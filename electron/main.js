@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, net, protocol } = require('electron');
+const { app, BrowserWindow, Menu, Notification, dialog, ipcMain, nativeImage, net, protocol } = require('electron');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -11,6 +11,7 @@ const { createLogoCache } = require('./logo-cache');
 const { createDataLoader } = require('./data-loader');
 const { createActivityReporter } = require('./activity');
 const { getDeviceInfo } = require('./device-info');
+const { createPriceStream } = require('./price-stream');
 
 // SalesKit is a client: it loads its data from the SalesKit Server, which does the Google Sheets sync.
 
@@ -53,19 +54,27 @@ let loadedDataVersion = null;
 let session = null;
 let onLoginPage = true;
 
-// withMeta: return { status, etag, body } instead of the body; a 304 (Not Modified) is then not an error.
-async function requestServer(pathname, { timeoutMs = 8000, method = 'GET', body, headers: extraHeaders = {}, withMeta = false } = {}) {
+// The server addresses (the one that answered last first) and the headers every request carries.
+async function serverConnection() {
   const { serverUrls, serverToken } = getConfig();
-  if (!serverUrls.length) throw new Error('SalesKit has no server address. Add it to electron/embedded-config.json and rebuild.');
   const device = await getDeviceInfo();
-  const headers = { Accept: 'application/json', ...CLIENT_HEADERS, 'X-SalesKit-Make': device.make, 'X-SalesKit-Model': device.model };
+  const headers = { ...CLIENT_HEADERS, 'X-SalesKit-Make': device.make, 'X-SalesKit-Model': device.model };
   if (serverToken) headers.Authorization = `Bearer ${serverToken}`;
   if (session) headers['X-SalesKit-Session'] = session.key;
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
-  Object.assign(headers, extraHeaders);
-  const ordered = workingServerUrl && serverUrls.includes(workingServerUrl)
+  const urls = workingServerUrl && serverUrls.includes(workingServerUrl)
     ? [workingServerUrl, ...serverUrls.filter((url) => url !== workingServerUrl)]
     : serverUrls;
+  return { urls, headers };
+}
+
+// withMeta: return { status, etag, body } instead of the body; a 304 (Not Modified) is then not an error.
+async function requestServer(pathname, { timeoutMs = 8000, method = 'GET', body, headers: extraHeaders = {}, withMeta = false } = {}) {
+  const { serverUrls } = getConfig();
+  if (!serverUrls.length) throw new Error('SalesKit has no server address. Add it to electron/embedded-config.json and rebuild.');
+  const { urls: ordered, headers: connectionHeaders } = await serverConnection();
+  const headers = { Accept: 'application/json', ...connectionHeaders };
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  Object.assign(headers, extraHeaders);
 
   let networkError;
   for (const serverUrl of ordered) {
@@ -171,12 +180,51 @@ function startDataChangeChecks() {
   }, DATA_CHECK_INTERVAL_MS);
 }
 
+// ---------- Price changes ----------
+
+let priceStream = null;
+
+// A price change pushed by the server: the window reloads its data and shows what changed; when SalesKit is
+// in the background, Windows shows a notification too (clicking it brings SalesKit to the front).
+function showPriceChanges(events) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('data:changed');
+  mainWindow.webContents.send('prices:changed', events);
+  if (mainWindow.isFocused() || !Notification.isSupported()) return;
+  const count = events.reduce((total, event) => total + event.changes.length, 0);
+  const first = events[events.length - 1].changes[0];
+  const notification = new Notification({
+    title: 'Price update',
+    body: count === 1
+      ? `${first.itemCode}${first.after && first.after.cash !== null ? ` · Cash ₱${Number(first.after.cash).toLocaleString('en-PH')}` : ''}`
+      : `${count} prices changed. Open Gigahertz Sales Tools to see them.`
+  });
+  notification.on('click', () => {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  });
+  notification.show();
+}
+
+function startPriceStream() {
+  priceStream = createPriceStream({
+    filePath: path.join(app.getPath('userData'), 'price-changes-seen.json'),
+    getConnection: async () => (session && !onLoginPage && getConfig().serverUrls.length ? serverConnection() : null),
+    requestServer: (pathname) => requestServer(pathname),
+    getUser: () => (session ? session.user : null),
+    onEvents: showPriceChanges
+  });
+  priceStream.start();
+}
+
 // ---------- Login ----------
 
 let loginMessage = '';
 
 function showLogin(message = '') {
   session = null;
+  if (priceStream) priceStream.reconnect();
   loadedDataVersion = null;
   loginMessage = message;
   onLoginPage = true;
@@ -359,6 +407,8 @@ if (!app.requestSingleInstanceLock()) {
 
 app.whenReady().then(() => {
   if (!app.hasSingleInstanceLock()) return;
+  // Windows shows notifications (price changes) under this app's name.
+  app.setAppUserModelId('com.gigahertz.saleskit');
   snapshotCache = createSnapshotCache(path.join(app.getPath('userData'), 'saleskit-data-cache.json'));
   imageCache = new ImageCache(path.join(app.getPath('userData'), 'image-cache'));
   dataLoader = createDataLoader({
@@ -382,6 +432,7 @@ app.whenReady().then(() => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update:status', status);
   }, { onBeforeInstall: () => updateResume.save(session) });
   startDataChangeChecks();
+  startPriceStream();
   activityReporter = createActivityReporter({
     send: (report) => requestServer('/api/activity', { method: 'POST', body: report, timeoutMs: 5000 }),
     getWindow: () => mainWindow,

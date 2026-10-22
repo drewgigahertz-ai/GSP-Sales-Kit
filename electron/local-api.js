@@ -57,7 +57,10 @@ function readJsonBody(request, limit = 10 * 1024) {
 // getInitialPayload(user, { dedupe }) (optional): { etag, gzip } of the prepared data for that user. Then
 //   /api/initial-data answers "304 Not Modified" to a matching If-None-Match, sends gzip when accepted,
 //   and /api/version includes the user's dataTag (the ETag), so laptops only download when their data changed.
-function createLocalApi({ database, token = '', onRequest = null, getDataVersion = () => null, getLatestClientVersion = () => null, getInitialPayload = null, onActivity = null, accounts = null }) {
+// priceChanges (optional): { latestId(), since(id), subscribe(listener) → unsubscribe } (server/price-watch.js).
+//   GET /api/price-changes?since=<id> lists the changes a laptop missed; GET /api/events stays open and sends
+//   each new price change the moment it happens (Server-Sent Events).
+function createLocalApi({ database, token = '', onRequest = null, getDataVersion = () => null, getLatestClientVersion = () => null, getInitialPayload = null, onActivity = null, accounts = null, priceChanges = null }) {
   return http.createServer(async (request, response) => {
     const url = new URL(request.url, 'http://localhost');
     const address = request.socket.remoteAddress || '';
@@ -125,6 +128,10 @@ function createLocalApi({ database, token = '', onRequest = null, getDataVersion
           });
         }
         sendJson(response, 200, { ok: true });
+      } else if (request.method === 'GET' && url.pathname === '/api/price-changes' && priceChanges) {
+        sendJson(response, 200, { latestId: priceChanges.latestId(), events: priceChanges.since(url.searchParams.get('since')) });
+      } else if (request.method === 'GET' && url.pathname === '/api/events' && priceChanges) {
+        openEventStream(request, response, priceChanges);
       } else if (request.method === 'GET' && url.pathname === '/api/status') {
         const status = database.getStatus();
         sendJson(response, 200, { connected: status.connected, tableCount: status.tableCount });
@@ -157,6 +164,28 @@ function createLocalApi({ database, token = '', onRequest = null, getDataVersion
       sendJson(response, 500, { error: error.message || 'Server request failed.' });
     }
   });
+}
+
+// Keeps the response open and writes each price change as an event; a comment every 25 seconds keeps
+// proxies and firewalls from closing an idle connection.
+function openEventStream(request, response, priceChanges) {
+  response.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no'
+  });
+  response.write(`event: hello\ndata: ${JSON.stringify({ latestId: priceChanges.latestId() })}\n\n`);
+  const unsubscribe = priceChanges.subscribe((event) => {
+    response.write(`event: prices\ndata: ${JSON.stringify(event)}\n\n`);
+  });
+  const keepAlive = setInterval(() => response.write(': ping\n\n'), 25 * 1000);
+  const close = () => {
+    clearInterval(keepAlive);
+    unsubscribe();
+  };
+  request.on('close', close);
+  response.on('error', close);
 }
 
 // What the SalesKit app supports (X-SalesKit-Features): 'dedupe' (1.0.6+), 'branch-modes' (1.0.11+: branch

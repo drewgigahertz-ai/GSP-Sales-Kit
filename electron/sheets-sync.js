@@ -166,4 +166,17 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
   return result;
 }
 
-module.exports = { DEFAULT_SPREADSHEET_ID, SHEETS, fetchSpreadsheetData, normalizeSheetValues };
+// One sheet's values (A:Z), for the quick price check (see server/price-watch.js).
+async function fetchSheetValues({ credentialsPath, spreadsheetId = DEFAULT_SPREADSHEET_ID }, sheetName) {
+  const { google } = require('googleapis');
+  const auth = new google.auth.GoogleAuth({ keyFile: credentialsPath, scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'] });
+  const sheets = google.sheets({ version: 'v4', auth });
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `'${sheetName.replace(/'/g, "''")}'!A:Z`,
+    valueRenderOption: 'UNFORMATTED_VALUE'
+  });
+  return response.data.values || [];
+}
+
+module.exports = { DEFAULT_SPREADSHEET_ID, SHEETS, fetchSpreadsheetData, fetchSheetValues, normalizeSheetValues };

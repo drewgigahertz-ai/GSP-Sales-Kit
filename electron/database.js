@@ -4,7 +4,7 @@ const Database = require('better-sqlite3');
 
 let connection = null;
 let activePath = null;
-const { buildBannerData } = require('./banner-data');
+const { buildBannerData, matchKey } = require('./banner-data');
 const { createFeatureBannerResolver } = require('./feature-banners');
 
 const SHEET_TABLES = new Set([
@@ -179,7 +179,8 @@ function parseSkuSpecs(itemDesc, cpuValue, graphicsValue, panelValue) {
   };
 }
 
-function makeSpecsMap(rows) {
+// priceByItem: NEW PRICING's regular cash price by item (matchKey); SPECS PRICE is used for laptops not in it.
+function makeSpecsMap(rows, priceByItem = new Map()) {
   const specsMap = {};
   const specsBySku = {};
 
@@ -199,7 +200,8 @@ function makeSpecsMap(rows) {
     const memory = parsedSpecs.memory || (/\D/.test(text(row.MEMORY)) ? text(row.MEMORY) : '');
     const resolution = /\D/.test(text(row.RESOLUTION)) ? text(row.RESOLUTION) : '';
     const panelSize = text(row['PANEL SIZE']);
-    const priceValue = text(row.PRICE);
+    const newPrice = priceByItem.get(matchKey(itemDesc));
+    const priceValue = newPrice !== undefined ? String(newPrice) : text(row.PRICE);
     const priceNumber = Number(priceValue.replace(/[^\d.]/g, ''));
     const price = priceValue && Number.isFinite(priceNumber)
       ? priceNumber.toLocaleString('en-US')
@@ -445,8 +447,19 @@ function makeLogoData(rows) {
 function getInitialData() {
   if (!connection) throw new Error('Open a database before loading SalesKit data.');
 
+  const recoTableData = getRows('reco_table');
+  const bannerData = buildBannerData({
+    laptops: getRows('banner_laptops'),
+    specs: getRows('banner_specs'),
+    photos: getRows('banner_photos'),
+    prices: getRows('banner_prices'),
+    ageing: getRows('ageing_banner'),
+    reco: recoTableData
+  }, normalizeImageUrl);
+  const priceByItem = new Map(bannerData.items.filter((item) => item.hasPrice && item.cash !== null)
+    .map((item) => [matchKey(item.itemCode), item.cash]));
   const specRows = getRows('specs');
-  const { specsMap, specsBySku } = makeSpecsMap(specRows);
+  const { specsMap, specsBySku } = makeSpecsMap(specRows, priceByItem);
   const applicationMatrix = makeApplicationMatrix(getRows('dv_transposed'));
   const criteriaSegmentData = makeCriteriaData(
     getRows('criteria_segment_application'),
@@ -460,7 +473,6 @@ function getInitialData() {
   });
   const ukspPerSkuData = makeUkspData(getRows('uksp_transposed'), modelBySku);
   const logoData = makeLogoData(getRows('logo'));
-  const recoTableData = getRows('reco_table');
   const appsLogoMap = Object.fromEntries(applicationMatrix.applications.map(({ name, icon }) => [name, icon]));
   const skuImageMap = Object.fromEntries(Object.values(specsBySku).map((spec) => [spec.cleanSku, spec.image]));
   const skuBrandMap = Object.fromEntries(Object.values(specsBySku).map((spec) => [spec.cleanSku, spec.brand]));
@@ -490,14 +502,7 @@ function getInitialData() {
     ukspBannerData,
     appUkspData: applicationMatrix,
     dvApplicationsPerSkuData: applicationMatrix,
-    bannerData: buildBannerData({
-      laptops: getRows('banner_laptops'),
-      specs: getRows('banner_specs'),
-      photos: getRows('banner_photos'),
-      prices: getRows('banner_prices'),
-      ageing: getRows('ageing_banner'),
-      reco: recoTableData
-    }, normalizeImageUrl),
+    bannerData,
     sheetStatus: {
       skuCount: criteriaSegmentData.laptops.length,
       specsCount: specRows.length,

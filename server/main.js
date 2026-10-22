@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const database = require('../electron/database');
-const { DEFAULT_SPREADSHEET_ID, fetchSpreadsheetData } = require('../electron/sheets-sync');
+const { DEFAULT_SPREADSHEET_ID, fetchSpreadsheetData, fetchSheetValues } = require('../electron/sheets-sync');
 const { createLocalApi } = require('../electron/local-api');
 const { createDeviceRegistry, deviceKey } = require('./devices');
 const { createActivityLog } = require('./activity');
@@ -14,6 +14,7 @@ const { createUserStore } = require('./users');
 const { hasFullAccess, filterDataForBranch, withHomeBranch } = require('./branch-filter');
 const { createClientReleaseWatcher } = require('./client-release');
 const { createCompressedData } = require('./compressed-data');
+const { createPriceWatch } = require('./price-watch');
 const { version: APP_VERSION } = require('../package.json');
 
 const APP_NAME = 'GigaHertz SalesKit Server';
@@ -49,6 +50,9 @@ let devicesPushTimer = null;
 let headerLogo = '';
 let clientRelease;
 let activity;
+let priceWatch;
+// Laptops listening on /api/events for price changes.
+const priceListeners = new Set();
 const logs = [];
 
 // ---------- Settings ----------
@@ -273,6 +277,14 @@ async function startApi() {
       if (activity && activity.record(deviceKey(address, client), user, report)) pushDevices();
     },
     getLatestClientVersion: () => clientRelease.get().version,
+    priceChanges: {
+      latestId: () => (priceWatch ? priceWatch.latestId() : 0),
+      since: (id) => (priceWatch ? priceWatch.since(id) : []),
+      subscribe: (listener) => {
+        priceListeners.add(listener);
+        return () => priceListeners.delete(listener);
+      }
+    },
     accounts: {
       login: (username, password, address) => users.login(username, password, address),
       logout: (key) => users.logout(key),
@@ -301,7 +313,7 @@ async function startApi() {
         if (pathname !== '/api/version') log('warning', `${who} needs to log in (older SalesKit or signed out)`);
       }
       // Clients poll /api/version every few minutes; keep those out of the activity log.
-      else if (pathname !== '/api/version' && pathname !== '/api/login' && pathname !== '/api/activity') {
+      else if (!['/api/version', '/api/login', '/api/activity', '/api/events', '/api/price-changes'].includes(pathname)) {
         log(status < 400 ? 'request' : 'error', `${who} ${method} ${pathname} → ${status}`);
       }
     }
@@ -356,7 +368,9 @@ async function runSync(reason) {
     return finish({ ok: false, error: 'Choose the Google service-account key file first.' });
   }
 
-  log('info', reason === 'schedule' ? 'Scheduled sync started' : reason === 'startup' ? 'Startup sync started' : 'Sync started');
+  log('info', reason === 'schedule' ? 'Scheduled sync started'
+    : reason === 'startup' ? 'Startup sync started'
+      : reason === 'prices' ? 'Price change: updating the data' : 'Sync started');
   try {
     const sheets = await fetchSpreadsheetData({
       credentialsPath: settings.serviceAccountPath,
@@ -390,6 +404,32 @@ async function runSync(reason) {
     log('error', `Sync failed: ${error.message}`);
     return finish({ ok: false, error: error.message });
   }
+}
+
+// A price change in NEW PRICING: the data is synced at once (after a sync already running, which may have read
+// the sheet before the change), then every listening laptop is told, so it reloads and shows what changed.
+function announcePriceChange(event) {
+  const synced = activeSync ? activeSync.then(() => syncNow('prices')) : syncNow('prices');
+  synced.catch(() => {}).finally(() => {
+    for (const listener of priceListeners) {
+      try {
+        listener(event);
+      } catch {}
+    }
+  });
+}
+
+function startPriceWatch() {
+  priceWatch = createPriceWatch({
+    filePath: path.join(app.getPath('userData'), 'price-changes.json'),
+    readValues: async () => {
+      if (!settings.serviceAccountPath || !fs.existsSync(settings.serviceAccountPath)) return [];
+      return fetchSheetValues({ credentialsPath: settings.serviceAccountPath, spreadsheetId: settings.spreadsheetId }, 'NEW PRICING');
+    },
+    onChange: announcePriceChange,
+    log
+  });
+  priceWatch.start();
 }
 
 function scheduleSync() {
@@ -736,12 +776,14 @@ if (!app.requestSingleInstanceLock()) {
     }
     scheduleSync();
     if (settings.serviceAccountPath) syncNow('startup');
+    startPriceWatch();
     pushState();
   });
 
   app.on('before-quit', () => {
     quitting = true;
     clearInterval(syncTimer);
+    if (priceWatch) priceWatch.stop();
     if (clientRelease) clientRelease.stop();
     if (activity) activity.close();
     stopApi();
