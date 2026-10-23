@@ -1714,6 +1714,11 @@
       line-height: 1.35;
     }
 
+    /* A blank line in the sheet cell: space between groups of metrics. */
+    .saleskit-metric-gap {
+      height: 0.7em;
+    }
+
     .saleskit-metric-key {
       color: #475569;
       font-weight: 600;
@@ -8293,8 +8298,10 @@
 
       // Case A: Multiline format
       if (raw.includes('\n')) {
-        const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+        // Blank lines in the sheet cell group the metrics; each one is kept as a gap (several in a row as one).
+        const lines = raw.split(/\r?\n/).map(l => l.trim()).filter((line, index, all) => line || all[index - 1]);
         return lines.map(line => {
+          if (!line) return '<div class="saleskit-metric-gap" aria-hidden="true"></div>';
           if (line.includes(':')) {
             const [k, ...v] = line.split(':');
             return `
