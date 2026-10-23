@@ -16,6 +16,7 @@
     "electron/banner-data.js",
     "electron/feature-banners.js",
     "electron/ageing-banners.js",
+    "electron/app-usability.js",
     "electron/embedded-config.json",
     "package.json",
     "!node_modules/electron-updater{,/**/*}",
