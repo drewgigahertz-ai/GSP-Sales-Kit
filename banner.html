@@ -10,6 +10,7 @@
   <link href="./node_modules/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
   <script src="./node_modules/html2canvas/dist/html2canvas.min.js"></script>
   <script src="./banner-color.js"></script>
+  <script src="./banner-hotkeys.js"></script>
   <link href="./node_modules/@fontsource/outfit/400.css" rel="stylesheet">
   <link href="./node_modules/@fontsource/outfit/500.css" rel="stylesheet">
   <link href="./node_modules/@fontsource/outfit/600.css" rel="stylesheet">
@@ -1556,7 +1557,7 @@
         ? '<i class="bi bi-fullscreen-exit" aria-hidden="true"></i> Exit fullscreen'
         : '<i class="bi bi-fullscreen" aria-hidden="true"></i> Fullscreen';
       button.setAttribute('aria-label', isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen');
-      button.title = isFullscreen ? 'Exit fullscreen (Esc)' : 'View banner fullscreen';
+      button.title = isFullscreen ? 'Exit fullscreen (Esc or Ctrl+Shift+F)' : 'View banner fullscreen (Ctrl+Shift+F)';
     }
 
     $('fullscreenButton').addEventListener('click', async () => {
