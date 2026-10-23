@@ -1276,12 +1276,12 @@
       });
     }
 
-    // Numbers as 2,400.00 (no peso sign); text such as CF codes as written; blank when the sheet is empty.
+    // Numbers as 2400 (no peso sign, no comma, no decimals); text such as CF codes as written; blank when the sheet is empty.
     function detailText(value) {
       if (value === null || value === undefined || value === '') return '';
       const number = typeof value === 'number' ? value : Number(String(value).replace(/,/g, ''));
       return Number.isFinite(number) && String(value).trim() !== ''
-        ? number.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        ? String(Math.round(number))
         : String(value);
     }
 
