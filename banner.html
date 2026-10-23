@@ -9,6 +9,7 @@
   <link href="./node_modules/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="./node_modules/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
   <script src="./node_modules/html2canvas/dist/html2canvas.min.js"></script>
+  <script src="./banner-color.js"></script>
   <link href="./node_modules/@fontsource/outfit/400.css" rel="stylesheet">
   <link href="./node_modules/@fontsource/outfit/500.css" rel="stylesheet">
   <link href="./node_modules/@fontsource/outfit/600.css" rel="stylesheet">
@@ -519,7 +520,13 @@
       display: none;
     }
 
-    #promoSelect {
+    .color-select {
+      flex: 0 1 230px;
+      min-width: 150px;
+    }
+
+    #promoSelect,
+    #colorSelect {
       width: 100%;
       min-width: 0;
       min-height: 32px;
@@ -536,13 +543,15 @@
       cursor: pointer;
     }
 
-    #promoSelect:focus {
+    #promoSelect:focus,
+    #colorSelect:focus {
       border-color: #003ecb;
       outline: 0;
       box-shadow: 0 0 0 3px rgba(0, 62, 203, .12);
     }
 
-    #promoSelect.is-manual {
+    #promoSelect.is-manual,
+    #colorSelect.is-manual {
       border-color: #003ecb;
       background: #eef3fb;
       color: #0012b3;
@@ -1000,6 +1009,10 @@
           Promo
           <select id="promoSelect" title="Promo title for this laptop"></select>
         </label>
+        <label class="promo-select color-select" id="colorSelectWrap" for="colorSelect" hidden>
+          Colour
+          <select id="colorSelect" title="Colour of the cash price box"></select>
+        </label>
         <span id="bannerStatus" class="small text-muted" aria-live="polite"></span>
         <button id="refreshBannerButton" type="button" title="Load the latest data from the SalesKit server">
           <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh data
@@ -1365,7 +1378,11 @@
 
       $('selectedItem').textContent = item.itemCode;
       // A picked branch follows that branch's segment for the laptop (RECO TABLE TARGET MARKET).
-      $('stage').dataset.segment = (selectedBranch && item.segmentByBranch && item.segmentByBranch[selectedBranch]) || item.segment || '';
+      // The salesperson can choose another colour in the bar (banner-color.js).
+      BannerColor.show(
+        (selectedBranch && item.segmentByBranch && item.segmentByBranch[selectedBranch]) || item.segment || '',
+        `${item.itemCode}|${selectedBranch || ''}`
+      );
       $('bannerTitle').textContent = item.brandModel || item.itemCode;
       setText('brandName', item.brand);
       setText('partNumber', item.partNumber);

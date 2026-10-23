@@ -49,6 +49,7 @@
       "saleskit.html",
       "banner.html",
       "banner-bridge.js",
+      "banner-color.js",
       "activity-tracker.js",
       "branch-mode.js",
       "hotkeys.js",
