@@ -55,8 +55,7 @@
       "activity-tracker.js",
       "branch-mode.js",
       "hotkeys.js",
-      "presentation-jump.js",
-      "presentation-apps-picker.js",
+      "presentation-picker.js",
       "price-notify.js",
       "updates.js",
       "package.json"
