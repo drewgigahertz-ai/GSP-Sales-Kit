@@ -569,6 +569,16 @@ ipcMain.handle('server:check-client-release', async () => {
   await clientRelease.checkNow();
   return getState();
 });
+// Price changes tab: every kept change, and deleting chosen ones (laptops' Price changes lists read them from here).
+ipcMain.handle('server:price-changes', async () => (priceWatch ? priceWatch.all() : []));
+
+ipcMain.handle('server:delete-price-changes', async (_event, items = []) => {
+  const removed = priceWatch ? priceWatch.remove(items) : 0;
+  log('info', `Deleted ${removed} price change${removed === 1 ? '' : 's'}`);
+  pushState();
+  return priceWatch ? priceWatch.all() : [];
+});
+
 // Clears the price-change history on every laptop (their Price changes list reads it from here).
 ipcMain.handle('server:clear-price-changes', async () => {
   if (priceWatch) priceWatch.clear();

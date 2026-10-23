@@ -640,6 +640,86 @@
       line-height: 1.1;
     }
 
+    .price-filters {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .price-filters label {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .price-filters input {
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .price-quick {
+      display: flex;
+      gap: 6px;
+    }
+
+    .price-quick .btn.active {
+      background: var(--brand, #003ecb);
+      border-color: var(--brand, #003ecb);
+      color: #fff;
+    }
+
+    .price-search {
+      flex: 1;
+      min-width: 220px;
+    }
+
+    .price-count {
+      padding: 8px 16px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .price-table-wrap {
+      max-height: calc(100vh - 330px);
+      overflow: auto;
+    }
+
+    .price-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #fff;
+    }
+
+    .price-table td.price-item {
+      min-width: 300px;
+      white-space: normal;
+      font-weight: 600;
+    }
+
+    .price-table td.price-item small {
+      display: block;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .price-table .old {
+      color: #94a3b8;
+      text-decoration: line-through;
+    }
+
+    .price-table .down { color: #15803d; font-weight: 700; }
+    .price-table .up { color: #c2410c; font-weight: 700; }
+
     .list-table {
       width: 100%;
       margin: 0;
@@ -753,6 +833,7 @@
       <button class="nav-tab" data-view="data" role="tab"><i class="bi bi-table"></i> Data</button>
       <button class="nav-tab" data-view="devices" role="tab"><i class="bi bi-laptop"></i> Devices <span class="nav-badge" id="onlineBadge" hidden>0</span></button>
       <button class="nav-tab" data-view="users" role="tab"><i class="bi bi-people"></i> Users</button>
+      <button class="nav-tab" data-view="prices" role="tab"><i class="bi bi-tags"></i> Price changes</button>
       <button class="nav-tab" data-view="backups" role="tab"><i class="bi bi-archive"></i> Backups</button>
     </nav>
     <div class="status-pill" id="statusPill"><span class="status-dot"></span><span id="statusText">Starting…</span></div>
@@ -902,6 +983,40 @@
     </section>
 
     <!-- BACKUPS -->
+    <section class="view" id="view-prices" hidden>
+      <section class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title"><i class="bi bi-tags"></i> Price changes</h2>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-danger btn-icon" id="deleteSelectedPrices" disabled><i class="bi bi-trash3"></i> Delete selected</button>
+            <button class="btn btn-sm btn-danger btn-icon" id="deleteShownPrices" disabled><i class="bi bi-trash3-fill"></i> Delete all shown</button>
+          </div>
+        </div>
+        <div class="price-filters">
+          <label>From <input type="datetime-local" class="form-control form-control-sm" id="pricesFrom"></label>
+          <label>To <input type="datetime-local" class="form-control form-control-sm" id="pricesTo"></label>
+          <div class="price-quick" id="pricesQuick">
+            <button type="button" class="btn btn-sm btn-light" data-range="today">Today</button>
+            <button type="button" class="btn btn-sm btn-light" data-range="yesterday">Yesterday</button>
+            <button type="button" class="btn btn-sm btn-light" data-range="7">Last 7 days</button>
+            <button type="button" class="btn btn-sm btn-light" data-range="all">All</button>
+          </div>
+          <label class="price-search">Laptop <input type="search" class="form-control form-control-sm" id="pricesSearch" placeholder="Item code, promo or branch"></label>
+        </div>
+        <div class="price-count" id="pricesCount"></div>
+        <div class="table-responsive price-table-wrap">
+          <table class="list-table price-table">
+            <thead><tr>
+              <th><input type="checkbox" class="form-check-input" id="pricesSelectAll" title="Select all shown"></th>
+              <th>Date &amp; time</th><th>Laptop</th><th>Change</th><th>Cash price</th><th>SRP</th><th>12MOS</th>
+            </tr></thead>
+            <tbody id="priceRows"></tbody>
+          </table>
+        </div>
+      </section>
+      <p class="muted-small mt-3"><i class="bi bi-info-circle"></i> Laptops show these under Price changes (the last 30 days). Deleting removes them from every laptop's list; prices are not changed.</p>
+    </section>
+
     <section class="view" id="view-backups" hidden>
       <section class="panel">
         <div class="panel-head">

@@ -166,6 +166,26 @@ function createPriceWatch({ filePath, readValues, onChange = () => {}, log = () 
       state.events = [];
       save();
     },
+    all: () => state.events,
+    // Deletes single changes, given as [{ eventId, index }] (index: the change's place in its update). An update
+    // left without changes is removed. Returns how many changes were deleted.
+    remove(items) {
+      const byEvent = new Map();
+      for (const { eventId, index } of items || []) {
+        if (!byEvent.has(Number(eventId))) byEvent.set(Number(eventId), new Set());
+        byEvent.get(Number(eventId)).add(Number(index));
+      }
+      let removed = 0;
+      state.events = state.events.flatMap((event) => {
+        const drop = byEvent.get(event.id);
+        if (!drop) return [event];
+        const changes = event.changes.filter((_, index) => !drop.has(index));
+        removed += event.changes.length - changes.length;
+        return changes.length ? [{ ...event, changes }] : [];
+      });
+      save();
+      return removed;
+    },
     // Events after the given id (newest last).
     since: (id) => state.events.filter((event) => event.id > Number(id || 0))
   };

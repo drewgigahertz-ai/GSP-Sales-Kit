@@ -268,6 +268,7 @@ function showView(view) {
   if (view === 'data' && !sheet.table && state && state.database.tables.length) openSheet(state.database.tables[0].name);
   if (view === 'devices') loadDevices();
   if (view === 'users') loadUsers();
+  if (view === 'prices') loadPriceChanges();
 }
 
 document.querySelectorAll('.nav-tab').forEach((tab) => tab.addEventListener('click', () => showView(tab.dataset.view)));
@@ -720,6 +721,152 @@ function renderBackups() {
     actions.appendChild(restore);
   });
 }
+
+// ---------- Price changes: filter, pick and delete ----------
+
+let priceEvents = [];
+let shownPrices = [];
+const selectedPrices = new Set();
+const priceKey = (eventId, index) => `${eventId}:${index}`;
+
+async function loadPriceChanges() {
+  try {
+    priceEvents = await api.getPriceChanges();
+  } catch {
+    priceEvents = [];
+  }
+  renderPriceRows();
+}
+
+const PESO = (value) => (value === null || value === undefined ? '—' : `₱${Number(value).toLocaleString('en-PH')}`);
+const KIND = { changed: 'Changed', added: 'New', removed: 'Removed' };
+
+function priceCell(change, field) {
+  const cell = document.createElement('td');
+  const before = change.before ? change.before[field] : null;
+  const after = change.after ? change.after[field] : null;
+  if (change.kind === 'changed' && before !== after) {
+    const old = document.createElement('span');
+    old.className = 'old';
+    old.textContent = PESO(before);
+    const now = document.createElement('span');
+    now.className = after < before ? 'down' : 'up';
+    now.textContent = PESO(after);
+    cell.append(old, ' → ', now);
+  } else {
+    cell.textContent = PESO(change.kind === 'removed' ? before : after);
+  }
+  return cell;
+}
+
+function renderPriceRows() {
+  const from = $('pricesFrom').value ? new Date($('pricesFrom').value) : null;
+  const to = $('pricesTo').value ? new Date($('pricesTo').value) : null;
+  const query = $('pricesSearch').value.trim().toLowerCase();
+  shownPrices = [];
+  [...priceEvents].reverse().forEach((event) => {
+    const at = new Date(event.at);
+    if ((from && at < from) || (to && at > to)) return;
+    event.changes.forEach((change, index) => {
+      const text = `${change.itemCode} ${change.promoTitle || ''} ${change.branch || ''}`.toLowerCase();
+      if (query && !text.includes(query)) return;
+      shownPrices.push({ event, change, index });
+    });
+  });
+  const rows = $('priceRows');
+  rows.replaceChildren();
+  if (!shownPrices.length) {
+    rows.innerHTML = '<tr><td colspan="7" class="empty text-center py-4">No price changes for this filter.</td></tr>';
+  }
+  shownPrices.forEach(({ event, change, index }) => {
+    const tr = rows.insertRow();
+    const pick = tr.insertCell();
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.className = 'form-check-input';
+    box.checked = selectedPrices.has(priceKey(event.id, index));
+    box.addEventListener('change', () => {
+      if (box.checked) selectedPrices.add(priceKey(event.id, index));
+      else selectedPrices.delete(priceKey(event.id, index));
+      updatePriceButtons();
+    });
+    pick.appendChild(box);
+    tr.insertCell().textContent = new Date(event.at).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    const item = tr.insertCell();
+    item.className = 'price-item';
+    item.textContent = change.itemCode;
+    const details = document.createElement('small');
+    details.textContent = [change.promoTitle, change.branch ? `${change.branch} only` : ''].filter(Boolean).join(' · ');
+    item.appendChild(details);
+    tr.insertCell().textContent = KIND[change.kind] || change.kind;
+    ['cash', 'srp', 'twelveMonths'].forEach((field) => tr.appendChild(priceCell(change, field)));
+  });
+  const total = priceEvents.reduce((count, event) => count + event.changes.length, 0);
+  $('pricesCount').textContent = `Showing ${shownPrices.length} of ${total} price change${total === 1 ? '' : 's'}`;
+  updatePriceButtons();
+}
+
+function updatePriceButtons() {
+  const shownSelected = shownPrices.filter(({ event, index }) => selectedPrices.has(priceKey(event.id, index))).length;
+  $('deleteSelectedPrices').disabled = !shownSelected;
+  $('deleteSelectedPrices').innerHTML = `<i class="bi bi-trash3"></i> Delete selected${shownSelected ? ` (${shownSelected})` : ''}`;
+  $('deleteShownPrices').disabled = !shownPrices.length;
+  $('deleteShownPrices').innerHTML = `<i class="bi bi-trash3-fill"></i> Delete all shown${shownPrices.length ? ` (${shownPrices.length})` : ''}`;
+  $('pricesSelectAll').checked = Boolean(shownPrices.length) && shownSelected === shownPrices.length;
+}
+
+async function deletePrices(entries, button) {
+  if (!entries.length) return;
+  if (!confirm(`Delete ${entries.length} price change${entries.length === 1 ? '' : 's'}? They disappear from every laptop's Price changes list. Prices are not changed.`)) return;
+  const next = await run(button, () => api.deletePriceChanges(entries.map(({ event, index }) => ({ eventId: event.id, index }))),
+    `Deleted ${entries.length} price change${entries.length === 1 ? '' : 's'}`);
+  if (!next) return;
+  priceEvents = next;
+  selectedPrices.clear();
+  renderPriceRows();
+}
+
+function setPriceRange(range) {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const local = (date) => new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  if (range === 'all') {
+    $('pricesFrom').value = '';
+    $('pricesTo').value = '';
+  } else {
+    const from = new Date(start);
+    const to = new Date(start);
+    to.setHours(23, 59, 0, 0);
+    if (range === 'yesterday') {
+      from.setDate(from.getDate() - 1);
+      to.setDate(to.getDate() - 1);
+    } else if (range !== 'today') {
+      from.setDate(from.getDate() - (Number(range) - 1));
+    }
+    $('pricesFrom').value = local(from);
+    $('pricesTo').value = local(to);
+  }
+  document.querySelectorAll('#pricesQuick [data-range]').forEach((button) => button.classList.toggle('active', button.dataset.range === range));
+  renderPriceRows();
+}
+
+document.querySelectorAll('#pricesQuick [data-range]').forEach((button) => button.addEventListener('click', () => setPriceRange(button.dataset.range)));
+['pricesFrom', 'pricesTo'].forEach((id) => $(id).addEventListener('change', () => {
+  document.querySelectorAll('#pricesQuick [data-range]').forEach((button) => button.classList.remove('active'));
+  renderPriceRows();
+}));
+$('pricesSearch').addEventListener('input', renderPriceRows);
+$('pricesSelectAll').addEventListener('change', (event) => {
+  shownPrices.forEach(({ event: priceEvent, index }) => {
+    if (event.target.checked) selectedPrices.add(priceKey(priceEvent.id, index));
+    else selectedPrices.delete(priceKey(priceEvent.id, index));
+  });
+  renderPriceRows();
+});
+$('deleteSelectedPrices').addEventListener('click', (event) => deletePrices(
+  shownPrices.filter(({ event: priceEvent, index }) => selectedPrices.has(priceKey(priceEvent.id, index))), event.currentTarget));
+$('deleteShownPrices').addEventListener('click', (event) => deletePrices(shownPrices, event.currentTarget));
+document.querySelector('#pricesQuick [data-range="all"]').classList.add('active');
 
 $('backupNow').addEventListener('click', (event) => run(event.currentTarget, api.backupNow, 'Backup saved').then((next) => next && render(next)));
 $('openBackups').addEventListener('click', (event) => run(event.currentTarget, api.openBackupsFolder));
