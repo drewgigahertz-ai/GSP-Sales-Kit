@@ -1574,6 +1574,7 @@
           url = item.ageingBanner;
         } else {
           const shapes = markSlantedShapes($('stage'));
+          const fits = markFittedPictures($('stage'));
           const canvas = await html2canvas($('stage'), {
             scale: 2,
             useCORS: true,
@@ -1585,6 +1586,7 @@
               shown.style.left = '0';
               shown.style.top = '0';
               drawSlantedShapes(shown, shapes);
+              drawFittedPictures(shown, fits);
             }
           });
           url = canvas.toDataURL('image/png');
@@ -1595,6 +1597,7 @@
         $('bannerStatus').textContent = `Could not prepare the banner: ${error.message || error}`;
       } finally {
         $('stage').querySelectorAll('[data-shape]').forEach((element) => element.removeAttribute('data-shape'));
+        $('stage').querySelectorAll('[data-fit]').forEach((element) => element.removeAttribute('data-fit'));
         button.disabled = false;
       }
     }
@@ -1622,6 +1625,41 @@
         shapes.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><polygon points="${points}" fill="${style.backgroundColor}"/></svg>`);
       });
       return shapes;
+    }
+
+    // The picture library also ignores object-fit: contain and stretches pictures (logos) to fill their box. Each
+    // such picture is marked (data-fit) with where the picture really sits in its box; in the copy, padding shrinks
+    // the box's inside to that spot, so the picture keeps its shape and the layout stays the same.
+    function markFittedPictures(stage) {
+      const fits = [];
+      stage.querySelectorAll('img').forEach((image) => {
+        const style = getComputedStyle(image);
+        const width = image.clientWidth;
+        const height = image.clientHeight;
+        if (style.objectFit !== 'contain' || !width || !height || !image.naturalWidth || !image.naturalHeight) return;
+        const scale = Math.min(width / image.naturalWidth, height / image.naturalHeight);
+        const drawnWidth = image.naturalWidth * scale;
+        const drawnHeight = image.naturalHeight * scale;
+        const [x = '50%', y = '50%'] = style.objectPosition.split(/\s+/);
+        const offset = (value, room) => (value.endsWith('%') ? room * parseFloat(value) / 100 : parseFloat(value) || 0);
+        const left = offset(x, width - drawnWidth);
+        const top = offset(y, height - drawnHeight);
+        image.dataset.fit = String(fits.length);
+        fits.push({ width, height, left, top, right: width - drawnWidth - left, bottom: height - drawnHeight - top });
+      });
+      return fits;
+    }
+
+    function drawFittedPictures(copy, fits) {
+      copy.querySelectorAll('img[data-fit]').forEach((image) => {
+        const fit = fits[Number(image.dataset.fit)];
+        if (!fit) return;
+        image.style.boxSizing = 'border-box';
+        image.style.width = `${fit.width}px`;
+        image.style.height = `${fit.height}px`;
+        image.style.padding = `${fit.top}px ${fit.right}px ${fit.bottom}px ${fit.left}px`;
+        image.style.objectFit = 'fill';
+      });
     }
 
     function drawSlantedShapes(copy, shapes) {
