@@ -5892,7 +5892,8 @@
           if (!valEl) return;
           valEl.classList.remove('spec-rank', 'spec-rank-high', 'spec-rank-mid', 'spec-rank-low');
           const key = li.getAttribute('data-spec-key');
-          if (!key) return;
+          // The display (resolution) is shown without ranking colours.
+          if (!key || key === 'display' || key === 'panel') return;
 
           const rankAttr = li.getAttribute('data-spec-rank');
           const rank = (rankAttr !== null && rankAttr !== '') ? Number(rankAttr) : null;

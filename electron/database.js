@@ -211,10 +211,10 @@ function makeSpecsMap(rows, priceByItem = new Map()) {
     if (graphics) specs.push(`Graphics: ${graphics}`);
     if (storage) specs.push(`Storage: ${storage}`);
     if (memory) specs.push(`Memory: ${memory}`);
-    if (parsedSpecs.display) specs.push(`Display: ${parsedSpecs.display}`);
-    else if (resolution && panelSize) specs.push(`Display: ${panelSize} (${resolution})`);
+    // SPECS column J (RESOLUTION) is shown as written; the display read from the item description only when J is empty.
+    if (resolution) specs.push(`Display: ${resolution}`);
+    else if (parsedSpecs.display) specs.push(`Display: ${parsedSpecs.display}`);
     else if (panelSize) specs.push(`Panel size: ${panelSize}`);
-    else if (resolution) specs.push(`Resolution: ${resolution}`);
 
     const specObj = {
       itemDesc,
