@@ -3,6 +3,15 @@
 (function () {
   const RELEASES = [
     {
+      version: '1.0.16',
+      date: 'October 23, 2026',
+      changes: [
+        'Applications: each app shows what it is and who it is best for, as tags.',
+        'Applications: the benchmark details are grouped with spaces between them.',
+        'Presentation: the application or feature name opens a list with checkboxes, the same as the Sales Kit dropdown.'
+      ]
+    },
+    {
       version: '1.0.15',
       date: 'October 23, 2026',
       changes: [
