@@ -1601,7 +1601,7 @@
 
     // The picture library cannot cut shapes (CSS clip-path): the slanted boxes would come out as rectangles. Each
     // slanted box with a plain colour is marked (data-shape) and, in the copy that is drawn, gets its shape as an SVG
-    // background instead. (The copy also holds the library's own extra elements, so boxes are found by the mark.)
+    // picture behind its text instead. (The copy also holds the library's own extra elements, so boxes are found by the mark.)
     function markSlantedShapes(stage) {
       const shapes = [];
       stage.querySelectorAll('*').forEach((element) => {
@@ -1630,9 +1630,15 @@
         if (!svg) return;
         target.style.clipPath = 'none';
         target.style.backgroundColor = 'transparent';
-        target.style.backgroundImage = `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}")`;
-        target.style.backgroundSize = '100% 100%';
-        target.style.backgroundRepeat = 'no-repeat';
+        // A picture behind the box's text, not a background: the library tiles backgrounds, and at an uneven
+        // position a thin strip of the next tile showed along the edge (a line under the cash box, a sliver
+        // beside the 12 MOS. price).
+        if (getComputedStyle(target).zIndex === 'auto') target.style.zIndex = '0';
+        const shape = copy.ownerDocument.createElement('img');
+        shape.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+        shape.alt = '';
+        shape.style.cssText = 'position:absolute;inset:0;z-index:-1;width:100%;height:100%;';
+        target.prepend(shape);
       });
     }
 
