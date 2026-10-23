@@ -1,5 +1,5 @@
 // Banner colour: the cash price box takes the laptop's segment colour on its own (Auto). The salesperson can pick
-// another of the five segment colours instead; that choice is for the laptop and branch on screen, and choosing
+// another of the five segment colours or the banner blue instead; that choice is for the laptop and branch on screen, and choosing
 // another laptop or branch goes back to Auto.
 (function () {
   const COLORS = [
@@ -7,7 +7,9 @@
     { segment: 'performance', label: 'Performance (orange)' },
     { segment: 'entry', label: 'Entry (yellow)' },
     { segment: 'aaa', label: 'AAA (blue)' },
-    { segment: 'casual', label: 'Casual (green)' }
+    { segment: 'casual', label: 'Casual (green)' },
+    // No segment rule matches "plain", so the box keeps the banner's own blue.
+    { segment: 'plain', label: 'Banner blue' }
   ];
 
   let autoSegment = '';
