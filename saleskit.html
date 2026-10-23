@@ -1220,6 +1220,12 @@
       display: inline-block;
     }
 
+    /* The display has no ranking colour, but is bold like the ranked specs. */
+    li[data-spec-key="display"] .spec-value,
+    li[data-spec-key="panel"] .spec-value {
+      font-weight: 700;
+    }
+
     .spec-rank {
       padding: 1px 7px;
       border-radius: 5px;
