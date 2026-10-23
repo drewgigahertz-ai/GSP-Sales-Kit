@@ -6,6 +6,7 @@ let connection = null;
 let activePath = null;
 const { buildBannerData, matchKey } = require('./banner-data');
 const { createFeatureBannerResolver } = require('./feature-banners');
+const { createUsabilityLookup } = require('./app-usability');
 
 const SHEET_TABLES = new Set([
   'banner_laptops',
@@ -14,6 +15,7 @@ const SHEET_TABLES = new Set([
   'banner_prices',
   'features_banner',
   'ageing_banner',
+  'usability',
   'specs',
   'criteria_segment_application',
   'dv_transposed',
@@ -502,6 +504,7 @@ function getInitialData() {
   });
   const ukspPerSkuData = makeUkspData(getRows('uksp_transposed'), modelBySku);
   const logoData = makeLogoData(getRows('logo'));
+  const usabilityOf = createUsabilityLookup(getRows('usability'));
   const appsLogoMap = Object.fromEntries(applicationMatrix.applications.map(({ name, icon }) => [name, icon]));
   const skuImageMap = Object.fromEntries(Object.values(specsBySku).map((spec) => [spec.cleanSku, spec.image]));
   const skuBrandMap = Object.fromEntries(Object.values(specsBySku).map((spec) => [spec.cleanSku, spec.brand]));
@@ -519,7 +522,9 @@ function getInitialData() {
     appsBenefitMap: {},
     appsLogoMap,
     appsIconBase64Map: {},
-    appsDataList: applicationMatrix.applications.map(({ name, hierarchy, icon, tierLabel }) => ({ name, hierarchy, icon, tierLabel })),
+    appsDataList: applicationMatrix.applications.map(({ name, hierarchy, icon, tierLabel }) => ({
+      name, hierarchy, icon, tierLabel, ...(usabilityOf(name) || {})
+    })),
     featuresList: ukspPerSkuData.features,
     featureBenefitMap: {},
     featureIconMap: {},

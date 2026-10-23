@@ -1,5 +1,5 @@
-// Presentation view, Applications and Features tabs: the application / feature name opens a dropdown of
-// every slide; picking one jumps straight to it. The arrows and the slideshow keep working, and the
+// Presentation view, Features tab: the feature name opens a dropdown of every slide (the Applications tab has
+// its own multi-select, see presentation-apps-picker.js); picking one jumps straight to it. The arrows and the slideshow keep working, and the
 // dropdown follows the slide on screen. The Reco Table tab keeps the plain title.
 // The title itself stays as it is (with an arrow after it); an invisible dropdown lies over it.
 (function () {
@@ -84,9 +84,10 @@
       } catch {
         return;
       }
-      const useDropdown = mode !== 'reco' && slides.length > 1;
+      // Applications have their own multi-select instead (presentation-apps-picker.js).
+      const useDropdown = mode === 'features' && slides.length > 1;
       select.hidden = !useDropdown;
-      title.classList.toggle('has-jump', useDropdown);
+      if (mode !== 'apps') title.classList.toggle('has-jump', useDropdown);
       if (!useDropdown) return;
       select.setAttribute('aria-label', mode === 'features' ? 'Feature shown' : 'Application shown');
       if (shownSlides !== slides) {

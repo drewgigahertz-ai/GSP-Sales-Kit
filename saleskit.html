@@ -28,6 +28,7 @@
   <script src="./branch-mode.js" defer></script>
   <script src="./hotkeys.js" defer></script>
   <script src="./presentation-jump.js" defer></script>
+  <script src="./presentation-apps-picker.js" defer></script>
   <script src="./price-notify.js" defer></script>
   <script src="./updates.js" defer></script>
   <script>
@@ -1599,6 +1600,29 @@
       line-height: 1.2;
     }
 
+    /* Who the application is for and what it is (USABILITY sheet), under its name. */
+    .saleskit-app-usability,
+    .saleskit-app-description {
+      margin-top: 6px;
+      font-size: 0.72rem;
+      line-height: 1.3;
+      text-align: center;
+    }
+
+    .saleskit-app-usability {
+      color: #003ecb;
+      font-weight: 600;
+    }
+
+    .saleskit-app-usability span {
+      font-weight: 800;
+    }
+
+    .saleskit-app-description {
+      margin-top: 3px;
+      color: #475569;
+    }
+
     .saleskit-sheet-badge-wrap {
       margin-top: 4px;
       display: flex;
@@ -2287,6 +2311,11 @@
 
     .saleskit-presentation-row .saleskit-app-name {
       font-size: calc(clamp(0.85rem, 1.8vw, 1.45rem) * max(var(--pres-fit, 1), 0.75));
+    }
+
+    .saleskit-presentation-row .saleskit-app-usability,
+    .saleskit-presentation-row .saleskit-app-description {
+      font-size: calc(clamp(0.72rem, 1.05vw, 0.95rem) * max(var(--pres-fit, 1), 0.8));
     }
 
     .saleskit-presentation-row .saleskit-feature-main-spec,
@@ -5056,6 +5085,8 @@
         let iconUrl = '';
         let hierarchy = 1;
         let tierLabel = '';
+        let usability = '';
+        let description = '';
         if (typeof item === 'string') {
           appName = item.trim();
           iconUrl = (appsLogoMap && appsLogoMap[appName]) ? appsLogoMap[appName] : '';
@@ -5065,6 +5096,8 @@
           iconUrl = item.icon || (appsLogoMap && appsLogoMap[appName]) || '';
           hierarchy = Number(item.hierarchy) || (appHierarchyMap && appHierarchyMap[appName.toLowerCase()]) || getDefaultAppHierarchy(appName);
           tierLabel = item.tierLabel || item.tierName || '';
+          usability = String(item.usability || '').trim();
+          description = String(item.description || '').trim();
         }
         if (!appName) return;
         const id = 'app_' + appName.toLowerCase().replace(/[^a-z0-9]/g, '_');
@@ -5084,6 +5117,8 @@
           name: appName,
           hierarchy: hierarchy,
           tierLabel: tierLabel,
+          usability: usability,
+          description: description,
           icon: icon,
           hasSheetIcon: Boolean(iconUrl)
         });
@@ -8692,6 +8727,8 @@
             <div class="saleskit-app-cell">
               <img class="saleskit-app-icon" src="${iconSrc}" alt="${escapeHtml(app.name)}" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/e/e1/Google_Chrome_icon_%28February_2022%29.svg'">
               <div class="saleskit-app-name">${escapeHtml(app.name)}</div>
+              ${app.usability ? `<div class="saleskit-app-usability"><span>Best for:</span> ${escapeHtml(app.usability)}</div>` : ''}
+              ${app.description ? `<div class="saleskit-app-description">${escapeHtml(app.description)}</div>` : ''}
             </div>
             <div class="saleskit-metric-cell">
               ${formatAppUkspCell({ value: valExceed }, 'exceed')}

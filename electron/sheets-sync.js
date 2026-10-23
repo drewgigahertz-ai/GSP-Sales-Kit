@@ -20,6 +20,7 @@ const REQUEST_TIMEOUT_MS = 3 * 60 * 1000;
 const { BANNER_SHEETS, normalizeBannerSheets } = require('./banner-data');
 const { FEATURES_BANNER_SHEET, featuresBannerCollection } = require('./feature-banners');
 const { AGEING_BANNER_SHEET, ageingBannerCollection } = require('./ageing-banners');
+const { USABILITY_SHEET, usabilityCollection } = require('./app-usability');
 
 function collectionName(sheetName) {
   return sheetName.toLowerCase().trim().replace(/[\/\s]+/g, '_');
@@ -180,6 +181,17 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
       valueRenderOption: 'FORMATTED_VALUE'
     });
     result.ageing_banner = ageingBannerCollection(response.data.values || []);
+  }
+
+  // Who each application is for (see app-usability.js); skipped when the tab is missing.
+  const usabilityTitle = titles.find((name) => name.trim().toUpperCase() === USABILITY_SHEET);
+  if (usabilityTitle) {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `'${usabilityTitle.replace(/'/g, "''")}'!A:C`,
+      valueRenderOption: 'FORMATTED_VALUE'
+    });
+    result.usability = usabilityCollection(response.data.values || []);
   }
 
   return result;

@@ -43,6 +43,7 @@
       "!electron/local-api.js",
       "!electron/banner-data.js",
       "!electron/feature-banners.js",
+      "!electron/app-usability.js",
       "!electron/ageing-banners.js",
       "!node_modules/googleapis{,/**/*}",
       "!node_modules/better-sqlite3{,/**/*}",
@@ -55,6 +56,7 @@
       "branch-mode.js",
       "hotkeys.js",
       "presentation-jump.js",
+      "presentation-apps-picker.js",
       "price-notify.js",
       "updates.js",
       "package.json"
