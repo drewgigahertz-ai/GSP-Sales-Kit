@@ -4,9 +4,13 @@
   const RELEASES = [
     {
       version: '1.0.15',
-      date: 'October 22, 2026',
+      date: 'October 23, 2026',
       changes: [
-        'Banner: Download button (or Ctrl+D) saves the banner on screen as a picture.',
+        'Banner: Download button (or Ctrl+D) saves the banner on screen as a picture; logos keep their shape.',
+        'Banner: Colour dropdown: the colour follows the segment, or pick another one (or the banner blue).',
+        'Banner: hotkeys for every dropdown and button; hover over one to see its key.',
+        'Banner: the price codes at the bottom are shown without commas and decimals.',
+        'Reco Table: the display shows the full resolution, in bold, without ranking colours.',
         'Banner: pick a branch to list only the laptops in stock there, each with "N in stock".',
         'Banner: the banner colour follows the picked branch\'s segment.',
         'Banner: bigger promo pictures.',
