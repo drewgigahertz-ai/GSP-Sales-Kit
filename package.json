@@ -56,6 +56,7 @@
       "branch-mode.js",
       "hotkeys.js",
       "presentation-picker.js",
+      "feature-banner-status.js",
       "price-notify.js",
       "updates.js",
       "package.json"

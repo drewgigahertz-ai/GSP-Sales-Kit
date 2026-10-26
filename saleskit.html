@@ -27,6 +27,7 @@
   <script src="./activity-tracker.js" defer></script>
   <script src="./branch-mode.js" defer></script>
   <script src="./hotkeys.js" defer></script>
+  <script src="./feature-banner-status.js"></script>
   <script src="./presentation-picker.js" defer></script>
   <script src="./price-notify.js" defer></script>
   <script src="./updates.js" defer></script>
@@ -5506,6 +5507,8 @@
         const isVis = (menu.style.display === 'block');
         menu.style.display = isVis ? 'none' : 'block';
         if (!isVis) {
+          // The result may have changed since the list was built: regroup it for the laptops shown now.
+          if (window.FeatureBannerStatus) FeatureBannerStatus.groupSalesKitList();
           const inp = document.getElementById('salesKitFeaturesSearchInput');
           if (inp) {
             inp.value = '';
@@ -5577,6 +5580,9 @@
         }
       });
 
+      // Banner dots and Recommended / Not recommended groups (feature-banner-status.js).
+      if (window.FeatureBannerStatus) FeatureBannerStatus.groupSalesKitList();
+
       updateFeaturesDisplayText();
       filterFeaturesMenu(document.getElementById('featuresSearchInput')?.value);
       filterSalesKitFeaturesMenu(document.getElementById('salesKitFeaturesSearchInput')?.value);
@@ -5594,7 +5600,9 @@
     }
 
     function selectAllFeatures() {
-      selectedFeatures = [...getActiveFeaturesList()];
+      // Once a result exists, only the features with a banner on at least one of its laptops.
+      const features = getActiveFeaturesList();
+      selectedFeatures = window.FeatureBannerStatus ? FeatureBannerStatus.recommendedOnly([...features]) : [...features];
       populateFeaturesDropdown();
       updateMatchedFeaturesInRecoResults();
       try { renderSalesKitMatrix(); } catch(e) {}

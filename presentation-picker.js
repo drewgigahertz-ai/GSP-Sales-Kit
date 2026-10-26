@@ -160,7 +160,16 @@
     },
     features: {
       label: 'Features',
-      items: () => getActiveFeaturesList().map((feature) => ({ key: feature, name: feature, iconClass: getUkspFeatureIcon(feature) })),
+      // Banner dots and Recommended / Not recommended groups (feature-banner-status.js).
+      items: () => {
+        const laptops = window.FeatureBannerStatus ? FeatureBannerStatus.laptops() : [];
+        return getActiveFeaturesList().map((feature) => ({
+          key: feature,
+          name: feature,
+          iconClass: getUkspFeatureIcon(feature),
+          banners: window.FeatureBannerStatus ? FeatureBannerStatus.statusOf(feature, laptops) : null
+        }));
+      },
       selected: () => selectedFeatures,
       toggle: (key) => handleFeatureToggle(key),
       selectAll: () => selectAllFeatures(),
@@ -231,7 +240,7 @@
       panel.querySelector('.picker-label').textContent = now.source.label;
       search.placeholder = `Search ${now.source.label.toLowerCase()}...`;
       list.setAttribute('aria-label', now.source.label);
-      list.replaceChildren(...now.source.items().map((item) => {
+      const rows = now.source.items().map((item) => {
         const row = document.createElement('label');
         const box = document.createElement('input');
         box.type = 'checkbox';
@@ -250,8 +259,24 @@
         const name = document.createElement('span');
         name.textContent = item.name;
         row.append(box, icon, name);
-        return row;
-      }));
+        if (item.banners) {
+          row.appendChild(FeatureBannerStatus.dotsElement(item.banners));
+          row.classList.toggle('feature-is-not-recommended', item.banners.known && !item.banners.recommended);
+        }
+        return { row, item };
+      });
+      // Features of a generated result: Recommended first, then Not recommended, each under its heading.
+      const grouped = rows.some(({ item }) => item.banners && item.banners.known);
+      if (grouped) {
+        const recommended = rows.filter(({ item }) => item.banners.recommended).map(({ row }) => row);
+        const notRecommended = rows.filter(({ item }) => !item.banners.recommended).map(({ row }) => row);
+        list.replaceChildren(
+          ...(recommended.length ? [FeatureBannerStatus.groupHead(true), ...recommended] : []),
+          ...(notRecommended.length ? [FeatureBannerStatus.groupHead(false), ...notRecommended] : [])
+        );
+      } else {
+        list.replaceChildren(...rows.map(({ row }) => row));
+      }
       filter();
     }
 
