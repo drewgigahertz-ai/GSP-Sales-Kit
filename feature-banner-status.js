@@ -132,18 +132,19 @@
     );
   }
 
-  // When the result's laptops change (a new recommendation or a swapped laptop), the Not recommended features are
-  // unticked; features ticked by hand afterwards stay until the laptops change again. Returns true when the
-  // selection changed.
+  // When the result's laptops change (a new recommendation or a swapped laptop), every Recommended feature is
+  // ticked and every Not recommended one unticked; changes made by hand afterwards stay until the laptops change
+  // again. Returns true when the selection changed.
   let resultKey = null;
   function untickNotRecommendedForNewResult() {
     const list = laptops();
     const key = list.map((laptop) => laptop.sku).join('|');
     if (!list.length || key === resultKey) return false;
     resultKey = key;
-    const kept = selectedFeatures.filter((feature) => statusOf(feature, list).recommended);
-    if (kept.length === selectedFeatures.length) return false;
-    selectedFeatures = kept;
+    const recommended = getActiveFeaturesList().filter((feature) => statusOf(feature, list).recommended);
+    const same = recommended.length === selectedFeatures.length && recommended.every((feature) => selectedFeatures.includes(feature));
+    if (same) return false;
+    selectedFeatures = recommended;
     return true;
   }
 
