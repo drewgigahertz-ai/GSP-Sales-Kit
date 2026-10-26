@@ -5494,7 +5494,9 @@
     // and keep any feature the user unticked unticked.
     function syncSelectedFeaturesWithSheet() {
       const activeFeatures = getActiveFeaturesList();
-      const addedFeatures = activeFeatures.filter(f => !knownFeatures.includes(f));
+      // New features from the sheet are ticked, except those with no banner on the result's laptops.
+      const newFeatures = activeFeatures.filter(f => !knownFeatures.includes(f));
+      const addedFeatures = window.FeatureBannerStatus ? FeatureBannerStatus.recommendedOnly(newFeatures) : newFeatures;
       selectedFeatures = activeFeatures.filter(f => selectedFeatures.includes(f) || addedFeatures.includes(f));
       knownFeatures = [...activeFeatures];
     }
@@ -8665,6 +8667,8 @@
       const grid = document.getElementById('salesKitMatrixGrid');
       if (!grid) return;
       renderSalesKitFeatureBannerTabs();
+      // A new result unticks the features none of its laptops has a banner for (feature-banner-status.js).
+      if (window.FeatureBannerStatus && FeatureBannerStatus.untickNotRecommendedForNewResult()) populateFeaturesDropdown();
 
       const exceedObj = getSelectedLaptopForTier('exceed');
       const meetObj = getSelectedLaptopForTier('meet');

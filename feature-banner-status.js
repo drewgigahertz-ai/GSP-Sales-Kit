@@ -30,6 +30,12 @@
       background: #dc2626;
     }
 
+    /* The row number badges (A3, A11, ...) all take the same width, so the dots line up. */
+    #salesKitFeaturesCheckboxesList .feature-checkbox-row .badge {
+      min-width: 2.9em;
+      text-align: center;
+    }
+
     .feature-group-head {
       padding: 5px 12px 3px;
       background: #f8fafc;
@@ -126,5 +132,22 @@
     );
   }
 
-  window.FeatureBannerStatus = { statusOf, laptops, dotsElement, groupHead, recommendedOnly, groupSalesKitList };
+  // When the result's laptops change (a new recommendation or a swapped laptop), the Not recommended features are
+  // unticked; features ticked by hand afterwards stay until the laptops change again. Returns true when the
+  // selection changed.
+  let resultKey = null;
+  function untickNotRecommendedForNewResult() {
+    const list = laptops();
+    const key = list.map((laptop) => laptop.sku).join('|');
+    if (!list.length || key === resultKey) return false;
+    resultKey = key;
+    const kept = selectedFeatures.filter((feature) => statusOf(feature, list).recommended);
+    if (kept.length === selectedFeatures.length) return false;
+    selectedFeatures = kept;
+    return true;
+  }
+
+  window.FeatureBannerStatus = {
+    statusOf, laptops, dotsElement, groupHead, recommendedOnly, groupSalesKitList, untickNotRecommendedForNewResult
+  };
 })();
