@@ -3,6 +3,16 @@
 (function () {
   const RELEASES = [
     {
+      version: '1.0.18',
+      date: 'October 27, 2026',
+      changes: [
+        'New Flyers tab (Ctrl+4): a printable flyer of your branch’s recommended laptops, with SRP and special cash discount. Download as PDF or PNG, or print.',
+        'Keyboard shortcuts: press ? or click the keyboard button in the header to see the keys for each page.',
+        'New keys: Ctrl+Shift+E / M / B open the Exceed / Meet / Budget lists; arrow keys and Enter choose an option in any list.',
+        'Presentation: Esc closes an open feature banner first; B+1 / B+2 / B+3 view a laptop’s feature banner.'
+      ]
+    },
+    {
       version: '1.0.17',
       date: 'October 27, 2026',
       changes: [
