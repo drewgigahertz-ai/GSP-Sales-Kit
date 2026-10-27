@@ -1,6 +1,6 @@
 // Keyboard shortcuts cheat sheet: the ⌨ button in the header, or ? anywhere (not while typing), opens a short list
-// of the keys for the page on screen (Reco Table, Sales Kit, Banner or the presentation), plus the few that work
-// everywhere. The Banner page sends its ? here (banner-hotkeys.js → banner-bridge.js).
+// of keys with a tab per page (Reco Table, Sales Kit, Banner, Presentation), on the page on screen, plus the few
+// that work everywhere. The Banner page sends its ? here (banner-hotkeys.js → banner-bridge.js).
 (function () {
   const EVERYWHERE = [
     ['Ctrl + 1 / 2 / 3', 'Reco Table / Sales Kit / Banner'],
@@ -107,6 +107,31 @@
       margin: 0;
       color: #c9d6ff;
       font-size: .82rem;
+    }
+
+    .hotkey-help-tabs {
+      display: flex;
+      gap: 4px;
+      padding: 10px 22px 0;
+      border-bottom: 1px solid #e2e8f0;
+      background: #f8fafc;
+    }
+
+    .hotkey-help-tabs button {
+      padding: 8px 14px;
+      border: 0;
+      border-bottom: 3px solid transparent;
+      background: none;
+      color: #64748b;
+      font: inherit;
+      font-size: .85rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .hotkey-help-tabs button.is-active {
+      border-bottom-color: #003ecb;
+      color: #0012b3;
     }
 
     .hotkey-help-body {
@@ -222,9 +247,10 @@
     }
   }
 
+  // Opens on the tab of the page on screen (or the one given); the other pages are a tab away.
   function open(pageName) {
     close();
-    const page = PAGES[pageName] || PAGES[currentPage()];
+    let shown = PAGES[pageName] ? pageName : currentPage();
     backdrop = element('div', 'hotkey-help-backdrop');
     backdrop.addEventListener('mousedown', (event) => {
       if (event.target === backdrop) close();
@@ -237,13 +263,32 @@
     const header = element('div', 'hotkey-help-header');
     header.innerHTML = '<i class="bi bi-keyboard" aria-hidden="true"></i>';
     const heading = element('div');
-    const title = element('h2', '', `Shortcuts: ${page.title}`);
+    const title = element('h2', '', 'Keyboard shortcuts');
     title.id = 'hotkeyHelpTitle';
     heading.append(title, element('p', '', 'Hover over any button to see its key too.'));
     header.appendChild(heading);
 
+    const tabs = element('div', 'hotkey-help-tabs');
+    tabs.setAttribute('role', 'tablist');
     const body = element('div', 'hotkey-help-body');
-    body.append(section(page.title, page.keys), section('Everywhere', EVERYWHERE));
+    function show(name) {
+      shown = name;
+      tabs.querySelectorAll('button').forEach((tab) => {
+        const active = tab.dataset.page === name;
+        tab.classList.toggle('is-active', active);
+        tab.setAttribute('aria-selected', String(active));
+      });
+      body.replaceChildren(section(PAGES[name].title, PAGES[name].keys), section('Everywhere', EVERYWHERE));
+    }
+    Object.entries(PAGES).forEach(([name, page]) => {
+      const tab = element('button', '', page.title);
+      tab.type = 'button';
+      tab.dataset.page = name;
+      tab.setAttribute('role', 'tab');
+      tab.addEventListener('click', () => show(name));
+      tabs.appendChild(tab);
+    });
+    show(shown);
 
     const footer = element('div', 'hotkey-help-footer');
     footer.appendChild(element('span', '', 'Press ? or Esc to close'));
@@ -252,7 +297,7 @@
     ok.addEventListener('click', close);
     footer.appendChild(ok);
 
-    dialog.append(header, body, footer);
+    dialog.append(header, tabs, body, footer);
     backdrop.appendChild(dialog);
     // Inside the presentation while it is fullscreen, so it shows over it.
     const overlay = document.getElementById('salesKitPresentation');
