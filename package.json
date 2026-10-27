@@ -57,6 +57,7 @@
       "hotkeys.js",
       "presentation-picker.js",
       "feature-banner-status.js",
+      "reco-promos.js",
       "price-notify.js",
       "updates.js",
       "package.json"

@@ -28,6 +28,7 @@
   <script src="./branch-mode.js" defer></script>
   <script src="./hotkeys.js" defer></script>
   <script src="./feature-banner-status.js"></script>
+  <script src="./reco-promos.js"></script>
   <script src="./presentation-picker.js" defer></script>
   <script src="./price-notify.js" defer></script>
   <script src="./updates.js" defer></script>
@@ -6207,6 +6208,8 @@
       const imgEl = document.getElementById('img' + cap);
       const specsEl = document.getElementById('specs' + cap);
       const stockBadgeEl = document.getElementById('stock' + cap);
+      // "N promos available" under the price when the laptop has several promo rows (reco-promos.js).
+      if (window.RecoPromos) RecoPromos.show(tier, prod);
 
       if (!prod) {
         if (displayInput) displayInput.textContent = `No ${tier.toUpperCase()} in stock for ${selectedLocation || 'branch'}`;
