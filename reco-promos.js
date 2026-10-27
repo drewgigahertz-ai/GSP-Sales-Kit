@@ -1,12 +1,35 @@
-// Reco Table cards: when a laptop has more than one promo row in the pricing sheet, a note under its price says
-// "N promos available" and opens the list (promo title and cash price). The card's price stays the one the app
-// picked (a dated promo first, else the upper row). A <details> element, so it also opens in the presentation's
-// copy of the result without extra code.
+// Reco Table cards: when a laptop has more than one promo row in the pricing sheet, its price works as a quiet
+// dropdown (a small chevron after it): clicking it lists every promo title with its cash price. The card's price
+// stays the one the app picked (a dated promo first, else the upper row). The click is an attribute and the list a
+// <details> element, so both still work in the presentation's copy of the result.
 (function () {
   const style = document.createElement('style');
   style.textContent = `
+    .reco-price-tag.has-promos {
+      cursor: pointer;
+    }
+
+    .reco-price-tag.has-promos::after {
+      content: '\\F282';
+      margin-left: 4px;
+      font-family: 'bootstrap-icons';
+      font-size: 0.6em;
+      vertical-align: middle;
+      opacity: .35;
+      transition: opacity .15s, transform .15s;
+      display: inline-block;
+    }
+
+    .reco-price-tag.has-promos:hover::after {
+      opacity: .8;
+    }
+
+    .reco-price-tag.has-promos.is-open::after {
+      transform: rotate(180deg);
+      opacity: .8;
+    }
+
     .reco-promos {
-      margin-top: 6px;
       font-size: 0.74rem;
       text-align: center;
     }
@@ -16,29 +39,7 @@
     }
 
     .reco-promos summary {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 2px 10px;
-      border: 1px solid #fcd34d;
-      border-radius: 999px;
-      background: #fffbeb;
-      color: #92400e;
-      font-weight: 700;
-      cursor: pointer;
-      list-style: none;
-    }
-
-    .reco-promos summary::-webkit-details-marker {
       display: none;
-    }
-
-    .reco-promos summary .bi {
-      transition: transform .15s;
-    }
-
-    .reco-promos[open] summary .bi-chevron-down {
-      transform: rotate(180deg);
     }
 
     .reco-promos ul {
@@ -121,18 +122,24 @@
     }
     const { item, rows } = prod ? promoRowsFor(prod) : { item: null, rows: [] };
     note.open = false;
-    if (rows.length < 2) {
+    tag.classList.remove('is-open');
+    const several = rows.length > 1;
+    tag.classList.toggle('has-promos', several);
+    if (several) {
+      tag.setAttribute('onclick', 'RecoPromos.toggle(this)');
+      tag.title = `${rows.length} promos`;
+    } else {
+      tag.removeAttribute('onclick');
+      tag.removeAttribute('title');
+    }
+    if (!several) {
       note.hidden = true;
       note.replaceChildren();
       return;
     }
     note.hidden = false;
     const summary = document.createElement('summary');
-    summary.innerHTML = '<i class="bi bi-tags-fill"></i>';
-    summary.append(` ${rows.length} promos available `);
-    const chevron = document.createElement('i');
-    chevron.className = 'bi bi-chevron-down';
-    summary.appendChild(chevron);
+    summary.textContent = `${rows.length} promos`;
     const list = document.createElement('ul');
     // The row whose prices the card shows (the first one with the same prices).
     const shown = rows.find((row) => row.cash === item.cash && row.srp === item.srp && row.twelveMonths === item.twelveMonths);
@@ -155,5 +162,13 @@
     note.replaceChildren(summary, list);
   }
 
-  window.RecoPromos = { show };
+  // The price was clicked: open or close its list (the <details> right after it).
+  function toggle(tag) {
+    const note = tag.nextElementSibling;
+    if (!note || !note.classList.contains('reco-promos')) return;
+    note.open = !note.open;
+    tag.classList.toggle('is-open', note.open);
+  }
+
+  window.RecoPromos = { show, toggle };
 })();
