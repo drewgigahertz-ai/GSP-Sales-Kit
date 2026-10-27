@@ -1024,8 +1024,10 @@ body.is-loading { overflow: hidden; }
     closeModal();
     var name = "Flyer-" + String(branch || "sheet").replace(/[^\w-]+/g, "_");
     var scale = 2;
-    setLoading(true, "Preparing the download…");
-    setProgress(50);
+    // Only the toolbar shows the work: the loading look (faded, one screen tall) would end up in the picture.
+    el("flyerStatus").textContent = "Preparing the download…";
+    el("download").disabled = true;
+    el("print").disabled = true;
     document.body.classList.add("capturing");
     html2canvas(el("sheet"), { scale: scale, useCORS: true, backgroundColor: "#ffffff" }).then(function (canvas) {
       var cuts = buildPages(canvas, scale);
@@ -1063,8 +1065,9 @@ body.is-loading { overflow: hidden; }
       el("flyerStatus").textContent = "Download failed: " + (e.message || e);
     }).finally(function () {
       document.body.classList.remove("capturing");
-      setProgress(100);
-      setLoading(false);
+      if (el("flyerStatus").textContent === "Preparing the download…") el("flyerStatus").textContent = "";
+      el("download").disabled = !branchReady() || !sections.length;
+      el("print").disabled = !branchReady() || !sections.length;
     });
   }
 
