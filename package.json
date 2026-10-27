@@ -55,6 +55,7 @@
       "activity-tracker.js",
       "branch-mode.js",
       "hotkeys.js",
+      "dropdown-keys.js",
       "presentation-picker.js",
       "feature-banner-status.js",
       "reco-promos.js",

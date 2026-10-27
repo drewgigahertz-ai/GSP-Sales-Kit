@@ -3,9 +3,11 @@
 //   Ctrl+Shift+A Application selection · Ctrl+Shift+R Recommendation selection · Ctrl+Shift+P Present
 //   Ctrl+D or Ctrl+Shift+D Download (Result on the Reco Table, Image on Sales Kit)
 //   Reco Table only: Ctrl+Shift+L Location selection · Ctrl+Shift+C Copy Details · Ctrl+R Refresh Data
+//     Ctrl+Shift+E / M / B the Exceed / Meet / Budget laptop list
 //   Sales Kit only: Alt+1 Applications tab · Alt+2 Features tab · Ctrl+Shift+S that tab's selector
-// In the presentation, Ctrl+1 / Ctrl+2 / Ctrl+3 switch to its Reco Table / Applications / Features tab instead;
-// the other shortcuts are paused there (it has its own keys).
+// In the presentation, Ctrl+1 / Ctrl+2 / Ctrl+3 switch to its Reco Table / Applications / Features tab instead,
+// and Ctrl+Shift+S opens the application / feature list; the other shortcuts are paused there (it has its own keys).
+// Inside any open dropdown, the arrow keys, Enter and Esc work too (dropdown-keys.js).
 (function () {
   function page() {
     try {
@@ -53,6 +55,17 @@
     else openMenu('salesKitAppsDropdownMenu', 'toggleSalesKitAppsMenu', 'salesKitAppsSearchInput');
   }
 
+  // Reco Table: the Exceed, Meet or Budget laptop list (opened, or kept open, with the cursor in its search box).
+  function openTier(tier) {
+    const menu = document.getElementById(`${tier}DropdownMenu`);
+    if (menu && menu.style.display === 'block') {
+      const search = menu.querySelector('input');
+      if (search) search.focus();
+      return;
+    }
+    if (typeof toggleProductMenu === 'function') toggleProductMenu(tier);
+  }
+
   // Download Result (Reco Table) or Download Image (Sales Kit).
   function download() {
     click(page() === 'saleskit' ? 'btnDownloadSalesKit' : 'btnDownloadReco');
@@ -75,6 +88,9 @@
     { ctrl: true, shift: false, code: 'KeyD', pages: BOTH, label: 'Download', run: download },
     { ctrl: true, shift: true, code: 'KeyD', pages: BOTH, label: 'Download', run: download },
     { ctrl: true, shift: false, code: 'KeyR', pages: RECO, label: 'Refresh Data', run: () => click('btnRefreshData') },
+    { ctrl: true, shift: true, code: 'KeyE', pages: RECO, label: 'Exceed laptop', run: () => openTier('exceed') },
+    { ctrl: true, shift: true, code: 'KeyM', pages: RECO, label: 'Meet laptop', run: () => openTier('meet') },
+    { ctrl: true, shift: true, code: 'KeyB', pages: RECO, label: 'Budget laptop', run: () => openTier('budget') },
     { ctrl: false, alt: true, shift: false, code: 'Digit1', pages: SALESKIT, label: 'Applications tab', run: () => switchSalesKitSubTab('apps') },
     { ctrl: false, alt: true, shift: false, code: 'Digit2', pages: SALESKIT, label: 'Features tab', run: () => switchSalesKitSubTab('features') },
     { ctrl: true, shift: true, code: 'KeyS', pages: SALESKIT, label: 'Applications / Features selection', run: openSalesKitSelector }
@@ -90,6 +106,13 @@
     if (!ctrl && !alt) return false;
     if (presentationOpen()) {
       if (!ctrl || alt) return false;
+      // The application / feature list under the slide's title (presentation-picker.js).
+      if (shift && code === 'KeyS') {
+        const trigger = document.querySelector('.saleskit-presentation-picker-trigger');
+        if (!trigger || trigger.hidden) return false;
+        trigger.click();
+        return true;
+      }
       const tab = { Digit1: 'reco', Digit2: 'apps', Digit3: 'features' }[code];
       if (!tab || shift || typeof switchSalesKitPresentationMode !== 'function') return false;
       switchSalesKitPresentationMode(tab);
@@ -124,7 +147,8 @@
     tabRecoTable: 'Ctrl+1', tabSalesKit: 'Ctrl+2', tabBanner: 'Ctrl+3',
     appsDisplayInput: 'Ctrl+Shift+A', locationDisplayInput: 'Ctrl+Shift+L', recoForDisplayInput: 'Ctrl+Shift+R',
     btnSalesKitSubTabApps: 'Alt+1', btnSalesKitSubTabFeatures: 'Alt+2',
-    salesKitAppsBtn: 'Ctrl+Shift+S', salesKitFeaturesBtn: 'Ctrl+Shift+S'
+    salesKitAppsBtn: 'Ctrl+Shift+S', salesKitFeaturesBtn: 'Ctrl+Shift+S',
+    exceedDisplayInput: 'Ctrl+Shift+E', meetDisplayInput: 'Ctrl+Shift+M', budgetDisplayInput: 'Ctrl+Shift+B'
   };
   Object.entries(TIPS).forEach(([id, keys]) => {
     const element = document.getElementById(id);
