@@ -1,6 +1,7 @@
 // Reco Table cards: when a laptop has more than one promo row in the pricing sheet, its price works as a quiet
-// dropdown (a small chevron after it): clicking it lists every promo title with its cash price. The card's price
-// stays the one the app picked (a dated promo first, else the upper row). The click is an attribute and the list a
+// dropdown (a small chevron after it): clicking it lists every promo title with its cash price, and picking one
+// shows that promo's price on the card. It starts on the one the app picked (a dated promo first, else the upper
+// row), and goes back to it when the card's laptop is set again. The click is an attribute and the list a
 // <details> element, so both still work in the presentation's copy of the result.
 (function () {
   const style = document.createElement('style');
@@ -65,6 +66,14 @@
 
     .reco-promos li:last-child {
       border-bottom: 0;
+    }
+
+    .reco-promos li[onclick] {
+      cursor: pointer;
+    }
+
+    .reco-promos li[onclick]:hover {
+      background: #f1f5ff;
     }
 
     .reco-promos li.is-shown {
@@ -146,6 +155,11 @@
     rows.forEach((row) => {
       const entry = document.createElement('li');
       if (row === shown) entry.classList.add('is-shown');
+      // Picking a promo shows its cash price on the card (an attribute, so it also works in the presentation).
+      if (row.cash !== null && row.cash !== undefined) {
+        entry.dataset.cash = String(row.cash);
+        entry.setAttribute('onclick', 'RecoPromos.pick(this)');
+      }
       const name = document.createElement('span');
       name.textContent = row.title;
       if (row.dates) {
@@ -170,5 +184,17 @@
     tag.classList.toggle('is-open', note.open);
   }
 
-  window.RecoPromos = { show, toggle };
+  // A promo in the list was picked: the card's price becomes that promo's cash price, and the list closes.
+  function pick(entry) {
+    const note = entry.closest('.reco-promos');
+    const tag = note && note.previousElementSibling;
+    const price = tag && tag.querySelector('.reco-price-val');
+    if (!price) return;
+    price.textContent = Number(entry.dataset.cash).toLocaleString('en-US');
+    note.querySelectorAll('li').forEach((row) => row.classList.toggle('is-shown', row === entry));
+    note.open = false;
+    tag.classList.remove('is-open');
+  }
+
+  window.RecoPromos = { show, toggle, pick };
 })();
