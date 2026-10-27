@@ -3,6 +3,16 @@
 (function () {
   const RELEASES = [
     {
+      version: '1.0.17',
+      date: 'October 27, 2026',
+      changes: [
+        'Features and Applications lists: 3 dots show which of the 3 laptops has a banner or data (green) or not (red), split into Recommended and Not recommended.',
+        'Features: a new result ticks every recommended feature automatically.',
+        'Applications: each value comes only from that laptop; an empty one shows "Not Applicable".',
+        'Reco Table: when a laptop has more than one promo, click its price to see each promo and pick one; the price changes to match.'
+      ]
+    },
+    {
       version: '1.0.16',
       date: 'October 23, 2026',
       changes: [
