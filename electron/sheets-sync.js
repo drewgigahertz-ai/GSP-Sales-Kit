@@ -21,6 +21,7 @@ const { BANNER_SHEETS, normalizeBannerSheets } = require('./banner-data');
 const { FEATURES_BANNER_SHEET, featuresBannerCollection } = require('./feature-banners');
 const { AGEING_BANNER_SHEET, ageingBannerCollection } = require('./ageing-banners');
 const { USABILITY_SHEET, usabilityCollection } = require('./app-usability');
+const { BRANCH_DETAILS_RANGE, branchDetailsCollection } = require('./branch-details');
 
 function collectionName(sheetName) {
   return sheetName.toLowerCase().trim().replace(/[\/\s]+/g, '_');
@@ -118,6 +119,11 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
           }
         }]
       };
+      // E–I: each branch's logo, store name and address, for the Flyers page (see branch-details.js).
+      const detailsRange = `${quotedName}!${BRANCH_DETAILS_RANGE}`;
+      const [shown, formulas] = await Promise.all(['FORMATTED_VALUE', 'FORMULA'].map((valueRenderOption) =>
+        sheets.spreadsheets.values.get({ spreadsheetId, range: detailsRange, valueRenderOption })));
+      result.branch_details = branchDetailsCollection(shown.data.values || [], formulas.data.values || []);
       onProgress({ phase: 'sheets', completed: index + 1, total: SHEETS.length, sheet: sheetName });
       continue;
     }

@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('saleskit', {
     return () => ipcRenderer.removeListener('sync:progress', listener);
   },
   saveBanner: (url, suggestedName) => ipcRenderer.invoke('banner:save', url, suggestedName),
+  saveFiles: (files) => ipcRenderer.invoke('files:save', files),
   getLoginInfo: () => ipcRenderer.invoke('auth:info'),
   login: (username, password) => ipcRenderer.invoke('auth:login', username, password),
   continueOffline: () => ipcRenderer.invoke('auth:offline'),

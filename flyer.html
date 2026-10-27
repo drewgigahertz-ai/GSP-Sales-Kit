@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Flyers</title>
+  <!-- FLYERS tab, shown in a frame by flyer-bridge.js: a branch's printable flyer of its Exceed / Meet / Budget
+       laptops per target market (RECO TABLE), with specs (BANNER SPECS), pictures (SPECS, DB PHOTOS), prices
+       (NEW PRICING: SRP = 12MOS, cash discount = 12MOS − cash) and the branch's logo and address (LOGO sheet). -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;500;600;700;800;900&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="./node_modules/html2canvas/dist/html2canvas.min.js"></script>
+  <script src="./node_modules/jspdf/dist/jspdf.umd.min.js"></script>
+  <style>
+  :root {
+    /* Fonts (offline: the system sans-serif) */
+    --font-heading: 'Nunito', 'Segoe UI', sans-serif;
+    --font-body: 'Mulish', 'Segoe UI', sans-serif;
+
+    /* Font Size */
+    --font-size-xxs: 10px;
+    --font-size-xs: 12px;
+    --font-size-sm: 14px;
+    --font-size-base: 16px;
+    --font-size-md: 18px;
+    --font-size-lg: 20px;
+
+    /* Brand colors */
+    --primary: #0A11FF;
+    --primary-hover: #8A8AFF;
+
+    /* Text colors */
+    --text-primary: #1F2937;
+    --text-heading: #020433;
+    --text-muted: #6B7280;
+    --text-on-primary: #FFFFFF;
+    --text-on-accent: #020433;
+    --text-default-color: #212121;
+
+    /* Surfaces */
+    --background: #e6e9ef;
+    --surface: #FFFFFF;
+    --border: #E5E7EB;
+
+    /* Toolbar */
+    --toolbar-start: #060B99;
+    --toolbar-end: #0A11FF;
+
+    --red: #c8102e;
+    --line: #d5dbe5;
+    --paper: #ffffff;
+    --sheet-w: 8.27in;
+  }
+  @page { size: A4; margin: .35in; }
+  
+  * { 
+    box-sizing: border-box; 
+    font-family: var(--font-body);
+  }
+  html, body { margin: 0; }
+  body {
+    font-family: var(--font-body);
+    color: var(--text-default-color);
+    background: var(--background);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ---------- Toolbar (screen only) ---------- */
+  .toolbar {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: 18px;
+    height: 80px; padding: 0 24px;
+    background: linear-gradient(135deg, var(--toolbar-start) 0%, var(--toolbar-end) 100%);
+    box-shadow: 0 1px 0 rgba(244, 197, 66, 0.7), 0 8px 24px rgba(10, 17, 255, 0.22);
+  }
+  .toolbar img {
+    height: 80%;
+    max-height: 80%;
+  }
+  .branch { 
+    display: flex; 
+    height: 100%;
+    align-items: center; 
+    margin-right: auto;
+    min-width: 0; 
+  }
+  
+  .divider { width: 1px; height: 28px; background: rgba(255,255,255,.14); }
+
+  .field { 
+    display: flex; 
+    align-items: center; 
+    gap: 10px; 
+  }
+  .field > span { 
+    font-size: var(--font-size-xs); 
+    color: var(--text-on-primary); 
+    font-weight: 400; 
+    }
+  .combo { position: relative; }
+  .combo-btn {
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+    gap: 12px;
+    min-width: 200px; 
+    height: 40px;
+    padding: 0 13px 0 14px; 
+    cursor: pointer;
+    font: 600 var(--font-size-sm) var(--font-body); 
+    color: #E6E7FF; 
+    text-align: left;
+    background: rgba(3,6,120,.45); 
+    border: 1px solid rgba(255,255,255,.14); border-radius: 8px;
+  }
+  .combo-btn:hover { border-color: rgba(255,255,235,1); }
+  .combo-btn.need { border-color: #E6E7FF; color: #E6E7FF; box-shadow: 0 0 0 3px rgba(10, 17, 255,.22); }
+  .combo-btn::after {
+    content: ""; width: 12px; height: 12px; flex: none; transition: transform .15s;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f4c542' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+  .combo-btn[aria-expanded="true"]::after { transform: rotate(180deg); }
+  .combo-btn:focus-visible { outline: 3px solid var(--surface); outline-offset: 2px; }
+  .combo-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .combo-panel {
+    position: absolute; top: calc(100% + 8px); left: 0; z-index: 30;
+    width: 280px; max-width: 90vw; padding: 8px;
+    background: var(--background); color: var(--text-primary); border-radius: 12px;
+    box-shadow: 0 18px 44px rgba(5,8,120,.35), 0 0 0 1px rgba(10,17,255,.12);
+  }
+  .combo-panel[hidden] { display: none; }
+  .combo-panel input {
+    width: 100%; height: 38px; padding: 0 12px 0 36px;
+    font: 500 13.5px var(--font-body); color: var(--text-muted);
+    border: 1px solid var(--primary); border-radius: 8px; background: var(--text-on-primary)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235d6b80' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E")
+      no-repeat 11px center / 16px;
+  }
+  .combo-panel input:focus { outline: 2px solid var(--primary); outline-offset: 0; background-color: var(--surface); }
+  .combo-panel ul { list-style: none; margin: 8px 0 0; padding: 0; max-height: 250px; overflow-y: auto; }
+  .combo-panel li {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 9px 10px; border-radius: 8px; cursor: pointer;
+    font: 600 var(--font-size-sm) var(--font-body);
+  }
+  .combo-panel ul li:hover {
+    background-color: var(--primary-hover);
+  }
+  .combo-panel li.active { background: var(--primary-hover); color: var(--text-primary); }
+  .combo-panel li[aria-selected="true"] { color: var(--primary); font-weight: 800;}
+  .combo-panel li[aria-selected="true"]::before { content: "✓"; margin-right: 8px; font-weight: 700; }
+  .combo-panel li[aria-selected="true"] { justify-content: flex-start; }
+  .combo-empty { padding: 14px 10px 8px; font-size: 12.5px; color: var(--text-muted); text-align: center; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    height: 40px; padding: 0 16px; border-radius: 8px; cursor: pointer;
+    font: 600 13px var(--font-body); transition: background .15s, transform .1s, box-shadow .15s;
+  }
+  .btn svg { flex: none; }
+  .btn.ghost { background: transparent; color: var(--text-on-primary); border: 1px solid rgba(255,255,255,.3); }
+  .btn.ghost:hover { background: rgba(255,255,255,.2); border-color: rgba(255,255,255,.85); }
+  .btn.primary {
+    border: 0; color: var(--text-on-accent);
+    background: linear-gradient(135deg, #F8F9FC, #E5E7EB);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.2), 0 2px 6px rgba(201, 194, 177, 0.35);
+  }
+  .btn.secondary {
+    border: 0; color: var(--text-heading);
+    background: linear-gradient(135deg, #F8F9FC, #E5E7EB);
+    box-shadow: inset 0 1px 0 rgba(115, 120, 255,.6), 0 2px 6px rgba(230, 231, 255,.35);
+  }
+
+  .btn.primary:hover { background: linear-gradient(180deg, #E6E7FF, #BFC2FF);}
+  .btn.secondary:hover { background: linear-gradient(180deg, #E6E7FF, #BFC2FF);}
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled, .btn:disabled:hover {
+    cursor: not-allowed; opacity: .45; transform: none; box-shadow: none;
+    background: rgba(255,255,255,.14); color: #e3e6ff;
+  }
+  .btn.spin svg { animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .btn.spin svg { animation: none; } }
+
+  .toolbar :focus-visible, .pick select:focus-visible, [contenteditable]:focus-visible { outline: 3px solid var(--surface); outline-offset: 2px; }
+
+  @media (max-width: 980px) {
+    .toolbar { height: auto; flex-wrap: wrap; padding: 12px 14px; gap: 10px 14px; }
+    .divider, .branch .sub { display: none; }
+  }
+  
+  /* ---------- Flyer sheet ---------- */
+  .stage { padding: 20px 12px 4px; overflow-x: auto; }
+  .sheet {
+    position: relative;
+    width: var(--sheet-w); margin: 0 auto;
+    min-height: 297mm;
+    background: var(--paper);
+    padding: .38in .4in .3in;
+    box-sizing: border-box;
+    box-shadow: 0 8px 30px rgba(15,27,45,.18);
+  }
+  .banner       { break-after: avoid; }          /* banner never ends a page alone */
+  .row          { break-inside: avoid; }         /* keep a market's 3 cards together */
+  .foot         { break-inside: avoid; }
+
+  .masthead {
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;
+    height: 120px;
+    max-height: 120px;
+    margin-bottom: 2px;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 5%;
+  }
+  .branchDetails li p { font-family: var(--font-body); letter-spacing: .04em;  font-size: var(--font-size-xs); color: var(--text-default-color); font-weight: 800; margin: 0;}
+  .branchDetails li span{ 
+    font-family: var(--font-body); 
+    font-size: var(--font-size-xxs); 
+    color: var(--text-default-color); 
+    font-weight: 800; 
+    max-height: 40px; 
+    overflow: hidden; 
+    align-content: center;
+    margin-top: 1.5px;
+  }
+  .branchDetails {
+    gap: 1px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    list-style-type: none;
+    padding-left: 0;
+    margin: 0; 
+    height: 100%;
+    width: 45%;
+    max-height: 100%;
+  }
+  .branchDetails li {
+    align-items: top;
+    display: grid; grid-template-columns: 80px 10px 1fr; gap: auto;
+    width: 100%;
+    padding: 1px 0px; 
+  }
+  .masthead .logo{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    width: 45%;
+  }
+  .s0 { --sec: #0005A3; --sec1: #8A8EFF;}
+  .s1 { --sec: #1D5C86; --sec1: #9FCCEA;}
+  .s2 { --sec: #85281E; --sec1: #E9A79F;}
+  .s3 { --sec: #7B3B97; --sec1: #CFABDE; }
+  .s4 { --sec: #934D10; --sec1: #F3C195;}
+  .s5 { --sec: #16a085; }
+   /* #sections > :nth-child(3) { background-color: #7B0080}
+  #sections > :nth-child(5) { background-color: #878000}
+  #sections > :nth-child(7) { background-color: #007305}
+  #sections > :nth-child(9) { background-color: #020433} */
+  .banner {
+    background-color: var(--sec);
+    position: relative;
+    margin: 6px 0 2px; padding: 2px 12px;
+    font-family: var(--font-heading); font-weight: 800; font-size: var(--font-size-sm); letter-spacing: .1em;
+    text-transform: uppercase; text-align: center; color: #fff;
+    border-radius: 3px;
+  }
+ 
+  .progress {
+  width: 220px; height: 8px;
+  background: #e5e7eb; border-radius: 999px; overflow: hidden;
+  }
+  #progressBar {
+    width: 0%; height: 100%;
+    background: #2563eb; border-radius: 999px;
+    transition: width .3s ease;
+  }
+  #progressText { margin: 0; font-size: 14px; color: #6b7280; font-variant-numeric: tabular-nums; }
+
+  .banner:first-of-type { margin-top: 0; }
+
+  .row {display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+
+  /* ---------- Card ---------- */
+  .card {
+    display: flex; 
+    flex-direction: column;
+    border: 1.5px solid var(--text-on-accent);
+    border-radius: 4px; overflow: hidden; background: #fff;
+    height: 280px;
+    max-height: 280px;
+   //break-inside: avoid;
+  }
+  .photo {
+    position: relative;
+    width: 100%;
+    height: 100px; display: flex; align-items: center; justify-content: center;
+    padding: 1px; 
+    background: #fff;
+  }
+  .photo img { max-height: 100%; object-fit: contain; }
+  .photo span { font-size: 12px; color: #9aa6b8; font-weight: 500; }
+  .photo .laptop_logo { 
+    position: absolute; 
+    bottom: 4px; 
+    right: 0px; 
+    margin-right: 4px; 
+    max-height: 16px; 
+    height:16px;}
+  .model {
+    background-color: var(--sec); 
+    padding: 2px 6px; 
+    height: 32px; 
+    max-height: 32px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+  }
+   .model > span{
+    color: #fff;
+    text-align: center;
+    font-family: var(--font-heading); 
+    font-weight: 700; 
+    font-size: var(--font-size-xs); 
+    letter-spacing: .03em;
+    padding: 4px 6px; 
+    height: 100%;
+    line-height: 1.15;
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+  }
+
+  .specs { 
+    //background-color: #98E366;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    list-style: none; margin: 0; padding: 2px 10px 2px; flex: 1; 
+    width: 100%;
+    justify-content: space-between;
+    overflow: hidden;
+    }
+  .specs li {
+    display: grid; grid-template-columns: 56px 10px 1fr; gap: auto;
+    width: 100%;
+    
+    padding: 1px 0px; 
+    font-size: var(--font-size-xxs); line-height: 1; align-items: baseline;
+  }
+  .specs li:last-child { border-bottom: 0; }
+  .specs .k { color: var(--sec); font-weight: 700; }
+  .specs .v { color: var(--text-default-color); font-weight: 500; overflow-wrap: anywhere; border-bottom: 0.2px solid var(--text-muted); }
+
+  .srp {
+    display: flex; justify-content: space-between; align-items: baseline;
+    background-color: #FFF;
+    padding: 1px 10px; border-top: 1.5px solid var(--sec);
+  }
+  .srp .lab { 
+    font-family: var(--font-body); 
+    font-weight: 700; 
+    font-size: var(--font-size-sm); 
+    color: var(--text-default-color); 
+  }
+  .srp .val { font-family: var(--font-body); font-weight: 700; font-size: var(--font-size-base); color: var(--text-default-color);}
+
+  .cash {
+        min-height: 24px;
+    display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center;
+    background: var(--sec1); padding: 1px 10px; border-top: 1.5px solid var(--sec);
+  }
+  .cash .lab { font-family: var(--font-body); font-weight: 700; font-size: var(--font-size-xxs); line-height: 1.05; color: var(--text-default-color); }
+  .cash .amt { font-family: var(--font-body); font-weight: 900; font-size: var(--font-size-md); line-height: 1; color: var(--sec); text-align: right; }
+
+  .card.empty .photo span::before { content: "Model Picture"; color: var(--text-muted); }
+  .pick select:disabled { background: #eef0f6; color: #8d99ad; cursor: not-allowed; }
+  .card.empty .specs .v, .card.empty .srp .val, .card.empty .cash .amt { color: var(--text-default-color); text-decoration: none; }
+
+  .foot {
+    margin-top: 14px; 
+    border-top: 1px solid var(--text-default-color);
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .foot-content svg{
+     flex: 0 0 20px;      /* don't grow, don't shrink, 20px wide */
+    width: 20px;
+    height: 20px;
+    color: #212121;
+  }
+  .foot-content{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+  .foot-content p{
+    font-size: var(--font-size-xxs); 
+    color: var(--text-default-color);
+    text-align: justify;
+    font-weight: 800;
+    margin: 4px 0px;
+  }
+  /* lock the page and the sheet while loading */
+body.is-loading { overflow: hidden; }
+
+.sheet.loading {
+  height: 100vh;          /* fixed height: the long card list can't make it scroll */
+  max-height: 100vh;
+  overflow: hidden;
+}
+  #loader {
+ position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;   /* was flex-start with padding-top */
+  padding-top: 0;
+  gap: 12px;
+  background: rgba(255, 255, 255, .85);
+}
+#loader[hidden] { display: none; }
+
+.spinner {
+  width: 40px; height: 40px;
+  border: 4px solid #ddd;
+  border-top-color: #2980b9;
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.skel .photo,
+.skel .model span,
+.skel .specs li span,
+.skel .srp,
+.skel .cash,
+.skel-banner span {
+  background: linear-gradient(90deg, #e6e6e6 25%, #f3f3f3 50%, #e6e6e6 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+  color: transparent !important;
+  border-radius: 4px;
+}
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.dl-overlay {
+  display: none;                      /* shown by JS as flex */
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, .55);
+  backdrop-filter: blur(3px);
+  animation: dlFade .15s ease-out;
+}
+
+.dl-dialog {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  padding: 24px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, .3);
+  text-align: left;
+  animation: dlPop .18s ease-out;
+}
+
+.dl-dialog h3 { margin: 0; font-size: 20px; color: #111827; }
+.dl-sub { margin: 4px 0 18px; font-size: 14px; color: #6b7280; }
+
+.dl-close {
+  position: absolute;
+  top: 10px; right: 12px;
+  width: 32px; height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  font-size: 24px;
+  line-height: 1;
+  color: #6b7280;
+  cursor: pointer;
+}
+.dl-close:hover { background: #f3f4f6; color: #111827; }
+
+.dl-options { display: flex; flex-direction: column; gap: 10px; }
+
+.dl-opt {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, transform .1s;
+}
+.dl-opt:hover { border-color: #2563eb; background: #eff6ff; }
+.dl-opt:active { transform: scale(.98); }
+.dl-opt:focus-visible,
+.dl-cancel:focus-visible,
+.dl-close:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+
+.dl-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px; height: 44px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+}
+.dl-icon.pdf { background: #dc2626; }
+.dl-icon.img { background: #2563eb; }
+
+.dl-text { display: flex; flex-direction: column; }
+.dl-text b { font-size: 15px; color: #111827; }
+.dl-text small { font-size: 12px; color: #6b7280; }
+
+.dl-cancel {
+  width: 100%;
+  margin-top: 16px;
+  padding: 10px;
+  border: 0;
+  border-radius: 8px;
+  background: #f3f4f6;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+}
+.dl-cancel:hover { background: #e5e7eb; }
+
+@keyframes dlFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dlPop  { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .dl-overlay, .dl-dialog { animation: none; }
+}
+.sheet.loading #sections { pointer-events: none; }
+/* never appear in downloads or print */
+.capturing #loader { display: none !important; }
+.capturing .dl-overlay { display: none !important; }
+  .capturing .no-print { display: none !important; }
+  
+  @media (max-width: 900px) { .sheet { transform-origin: top left; } }
+
+  /* ---------- Print ---------- */
+  @media print {
+    body { background: #fff; }
+    .toolbar, .no-print, .add-wrap, .banner .rm, h1, title { display: none !important; }
+    .stage { padding: 0; overflow: visible; }
+    .sheet { width: auto; margin: 0; padding: 0; box-shadow: none; }
+    #loader { display: none !important; }
+    .dl-overlay { display: none !important; }
+  }
+  .sheet.loading #sections { opacity: .4; pointer-events: none; }
+
+  /* ---------- Gigahertz Sales Tools additions ---------- */
+  .branch img { max-width: 240px; object-fit: contain; object-position: left center; }
+  .photo img.failed { visibility: hidden; }
+  .combo-btn:disabled { cursor: default; opacity: .85; }
+  .combo-btn:disabled::after { display: none; }
+  .combo-panel li small { color: var(--text-muted); font-weight: 600; }
+  .branchDetails li span[contenteditable] { min-height: 12px; outline: none; }
+  .branchDetails li span[contenteditable]:empty::before { content: "Click to type"; color: #b6bdc9; }
+  .capturing .branchDetails li span[contenteditable]:empty::before { content: ""; }
+  .flyer-status { color: #E6E7FF; font-size: var(--font-size-xs); white-space: nowrap; }
+  .flyer-empty {
+    padding: 60px 20px; text-align: center; color: var(--text-muted);
+    font-size: var(--font-size-base); font-weight: 600;
+  }
+  </style>
+</head>
+<body>
+<header class="toolbar">
+  <div class="branch">
+    <img id="headerLogo" alt="Gigahertz" hidden>
+  </div>
+  <div class="divider"></div>
+  <div class="field" id="branchField">
+    <span>Branch</span>
+    <div class="combo" id="branchCombo">
+      <button type="button" id="branchBtn" class="combo-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="branchPanel" title="Branch (Ctrl+Shift+B)">
+        <span id="branchLabel">Select a branch</span>
+      </button>
+      <div class="combo-panel" id="branchPanel" hidden>
+        <input id="branchSearch" type="text" placeholder="Search branch..." autocomplete="off" aria-label="Search branches">
+        <ul id="branchOptions" role="listbox" aria-label="Branches"></ul>
+        <div class="combo-empty" id="branchEmpty" hidden>No branch found</div>
+      </div>
+    </div>
+  </div>
+  <span class="flyer-status" id="flyerStatus" aria-live="polite"></span>
+  <div class="divider"></div>
+  <button id="reload" type="button" class="btn ghost" title="Load the latest data from the SalesKit server (Ctrl+R)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+    Refresh data
+  </button>
+  <button id="download" type="button" class="btn primary" title="Download the flyer (Ctrl+D)">
+    <svg width="16px" height="16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <path d="M8 22.0002H16C18.8284 22.0002 20.2426 22.0002 21.1213 21.1215C22 20.2429 22 18.8286 22 16.0002V15.0002C22 12.1718 22 10.7576 21.1213 9.8789C20.3529 9.11051 19.175 9.01406 17 9.00195M7 9.00195C4.82497 9.01406 3.64706 9.11051 2.87868 9.87889C2 10.7576 2 12.1718 2 15.0002L2 16.0002C2 18.8286 2 20.2429 2.87868 21.1215C3.17848 21.4213 3.54062 21.6188 4 21.749" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M12 2L12 15M12 15L9 11.5M12 15L15 11.5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Download
+  </button>
+  <button id="print" type="button" class="btn secondary" title="Print the flyer (Ctrl+P)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="9" rx="2"/><rect x="7" y="14" width="10" height="7" rx="1"/></svg>
+    Print
+  </button>
+</header>
+
+<div class="stage">
+  <div class="sheet" id="sheet">
+    <div id="loader" hidden>
+      <div class="spinner"></div>
+      <p id="loaderText">Preparing the flyer…</p>
+      <div class="progress"><div id="progressBar"></div></div>
+      <p id="progressText">0%</p>
+    </div>
+    <div class="masthead">
+      <div class="logo">
+        <img id="branch-logo" alt="LOGO" style="max-height: 100%; max-width: 100%;">
+      </div>
+      <ul class="branchDetails" spellcheck="false">
+        <li><p>Store Name </p><p>:</p><span id="branchName"></span></li>
+        <li><p>Address </p><p>:</p><span id="branchAddress"></span></li>
+        <li><p>Contact No. </p><p>:</p><span id="branchContact" contenteditable="true" title="Type the contact number"></span></li>
+        <li><p>Look for </p><p>:</p><span id="branchLook" contenteditable="true" title="Type who to look for"></span></li>
+      </ul>
+    </div>
+
+    <div id="sections"></div>
+
+    <div class="foot" spellcheck="false">
+      <div class="foot-content">
+        <svg fill="#212121" width="40" height="40" viewBox="0 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg">
+          <path d="M15.5 3c-7.456 0-13.5 6.044-13.5 13.5s6.044 13.5 13.5 13.5 13.5-6.044 13.5-13.5-6.044-13.5-13.5-13.5zM15.5 27c-5.799 0-10.5-4.701-10.5-10.5s4.701-10.5 10.5-10.5 10.5 4.701 10.5 10.5-4.701 10.5-10.5 10.5zM15.5 10c-0.828 0-1.5 0.671-1.5 1.5v5.062c0 0.828 0.672 1.5 1.5 1.5s1.5-0.672 1.5-1.5v-5.062c0-0.829-0.672-1.5-1.5-1.5zM15.5 20c-0.828 0-1.5 0.672-1.5 1.5s0.672 1.5 1.5 1.5 1.5-0.672 1.5-1.5-0.672-1.5-1.5-1.5z"></path>
+        </svg>
+        <p>Prices and product availability are subject to change without prior notice. We reserve the right to correct any errors, inaccuracies, or omissions, and to update or modify information at any time without prior notice. Product images are for illustrative purposes only and may differ from the actual item.</p>
+      </div>
+      <div class="foot-content">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M12 16C14.2091 16 16 14.2091 16 12C16 9.79086 14.2091 8 12 8C9.79086 8 8 9.79086 8 12C8 14.2091 9.79086 16 12 16ZM12 14.0967C10.842 14.0967 9.90331 13.158 9.90331 12C9.90331 10.842 10.842 9.90331 12 9.90331C13.158 9.90331 14.0967 10.842 14.0967 12C14.0967 13.158 13.158 14.0967 12 14.0967Z" fill="#212121"/>
+          <path d="M7 12C7 12.5523 6.55229 13 6 13C5.44772 13 5 12.5523 5 12C5 11.4477 5.44772 11 6 11C6.55229 11 7 11.4477 7 12Z" fill="#212121"/>
+          <path d="M18 13C18.5523 13 19 12.5523 19 12C19 11.4477 18.5523 11 18 11C17.4477 11 17 11.4477 17 12C17 12.5523 17.4477 13 18 13Z" fill="#212121"/>
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M21 5C22.6569 5 24 6.34315 24 8V16C24 17.6569 22.6569 19 21 19H3C1.34315 19 0 17.6569 0 16V8C0 6.34315 1.34315 5 3 5H21ZM4 7H20C20 7.26264 20.0517 7.52272 20.1522 7.76537C20.2528 8.00802 20.4001 8.2285 20.5858 8.41421C20.7715 8.59993 20.992 8.74725 21.2346 8.84776C21.4773 8.94827 21.7374 9 22 9V15C21.7374 15 21.4773 15.0517 21.2346 15.1522C20.992 15.2528 20.7715 15.4001 20.5858 15.5858C20.4001 15.7715 20.2528 15.992 20.1522 16.2346C20.0517 16.4773 20 16.7374 20 17H4C4 16.7374 3.94827 16.4773 3.84776 16.2346C3.74725 15.992 3.59993 15.7715 3.41421 15.5858C3.2285 15.4001 3.00802 15.2528 2.76537 15.1522C2.52272 15.0517 2.26264 15 2 15V9C2.26264 9 2.52272 8.94827 2.76537 8.84776C3.00802 8.74725 3.2285 8.59993 3.41421 8.41421C3.59993 8.2285 3.74725 8.00802 3.84776 7.76537C3.94827 7.52272 4 7.26264 4 7Z" fill="#212121"/>
+        </svg>
+        <p>Cash discounts are applicable only for payments made via cash on hand or bank transfer. Other payment methods may not qualify for the same discount.</p>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="dlModal" class="dl-overlay no-print" aria-hidden="true">
+  <div class="dl-dialog" role="dialog" aria-modal="true" aria-labelledby="dlTitle">
+    <button class="dl-close" type="button" onclick="closeModal()" aria-label="Close">&times;</button>
+    <h3 id="dlTitle">Download flyer</h3>
+    <p class="dl-sub">Choose a format</p>
+    <div class="dl-options">
+      <button class="dl-opt" type="button" onclick="downloadSheet('pdf')">
+        <span class="dl-icon pdf">PDF</span>
+        <span class="dl-text">
+          <b>PDF document</b>
+          <small>Best for printing and sharing</small>
+        </span>
+      </button>
+      <button class="dl-opt" type="button" onclick="downloadSheet('png')">
+        <span class="dl-icon img">PNG</span>
+        <span class="dl-text">
+          <b>Image</b>
+          <small>One image per page</small>
+        </span>
+      </button>
+    </div>
+    <button class="dl-cancel" type="button" onclick="closeModal()">Cancel</button>
+  </div>
+</div>
+<script>
+  // ---------- Config ----------
+  var FIELDS = ["Processor", "Graphics", "Storage", "Memory", "Resolution", "OS"];
+  var SLOT_TAGS = ["EXCEED", "MEET", "BUDGET"];
+  var TARGET_MARKET_ORDER = ["Entry-level", "Productivity Users", "Performance-driven Users", "Casual Gamers", "AAA Gamers"];
+  var MARGIN_TOP = 5;      // mm, space at the top of every page after the first
+  var MARGIN_BOTTOM = 0;   // mm, space at the bottom of every page
+
+  // ---------- State (filled by flyer-bridge.js) ----------
+  var data = { rows: [], laptops: {}, branchDetails: {}, logos: {}, homeBranch: "" };
+  var sections = [];
+  var branch = "";
+  var loaded = false;
+  var branchItems = [];     // what is currently listed (after searching)
+  var branchActive = 0;     // highlighted row (keyboard / hover)
+  var progress = 0;
+  var pictures = {};        // address → address saved on this laptop (or the address itself)
+  var pictureWaits = {};
+  var requestCount = 0;
+
+  var el = function (id) { return document.getElementById(id); };
+  function toParent(message) { window.parent.postMessage(message, "*"); }
+  function norm(v) { return String(v || "").trim().toLowerCase(); }
+  function key(v) { return String(v || "").toUpperCase().replace(/\s+/g, " ").trim(); }
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function hasValue(v) { return typeof v === "number" && !isNaN(v) && v > 0; }
+  function money(v) {
+    if (v === "" || v == null || isNaN(Number(v))) return "—";
+    return "₱" + Number(v).toLocaleString("en-PH", { maximumFractionDigits: 0 });
+  }
+
+  // ---------- Pictures: saved on this laptop by SalesKit, so they show offline and in downloads ----------
+  function picture(url) {
+    if (!url) return Promise.resolve("");
+    if (pictures[url] !== undefined) return Promise.resolve(pictures[url]);
+    if (!pictureWaits[url]) {
+      pictureWaits[url] = new Promise(function (resolve) {
+        var id = "img" + (++requestCount);
+        function onReply(event) {
+          if (event.source !== window.parent || !event.data || event.data.channel !== "saleskit-flyer-image" || event.data.requestId !== id) return;
+          window.removeEventListener("message", onReply);
+          pictures[url] = event.data.url || url;
+          resolve(pictures[url]);
+        }
+        window.addEventListener("message", onReply);
+        toParent({ channel: "saleskit-flyer-image", requestId: id, url: url });
+        setTimeout(function () { if (pictures[url] === undefined) { pictures[url] = url; resolve(url); } }, 15000);
+      });
+    }
+    return pictureWaits[url];
+  }
+  // <img data-src> → the saved picture.
+  function fillPictures(root) {
+    return Promise.all(Array.from(root.querySelectorAll("img[data-src]")).map(function (img) {
+      return picture(img.getAttribute("data-src")).then(function (src) {
+        if (src) img.src = src;
+        img.removeAttribute("data-src");
+      });
+    }));
+  }
+
+  // ---------- Branches (RECO TABLE column A; a branch account sees only its own) ----------
+  function branchList() {
+    var seen = {}, out = [];
+    data.rows.forEach(function (r) {
+      var b = String(r.branch || "").trim();
+      if (b && !seen[key(b)]) { seen[key(b)] = true; out.push(b); }
+    });
+    return out.sort(function (a, b) { return a.localeCompare(b); });
+  }
+  function branchReady() { return loaded && !!branch; }
+  function branchLocked() { return !!data.homeBranch; }
+
+  function branchChoices(q) {
+    q = norm(q);
+    var counts = {};
+    data.rows.forEach(function (r) { var k = key(r.branch); if (k) counts[k] = (counts[k] || 0) + 1; });
+    return branchList()
+      .map(function (b) {
+        var details = data.branchDetails[key(b)] || {};
+        return { value: b, label: b, store: details.storeName || "", count: counts[key(b)] || 0 };
+      })
+      .filter(function (it) { return !q || norm(it.label + " " + it.store).indexOf(q) !== -1; });
+  }
+  function drawBranchList() {
+    branchItems = branchChoices(el("branchSearch").value);
+    if (branchActive >= branchItems.length) branchActive = branchItems.length - 1;
+    if (branchActive < 0) branchActive = 0;
+    el("branchOptions").innerHTML = branchItems.map(function (it, i) {
+      return '<li role="option" data-i="' + i + '" aria-selected="' + (key(it.value) === key(branch)) + '"' +
+        (i === branchActive ? ' class="active"' : "") + "><span>" + esc(it.label) + "</span>" +
+        (it.store ? "<small>" + esc(it.store) + "</small>" : "") + "</li>";
+    }).join("");
+    el("branchEmpty").hidden = branchItems.length > 0;
+    var act = el("branchOptions").querySelector(".active");
+    if (act && act.scrollIntoView) act.scrollIntoView({ block: "nearest" });
+  }
+  function updateBranchButton() {
+    el("branchLabel").textContent = branch || "Select a branch";
+    el("branchBtn").classList.toggle("need", !branch);
+    el("branchBtn").disabled = branchLocked();
+    el("branchBtn").title = branchLocked() ? "Your account’s branch" : "Branch (Ctrl+Shift+B)";
+  }
+  function openBranch() {
+    if (branchLocked()) return;
+    el("branchSearch").value = "";
+    branchItems = branchChoices("");
+    branchActive = 0;
+    branchItems.forEach(function (it, i) { if (key(it.value) === key(branch)) branchActive = i; });
+    el("branchPanel").hidden = false;
+    el("branchBtn").setAttribute("aria-expanded", "true");
+    drawBranchList();
+    el("branchSearch").focus();
+  }
+  function closeBranch(refocus) {
+    el("branchPanel").hidden = true;
+    el("branchBtn").setAttribute("aria-expanded", "false");
+    if (refocus) el("branchBtn").focus();
+  }
+  function chooseBranch(i) {
+    if (!branchItems[i]) return;
+    branch = branchItems[i].value;
+    updateBranchButton();
+    closeBranch(true);
+    showBranchFlyer();
+  }
+
+  el("branchBtn").addEventListener("click", function () { el("branchPanel").hidden ? openBranch() : closeBranch(false); });
+  el("branchBtn").addEventListener("keydown", function (e) {
+    if (e.key === "ArrowDown") { e.preventDefault(); openBranch(); }
+  });
+  el("branchSearch").addEventListener("input", function () { branchActive = 0; drawBranchList(); });
+  el("branchSearch").addEventListener("keydown", function (e) {
+    if (e.key === "ArrowDown") { e.preventDefault(); branchActive = Math.min(branchActive + 1, branchItems.length - 1); drawBranchList(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); branchActive = Math.max(branchActive - 1, 0); drawBranchList(); }
+    else if (e.key === "Enter") { e.preventDefault(); chooseBranch(branchActive); }
+    else if (e.key === "Escape") { e.preventDefault(); closeBranch(true); }
+    else if (e.key === "Tab") { closeBranch(false); }
+  });
+  el("branchOptions").addEventListener("click", function (e) {
+    var li = e.target.closest("li");
+    if (li) chooseBranch(+li.dataset.i);
+  });
+  el("branchOptions").addEventListener("mousemove", function (e) {
+    var li = e.target.closest("li");
+    if (li && +li.dataset.i !== branchActive) {
+      branchActive = +li.dataset.i;
+      Array.prototype.forEach.call(this.children, function (c) { c.classList.toggle("active", c === li); });
+    }
+  });
+  document.addEventListener("click", function (e) {
+    if (!el("branchCombo").contains(e.target)) closeBranch(false);
+  });
+
+  // ---------- Laptops and prices ----------
+  function laptopFor(desc) { return desc ? data.laptops[key(desc)] || null : null; }
+
+  // SRP = 12MOS; the special cash discount = 12MOS − cash. A branch's own price row wins over the regular one.
+  function priceFor(desc) {
+    var p = laptopFor(desc);
+    if (!p) return null;
+    var price = (p.branchPrices && p.branchPrices[key(branch)]) || p.prices || null;
+    if (!price || price.twelveMonths == null) return null;
+    var srp = Number(price.twelveMonths);
+    var discount = price.cash == null ? null : srp - Number(price.cash);
+    return { SRP: srp, Discount: discount };
+  }
+
+  // RECO TABLE rows of the branch → one section per Target Market (fixed order), slots EXCEED / MEET / BUDGET.
+  function setRecoSections(rows) {
+    var order = [], groups = {};
+    rows.forEach(function (r) {
+      var tm = String(r.market || "").trim();
+      if (!tm) return;
+      if (!groups[tm]) { groups[tm] = []; order.push(tm); }
+      groups[tm].push(r);
+    });
+    var rank = function (tm) {
+      var i = TARGET_MARKET_ORDER.findIndex(function (m) { return norm(m) === norm(tm); });
+      return i === -1 ? TARGET_MARKET_ORDER.length : i;
+    };
+    order.sort(function (a, b) { return rank(a) - rank(b); });
+    return order.map(function (tm) {
+      var marketRows = groups[tm], used = [];
+      var slots = SLOT_TAGS.map(function (tag) {
+        var row = marketRows.find(function (r) { return used.indexOf(r) === -1 && norm(r.tag) === norm(tag); });
+        if (!row) return "";
+        used.push(row);
+        return String(row.item || "").trim();
+      });
+      return { title: tm, slots: slots };
+    });
+  }
+
+  // ---------- Rendering ----------
+  function cardHtml(model) {
+    var p = laptopFor(model);
+    var pr = priceFor(model);
+    var showCash = pr && hasValue(pr.Discount);
+    var cash = '<div class="cash">' +
+      (showCash ? '<span class="lab">Special Cash<br>Discount!</span>' : '<span class="lab lab-empty"></span>') +
+      '<span class="amt">' + (showCash ? money(pr.Discount) : "") + "</span></div>";
+    var name = p ? (p.model || model) : (model || "Model name");
+    var photo = p && p.picture ? '<img data-src="' + esc(p.picture) + '" alt="' + esc(name) + '">' : "<span>" + (model ? "No image" : "") + "</span>";
+    var logo = p && p.brandLogo ? '<img data-src="' + esc(p.brandLogo) + '" alt="">' : "";
+    var specs = FIELDS.map(function (f) {
+      var v = p && p.specs ? p.specs[f] : "";
+      return '<li><span class="k">' + f + '</span><span class="k">:</span><span class="v">' + (v ? esc(v) : "—") + "</span></li>";
+    }).join("");
+    return '<div class="card' + (model ? "" : " empty") + '">' +
+      '<div class="photo">' + photo + '<div class="laptop_logo">' + logo + "</div></div>" +
+      '<div class="model"><span>' + esc(name) + "</span></div>" +
+      '<ul class="specs">' + specs + "</ul>" +
+      '<div class="srp"><span class="lab">SRP</span><span class="val">' + (pr ? money(pr.SRP) : "—") + "</span></div>" +
+      cash + "</div>";
+  }
+
+  function showBranchDetails() {
+    var info = branch ? data.branchDetails[key(branch)] || null : null;
+    el("branchName").textContent = info ? info.storeName : "";
+    el("branchAddress").textContent = info ? info.address : "";
+    var logo = (info && info.logo) || data.logos.blue || "";
+    var img = el("branch-logo");
+    if (logo) picture(logo).then(function (src) { img.src = src; img.hidden = false; });
+    else img.hidden = true;
+  }
+
+  function render() {
+    showBranchDetails();
+    if (!branchReady()) {
+      el("sections").innerHTML = '<div class="flyer-empty">' + (loaded ? "Select a branch to make its flyer." : "Loading SalesKit data…") + "</div>";
+    } else if (!sections.length) {
+      el("sections").innerHTML = '<div class="flyer-empty">No recommendations in RECO TABLE for ' + esc(branch) + ".</div>";
+    } else {
+      el("sections").innerHTML = sections.map(function (section, i) {
+        var cls = " s" + (i % 5);
+        return '<div class="banner' + cls + '"><span>' + esc(section.title) + "</span></div>" +
+          '<div class="row' + cls + '">' + section.slots.map(cardHtml).join("") + "</div>";
+      }).join("");
+    }
+    el("sheet").classList.toggle("no-branch", !branchReady());
+    el("download").disabled = !branchReady() || !sections.length;
+    el("print").disabled = !branchReady() || !sections.length;
+  }
+
+  // Draws the branch's flyer, then waits for its pictures (at most 8 seconds).
+  function showBranchFlyer() {
+    sections = setRecoSections(data.rows.filter(function (r) { return key(r.branch) === key(branch); }));
+    render();
+    if (!branchReady() || !sections.length) return;
+    resetProgress();
+    setLoading(true, "Preparing images…");
+    var imgs = Array.from(el("sheet").querySelectorAll("img[data-src]"));
+    var total = imgs.length || 1, done = 0;
+    var ready = Promise.all(imgs.map(function (img) {
+      return picture(img.getAttribute("data-src")).then(function (src) {
+        if (src) img.src = src;
+        img.removeAttribute("data-src");
+        return img.decode ? img.decode().catch(function () {}) : null;
+      }).then(function () { setProgress((++done / total) * 100); });
+    }));
+    Promise.race([ready, new Promise(function (r) { setTimeout(r, 8000); })]).then(function () {
+      setProgress(100);
+      setTimeout(function () { setLoading(false); }, 200);
+    });
+  }
+
+  // ---------- Data from SalesKit ----------
+  window.addEventListener("message", function (event) {
+    if (event.source !== window.parent || !event.data) return;
+    var m = event.data;
+    if (m.channel === "saleskit-flyer-data") {
+      data = {
+        rows: m.rows || [], laptops: m.laptops || {}, branchDetails: m.branchDetails || {},
+        logos: m.logos || {}, homeBranch: m.homeBranch || ""
+      };
+      loaded = true;
+      if (data.logos.header) picture(data.logos.header).then(function (src) { el("headerLogo").src = src; el("headerLogo").hidden = false; });
+      var branches = branchList();
+      if (data.homeBranch) branch = branches.find(function (b) { return key(b) === key(data.homeBranch); }) || data.homeBranch;
+      else if (branches.map(key).indexOf(key(branch)) === -1) branch = "";
+      el("branchField").style.display = branches.length || data.homeBranch ? "" : "none";
+      updateBranchButton();
+      showBranchFlyer();
+    } else if (m.channel === "saleskit-flyer-status") {
+      el("flyerStatus").textContent = m.message || "";
+      el("reload").disabled = !!m.busy;
+      el("reload").classList.toggle("spin", !!m.busy);
+    }
+  });
+
+  el("reload").onclick = function () { if (!el("reload").disabled) toParent({ channel: "saleskit-flyer-refresh" }); };
+  el("print").onclick = function () { if (!el("print").disabled) window.print(); };
+  el("download").onclick = function () {
+    if (el("download").disabled) return;
+    el("dlModal").style.display = "flex";
+  };
+  function closeModal() { el("dlModal").style.display = "none"; }
+
+  // ---------- Download: A4 pages, cut only between target markets ----------
+  function getBreakPoints(scale) {
+    var sheet = el("sheet");
+    var top = sheet.getBoundingClientRect().top;
+    var points = [];
+    sheet.querySelectorAll("#sections > .banner, .foot").forEach(function (n) {
+      points.push((n.getBoundingClientRect().top - top) * scale);
+    });
+    return points;
+  }
+  function buildPages(canvas, scale) {
+    var usableMm = 297 - MARGIN_TOP - MARGIN_BOTTOM;
+    var slicePx = Math.floor(canvas.width * usableMm / 210);
+    var points = getBreakPoints(scale);
+    var cuts = [0], start = 0;
+    while (canvas.height - start > slicePx) {
+      var limit = start + slicePx;
+      var cut = points.filter(function (p) { return p > start + 1 && p <= limit; }).pop();
+      if (!cut) cut = limit;
+      cuts.push(cut);
+      start = cut;
+    }
+    cuts.push(canvas.height);
+    return cuts;
+  }
+
+  function downloadSheet(type) {
+    closeModal();
+    var name = "Flyer-" + String(branch || "sheet").replace(/[^\w-]+/g, "_");
+    var scale = 2;
+    setLoading(true, "Preparing the download…");
+    setProgress(50);
+    document.body.classList.add("capturing");
+    html2canvas(el("sheet"), { scale: scale, useCORS: true, backgroundColor: "#ffffff" }).then(function (canvas) {
+      var cuts = buildPages(canvas, scale);
+      var files = [];
+      if (type === "png") {
+        var pageW = canvas.width, pageH = Math.round(canvas.width * 297 / 210);
+        var marginPx = Math.round(pageW * MARGIN_TOP / 210);
+        for (var i = 0; i < cuts.length - 1; i++) {
+          var y = cuts[i], h = cuts[i + 1] - cuts[i];
+          var out = document.createElement("canvas");
+          out.width = pageW;
+          out.height = pageH;
+          var ctx = out.getContext("2d");
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, pageW, pageH);
+          ctx.drawImage(canvas, 0, y, canvas.width, h, 0, (i === 0 ? 0 : marginPx), canvas.width, h);
+          files.push({ name: name, dataUrl: out.toDataURL("image/png") });
+        }
+      } else {
+        var pdf = new window.jspdf.jsPDF({ unit: "mm", format: "a4" });
+        for (var j = 0; j < cuts.length - 1; j++) {
+          var sy = cuts[j], sh = cuts[j + 1] - cuts[j];
+          var slice = document.createElement("canvas");
+          slice.width = canvas.width;
+          slice.height = sh;
+          slice.getContext("2d").drawImage(canvas, 0, sy, canvas.width, sh, 0, 0, canvas.width, sh);
+          if (j > 0) pdf.addPage();
+          pdf.addImage(slice.toDataURL("image/jpeg", 0.95), "JPEG", 0, j === 0 ? 0 : MARGIN_TOP, 210, sh * 210 / canvas.width);
+        }
+        files.push({ name: name, dataUrl: pdf.output("datauristring").replace(/^data:application\/pdf;[^,]*,/, "data:application/pdf;base64,") });
+      }
+      toParent({ channel: "saleskit-flyer-save", files: files });
+    }).catch(function (e) {
+      console.error(e);
+      el("flyerStatus").textContent = "Download failed: " + (e.message || e);
+    }).finally(function () {
+      document.body.classList.remove("capturing");
+      setProgress(100);
+      setLoading(false);
+    });
+  }
+
+  // ---------- Loader ----------
+  function resetProgress() { progress = 0; paintProgress(); }
+  function setProgress(p) { progress = Math.max(progress, Math.min(100, p)); paintProgress(); }
+  function paintProgress() {
+    var pct = Math.round(progress);
+    el("progressBar").style.width = pct + "%";
+    el("progressText").textContent = pct + "%";
+  }
+  function setLoading(on, text) {
+    el("sheet").classList.toggle("loading", on);
+    document.body.classList.toggle("is-loading", on);
+    el("loader").hidden = !on;
+    if (text) el("loaderText").textContent = text;
+    el("download").disabled = on || !branchReady() || !sections.length;
+    el("print").disabled = on || !branchReady() || !sections.length;
+    if (on) window.scrollTo(0, 0);
+  }
+
+  // ---------- Keys: Ctrl+1–4 switch SalesKit tabs; ? shows the shortcuts ----------
+  document.addEventListener("keydown", function (e) {
+    var ctrl = e.ctrlKey || e.metaKey;
+    var typing = e.target instanceof HTMLInputElement || (e.target && e.target.isContentEditable);
+    if (e.key === "?" && !typing && !ctrl && !e.altKey) { e.preventDefault(); toParent({ channel: "saleskit-flyer-help" }); return; }
+    if (e.key === "Escape" && el("dlModal").style.display === "flex") { e.preventDefault(); closeModal(); return; }
+    if (!ctrl || e.altKey) return;
+    if (!e.shiftKey && /^Digit[1-4]$/.test(e.code)) {
+      e.preventDefault();
+      toParent({ channel: "saleskit-flyer-hotkey", keys: { ctrl: true, shift: false, alt: false, code: e.code } });
+    } else if (e.code === "KeyD") { e.preventDefault(); el("download").click(); }
+    else if (!e.shiftKey && e.code === "KeyP") { e.preventDefault(); el("print").click(); }
+    else if (!e.shiftKey && e.code === "KeyR") { e.preventDefault(); el("reload").click(); }
+    else if (e.shiftKey && e.code === "KeyB") { e.preventDefault(); openBranch(); }
+  });
+
+  // A picture that cannot be shown is left blank (no broken-image icon on the flyer).
+  document.addEventListener("error", function (e) {
+    if (e.target && e.target.tagName === "IMG" && e.target.closest("#sections")) e.target.classList.add("failed");
+  }, true);
+
+  // ---------- Start ----------
+  render();
+  toParent({ channel: "saleskit-flyer-ready" });
+</script>
+</body>
+</html>

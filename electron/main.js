@@ -367,6 +367,9 @@ ipcMain.handle('banner:save', async (_event, url, suggestedName = 'banner') => {
   return { canceled: false, filePath: result.filePath };
 });
 
+// The Flyers page's PDF and PNG pages (see file-save.js).
+require('./file-save').registerFileSave({ ipcMain, dialog, app, getWindow: () => mainWindow });
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,

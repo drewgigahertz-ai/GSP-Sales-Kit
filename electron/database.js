@@ -7,6 +7,7 @@ let activePath = null;
 const { buildBannerData, matchKey } = require('./banner-data');
 const { createFeatureBannerResolver } = require('./feature-banners');
 const { createUsabilityLookup } = require('./app-usability');
+const { makeBranchDetails } = require('./branch-details');
 
 const SHEET_TABLES = new Set([
   'banner_laptops',
@@ -16,6 +17,7 @@ const SHEET_TABLES = new Set([
   'features_banner',
   'ageing_banner',
   'usability',
+  'branch_details',
   'specs',
   'criteria_segment_application',
   'dv_transposed',
@@ -532,6 +534,8 @@ function getInitialData() {
     specsMap,
     criteriaSegmentData: { ...criteriaSegmentData, specsMap },
     recoTableData,
+    // Flyers page: each branch's logo, store name and address (LOGO sheet E–I).
+    branchDetails: makeBranchDetails(getRows('branch_details'), normalizeImageUrl),
     ukspPerSkuData,
     ukspBannerData,
     appUkspData: applicationMatrix,

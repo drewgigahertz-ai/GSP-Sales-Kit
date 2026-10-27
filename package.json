@@ -22,7 +22,8 @@
     "bootstrap-icons": "^1.13.1",
     "electron-updater": "^6.8.9",
     "googleapis": "^183.0.0",
-    "html2canvas": "^1.4.1"
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.1"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.1",
@@ -44,11 +45,14 @@
       "!electron/banner-data.js",
       "!electron/feature-banners.js",
       "!electron/app-usability.js",
+      "!electron/branch-details.js",
       "!electron/ageing-banners.js",
       "!node_modules/googleapis{,/**/*}",
       "!node_modules/better-sqlite3{,/**/*}",
       "saleskit.html",
       "banner.html",
+      "flyer.html",
+      "flyer-bridge.js",
       "banner-bridge.js",
       "banner-color.js",
       "banner-hotkeys.js",

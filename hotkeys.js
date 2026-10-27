@@ -1,5 +1,5 @@
 // Keyboard shortcuts, as proposed by the sales team (GST hotkeys):
-//   Ctrl+1 Reco Table · Ctrl+2 Sales Kit · Ctrl+3 Banner
+//   Ctrl+1 Reco Table · Ctrl+2 Sales Kit · Ctrl+3 Banner · Ctrl+4 Flyers
 //   Ctrl+Shift+A Application selection · Ctrl+Shift+R Recommendation selection · Ctrl+Shift+P Present
 //   Ctrl+D or Ctrl+Shift+D Download (Result on the Reco Table, Image on Sales Kit)
 //   Reco Table only: Ctrl+Shift+L Location selection · Ctrl+Shift+C Copy Details · Ctrl+R Refresh Data
@@ -81,6 +81,7 @@
     { ctrl: true, shift: false, code: 'Digit1', pages: null, label: 'Reco Table', run: () => navigateTo('recotable') },
     { ctrl: true, shift: false, code: 'Digit2', pages: null, label: 'Sales Kit', run: () => navigateTo('saleskit') },
     { ctrl: true, shift: false, code: 'Digit3', pages: null, label: 'Banner', run: () => navigateTo('banner') },
+    { ctrl: true, shift: false, code: 'Digit4', pages: null, label: 'Flyers', run: () => navigateTo('flyers') },
     { ctrl: true, shift: true, code: 'KeyA', pages: BOTH, label: 'Application selection', run: () => openMenu('appsDropdownMenu', 'toggleAppsMenu', 'appsSearchInput') },
     { ctrl: true, shift: true, code: 'KeyL', pages: RECO, label: 'Location selection', run: openLocation },
     { ctrl: true, shift: true, code: 'KeyR', pages: BOTH, label: 'Recommendation selection', run: () => openMenu('recoForDropdownMenu', 'toggleRecoForMenu') },
@@ -145,7 +146,7 @@
   const TIPS = {
     btnCopyReco: 'Ctrl+Shift+C', btnPresentReco: 'Ctrl+Shift+P', btnDownloadReco: 'Ctrl+D', btnRefreshData: 'Ctrl+R',
     btnPresentSalesKit: 'Ctrl+Shift+P', btnDownloadSalesKit: 'Ctrl+Shift+D',
-    tabRecoTable: 'Ctrl+1', tabSalesKit: 'Ctrl+2', tabBanner: 'Ctrl+3',
+    tabRecoTable: 'Ctrl+1', tabSalesKit: 'Ctrl+2', tabBanner: 'Ctrl+3', tabFlyers: 'Ctrl+4',
     appsDisplayInput: 'Ctrl+Shift+A', locationDisplayInput: 'Ctrl+Shift+L', recoForDisplayInput: 'Ctrl+Shift+R',
     btnSalesKitSubTabApps: 'Alt+1', btnSalesKitSubTabFeatures: 'Alt+2',
     salesKitAppsBtn: 'Ctrl+Shift+S', salesKitFeaturesBtn: 'Ctrl+Shift+S',

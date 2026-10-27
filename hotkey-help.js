@@ -3,7 +3,7 @@
 // that work everywhere. The Banner page sends its ? here (banner-hotkeys.js → banner-bridge.js).
 (function () {
   const EVERYWHERE = [
-    ['Ctrl + 1 / 2 / 3', 'Reco Table / Sales Kit / Banner'],
+    ['Ctrl + 1 / 2 / 3 / 4', 'Reco Table / Sales Kit / Banner / Flyers'],
     ['↑ ↓ then Enter', 'Choose an option in any open list'],
     ['Esc', 'Close the open list or window'],
     ['?', 'Show these shortcuts']
@@ -44,6 +44,15 @@
         ['Alt + 1 / Alt + 2', 'Clearance / Generated banner'],
         ['Ctrl + D', 'Download banner'],
         ['Ctrl + Shift + F', 'Fullscreen'],
+        ['Ctrl + R', 'Refresh data']
+      ]
+    },
+    flyers: {
+      title: 'Flyers',
+      keys: [
+        ['Ctrl + Shift + B', 'Branch'],
+        ['Ctrl + D', 'Download (PDF or PNG)'],
+        ['Ctrl + P', 'Print'],
         ['Ctrl + R', 'Refresh data']
       ]
     },

@@ -24,6 +24,7 @@
   <link href="./node_modules/@fontsource/plus-jakarta-sans/800.css" rel="stylesheet">
   <script src="./node_modules/html2canvas/dist/html2canvas.min.js"></script>
   <script src="./banner-bridge.js"></script>
+  <script src="./flyer-bridge.js"></script>
   <script src="./activity-tracker.js" defer></script>
   <script src="./branch-mode.js" defer></script>
   <script src="./hotkeys.js" defer></script>
@@ -2652,6 +2653,7 @@
       <button class="nav-tab-ghz active" id="tabRecoTable" onclick="navigateTo('recotable')" role="tab">RECO TABLE</button>
       <button class="nav-tab-ghz" id="tabSalesKit" onclick="navigateTo('saleskit')" role="tab">SALES KIT</button>
       <button class="nav-tab-ghz" id="tabBanner" onclick="navigateTo('banner')" role="tab">BANNER</button>
+      <button class="nav-tab-ghz" id="tabFlyers" onclick="navigateTo('flyers')" role="tab">FLYERS</button>
     </div>
   </div>
 
@@ -3327,6 +3329,11 @@
     <!-- VIEW: BANNER (banner.html, connected by banner-bridge.js) -->
     <div id="viewBanner" class="view-section">
       <iframe id="bannerPageFrame" class="banner-page-frame" src="banner.html" title="Banner" allow="fullscreen *" allowfullscreen></iframe>
+    </div>
+
+    <!-- VIEW: FLYERS (flyer.html, fed by flyer-bridge.js) -->
+    <div id="viewFlyers" class="view-section">
+      <iframe id="flyerPageFrame" class="banner-page-frame" src="flyer.html" title="Flyers"></iframe>
     </div>
 
     <!-- VIEW: MIX & MATCH -->
@@ -4417,6 +4424,7 @@
       'availability': { tab: 'tabAvailability', view: 'viewAvailability' },
       'mixmatch': { tab: 'tabMixMatch', view: 'viewMixMatch' },
       'banner': { tab: 'tabBanner', view: 'viewBanner' },
+      'flyers': { tab: 'tabFlyers', view: 'viewFlyers' },
       'uksp': { tab: 'tabUksp', view: 'viewUksp' },
       'attachment': { tab: 'tabAttachment', view: 'viewAttachment' }
     };
@@ -4513,6 +4521,7 @@
       if (!key) return 'recotable';
       const clean = String(key).toLowerCase().replace(/[^a-z]/g, '');
       if (clean.includes('banner')) return 'banner';
+      if (clean.includes('flyer')) return 'flyers';
       if (clean.includes('sales') || clean.includes('kit') || clean === 'sk') return 'saleskit';
       if (clean.includes('reco') || clean.includes('table')) return 'recotable';
       if (clean.includes('avail')) return 'availability';
@@ -4749,6 +4758,9 @@
         }
         if (normKey === 'banner' && typeof window.fitBannerFrame === 'function') {
           requestAnimationFrame(window.fitBannerFrame);
+        }
+        if (normKey === 'flyers' && typeof window.fitFlyerFrame === 'function') {
+          requestAnimationFrame(window.fitFlyerFrame);
         }
       }
     }
@@ -8915,6 +8927,7 @@
       if (fromSaved && window._desktopCurrentDataApplied) return;
       if (!fromSaved) window._desktopCurrentDataApplied = true;
       if (typeof window.updateBannerPage === 'function') window.updateBannerPage(data.bannerData, data.homeBranch, data.specsMap);
+      if (typeof window.updateFlyerPage === 'function') window.updateFlyerPage(data);
       window.SERVER_INITIAL_DATA = data;
       window.sheetData = data;
       window.UKSP_BANNER_DATA = data.ukspBannerData || { features: [], skus: [] };
