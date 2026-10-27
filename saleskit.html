@@ -8313,7 +8313,7 @@
 
     function formatAppUkspCell(matchResult, tierName) {
       if (!matchResult || !matchResult.value || String(matchResult.value).trim() === '') {
-        return `<div class="saleskit-metric-empty text-muted fst-italic" style="font-size: 0.80rem; padding: 4px 0;">Not applicable</div>`;
+        return `<div class="saleskit-metric-empty text-muted fst-italic" style="font-size: 0.80rem; padding: 4px 0;">Not Applicable</div>`;
       }
 
       const raw = String(matchResult.value).trim();
@@ -8453,146 +8453,20 @@
       return `<div class="saleskit-feature-main-spec" style="margin-bottom:0;">${escapeHtml(spec)}</div>`;
     }
 
+    // An application's value for a laptop: the DV cell where the application's row meets that laptop's own
+    // column, matched by its exact item code. An empty cell stays empty (shown as "Not Applicable"); no value is
+    // borrowed from a similar item code, another laptop or another sheet.
     function getDvAppValue(appOrName, laptopOrSku) {
       if (!appOrName || !laptopOrSku) return '';
-      const appObj = (typeof appOrName === 'object' && appOrName) ? appOrName : { name: String(appOrName || '') };
-      const appName = String(appObj.name || '').trim();
-      if (!appName) return '';
-
-      const laptopObj = (typeof laptopOrSku === 'object' && laptopOrSku) ? laptopOrSku : { sku: String(laptopOrSku || '') };
-      const rawSku = String(laptopObj.sku || '').trim();
-      if (!rawSku && !laptopObj.cleanSku && !laptopObj.modelCode && !laptopObj.title) return '';
-
-      const candidateTokens = extractLaptopCandidateTokens(laptopObj);
-      const canonicalTokens = candidateTokens.map(t => String(t).replace(/[^a-zA-Z0-9]/g, '').toLowerCase()).filter(Boolean);
-
-      const normAppName = appName.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const cleanAppName = appName.replace(/^[#0-9]+[\.\-\)\:\s]+/, '').trim().toLowerCase();
-
-      // 1. Live values store check
-      const liveStore = window.DV_LIVE_APPLICATION_VALUES || {};
-      const liveApps = liveStore.applications || liveStore;
-      const liveRow = liveApps[normAppName] || liveApps[cleanAppName] || liveApps[appName.toLowerCase()];
-      if (liveRow && typeof liveRow === 'object') {
-        for (const tok of canonicalTokens) {
-          if (liveRow[tok]) return liveRow[tok];
-        }
-        for (const tok of candidateTokens) {
-          const lower = tok.toLowerCase();
-          if (liveRow[lower]) return liveRow[lower];
-          if (liveRow[tok]) return liveRow[tok];
-        }
-      }
-
-      // 2. Full DV / Applications matrix check (window.APPLICATION_UKSP_DATA)
-      const matrixData = window.APPLICATION_UKSP_DATA;
-      if (matrixData) {
-        // 2a. Match via applications array
-        if (Array.isArray(matrixData.applications) && matrixData.applications.length > 0) {
-          const appRow = matrixData.applications.find(item => {
-            if (!item) return false;
-            if (item.name && matchAppName(appName, item.name)) return true;
-            if (item.cleanName && matchAppName(appName, item.cleanName)) return true;
-            if (item.rawName && matchAppName(appName, item.rawName)) return true;
-            if (appObj.sheetName && item.name && matchAppName(appObj.sheetName, item.name)) return true;
-            if (appObj.sheetAppNames && Array.isArray(appObj.sheetAppNames)) {
-              if (appObj.sheetAppNames.some(sn => matchAppName(sn, item.name) || matchAppName(sn, item.rawName))) return true;
-            }
-            return false;
-          });
-
-          if (appRow && appRow.values) {
-            for (const tok of canonicalTokens) {
-              if (appRow.values[tok]) return appRow.values[tok];
-            }
-            for (const tok of candidateTokens) {
-              const lower = tok.toLowerCase();
-              if (appRow.values[lower]) return appRow.values[lower];
-              if (appRow.values[tok]) return appRow.values[tok];
-            }
-            if (Array.isArray(matrixData.skuHeaders)) {
-              const matchedHeader = matrixData.skuHeaders.find(h =>
-                candidateTokens.some(tok => matchSkuWithHeader(tok, h.rawSku) || (h.cleanSku && matchSkuWithHeader(tok, h.cleanSku)))
-              );
-              if (matchedHeader) {
-                const colKeys = [
-                  matchedHeader.canonicalSku,
-                  'col_' + matchedHeader.colIndex,
-                  'col_' + (matchedHeader.colIndex + 1),
-                  'col_' + matchedHeader.colLetter,
-                  'col_' + String(matchedHeader.colLetter || '').toLowerCase()
-                ].filter(Boolean);
-                for (const ck of colKeys) {
-                  if (appRow.values[ck]) return appRow.values[ck];
-                }
-              }
-            }
-            const valKeys = Object.keys(appRow.values).filter(k => !k.startsWith('col_'));
-            const matchedKey = valKeys.find(k => candidateTokens.some(tok => matchSkuWithHeader(tok, k)));
-            if (matchedKey && appRow.values[matchedKey]) return appRow.values[matchedKey];
-          }
-        }
-
-        // 2b. Match via appSkuMap / allAppsMap dictionary
-        const dict = matrixData.appSkuMap || matrixData.allAppsMap;
-        if (dict && typeof dict === 'object') {
-          let row = dict[cleanAppName] || dict[normAppName] || dict[appName.toLowerCase()];
-          if (!row && appObj.sheetName) row = dict[appObj.sheetName.toLowerCase()] || dict[appObj.sheetName];
-          if (!row) {
-            const foundKey = Object.keys(dict).find(k => matchAppName(appName, k) || matchAppName(cleanAppName, k));
-            if (foundKey) row = dict[foundKey];
-          }
-          if (row && typeof row === 'object') {
-            for (const tok of canonicalTokens) {
-              if (row[tok]) return row[tok];
-            }
-            for (const tok of candidateTokens) {
-              const lower = tok.toLowerCase();
-              if (row[lower]) return row[lower];
-              if (row[tok]) return row[tok];
-            }
-            if (Array.isArray(matrixData.skuHeaders)) {
-              const matchedHeader = matrixData.skuHeaders.find(h =>
-                candidateTokens.some(tok => matchSkuWithHeader(tok, h.rawSku) || (h.cleanSku && matchSkuWithHeader(tok, h.cleanSku)))
-              );
-              if (matchedHeader) {
-                const colKeys = [
-                  matchedHeader.canonicalSku,
-                  'col_' + matchedHeader.colIndex,
-                  'col_' + (matchedHeader.colIndex + 1),
-                  'col_' + matchedHeader.colLetter,
-                  'col_' + String(matchedHeader.colLetter || '').toLowerCase()
-                ].filter(Boolean);
-                for (const ck of colKeys) {
-                  if (row[ck]) return row[ck];
-                }
-              }
-            }
-          }
-        }
-      }
-
-      // 3. Fallback: DV_APPLICATIONS_PER_SKU_DATA
-      const dvData = window.DV_APPLICATIONS_PER_SKU_DATA;
-      if (dvData && Array.isArray(dvData.applications)) {
-        const appRow = dvData.applications.find(item => item && item.name && matchAppName(appName, item.name));
-        if (appRow && appRow.values) {
-          for (const tok of canonicalTokens) {
-            if (appRow.values[tok]) return appRow.values[tok];
-          }
-          for (const tok of candidateTokens) {
-            const lower = tok.toLowerCase();
-            if (appRow.values[lower]) return appRow.values[lower];
-            if (appRow.values[tok]) return appRow.values[tok];
-          }
-        }
-      }
-
-      // 4. Fallback: getAppUkspMatch
-      const ukspMatch = getAppUkspMatch(appObj, laptopObj);
-      if (ukspMatch && ukspMatch.value) return ukspMatch.value;
-
-      return '';
+      const appName = String((typeof appOrName === 'object' ? appOrName.name : appOrName) || '').trim();
+      const laptop = typeof laptopOrSku === 'object' ? laptopOrSku : { sku: String(laptopOrSku) };
+      const skuKey = normalizeSmtSku(laptop.sku || laptop.cleanSku);
+      if (!appName || !skuKey) return '';
+      const appKey = appName.replace(/[^a-z0-9]/gi, '').toLowerCase();
+      const matrix = window.APPLICATION_UKSP_DATA;
+      const applications = matrix && Array.isArray(matrix.applications) ? matrix.applications : [];
+      const appRow = applications.find(item => item && String(item.name || '').replace(/[^a-z0-9]/gi, '').toLowerCase() === appKey);
+      return (appRow && appRow.values && appRow.values[skuKey]) || '';
     }
 
     let _dvLiveRequestSignature = '';
@@ -8884,9 +8758,9 @@
         const skuMeetLower = (meetObj.sku || '').toLowerCase();
         const skuBudgetLower = (budgetObj.sku || '').toLowerCase();
         activeApps.forEach(app => {
-          const me = getDvAppValue(app.name, skuExceedLower) || 'No benchmark data';
-          const mm = getDvAppValue(app.name, skuMeetLower) || 'No benchmark data';
-          const mb = getDvAppValue(app.name, skuBudgetLower) || 'No benchmark data';
+          const me = getDvAppValue(app.name, skuExceedLower) || 'Not Applicable';
+          const mm = getDvAppValue(app.name, skuMeetLower) || 'Not Applicable';
+          const mb = getDvAppValue(app.name, skuBudgetLower) || 'Not Applicable';
           lines.push(`[${app.name.toUpperCase()}] (Sheet: DV)`);
           lines.push(`  Exceed -> ${me}`);
           lines.push(`  Meet   -> ${mm}`);
