@@ -7607,7 +7607,11 @@
       if (closeButton) closeButton.focus();
 
       if (typeof overlay.requestFullscreen === 'function') {
-        overlay.requestFullscreen().catch(error => {
+        // In fullscreen, Esc would leave fullscreen (and so the presentation) before the page sees it. Keeping Esc
+        // for the page lets it close an open banner first, and leave the presentation only on the next Esc.
+        overlay.requestFullscreen().then(() => {
+          if (navigator.keyboard && navigator.keyboard.lock) navigator.keyboard.lock(['Escape']).catch(() => {});
+        }).catch(error => {
           console.warn('Fullscreen presentation is unavailable; keeping the presentation view open:', error.message);
           showAppNotification('Fullscreen is unavailable; presentation view remains open in this window.', 'info', 4500);
         });
@@ -7696,6 +7700,7 @@
           button.type = 'button';
           button.className = 'saleskit-presentation-view-banner';
           button.innerHTML = '<i class="bi bi-image me-1"></i>View banner';
+          button.title = `View banner (${index + 1}, or B for the first)`;
           button.appendChild(createFeatureBannerPreview(banner.url));
           button.addEventListener('click', () => openSalesKitPresentationBanner(banner, slide.title));
           cells[index + 1].appendChild(button);
@@ -7780,19 +7785,51 @@
       } else if (event.key === ' ') {
         event.preventDefault();
         toggleSalesKitSlideshow();
+      } else if (!event.ctrlKey && !event.altKey && !event.metaKey && ['b', 'B', '1', '2', '3'].includes(event.key)) {
+        // View banner (Features slides).
+        if (toggleSalesKitPresentationBannerByKey(event.key.toLowerCase())) event.preventDefault();
       }
     }
 
     function handleSalesKitPresentationFullscreenChange() {
       const overlay = document.getElementById('salesKitPresentation');
       if (overlay && overlay.classList.contains('is-open') && document.fullscreenElement !== overlay) {
+        // Fullscreen ended while a banner was open (Esc where the key could not be kept): close only the banner
+        // and go back to fullscreen; the presentation stays.
+        const bannerViewer = document.getElementById('salesKitPresentationBannerViewer');
+        if (bannerViewer && bannerViewer.classList.contains('is-open')) {
+          closeSalesKitPresentationBanner();
+          overlay.requestFullscreen().then(() => {
+            if (navigator.keyboard && navigator.keyboard.lock) navigator.keyboard.lock(['Escape']).catch(() => {});
+          }).catch(() => {});
+          return;
+        }
         closeSalesKitPresentation(false);
       }
+    }
+
+    // Features slide: B opens the banner of the first laptop that has one (B again closes it); 1 / 2 / 3 open the
+    // banner of the first / second / third laptop column.
+    function toggleSalesKitPresentationBannerByKey(key) {
+      const bannerViewer = document.getElementById('salesKitPresentationBannerViewer');
+      const isOpen = Boolean(bannerViewer && bannerViewer.classList.contains('is-open'));
+      if (key === 'b' && isOpen) {
+        closeSalesKitPresentationBanner();
+        return true;
+      }
+      const row = document.getElementById('salesKitPresentationRow');
+      const cells = Array.from(row?.firstElementChild?.children || []).slice(1);
+      const buttons = cells.map(cell => cell.querySelector('.saleskit-presentation-view-banner'));
+      const button = key === 'b' ? buttons.find(Boolean) : buttons[Number(key) - 1];
+      if (!button) return false;
+      button.click();
+      return true;
     }
 
     function closeSalesKitPresentation(exitFullscreen = true) {
       const overlay = document.getElementById('salesKitPresentation');
       const bannerViewer = document.getElementById('salesKitPresentationBannerViewer');
+      if (navigator.keyboard && navigator.keyboard.unlock) navigator.keyboard.unlock();
       if (salesKitSlideshowTimer) clearInterval(salesKitSlideshowTimer);
       salesKitSlideshowTimer = null;
       salesKitPresentationSlides = [];

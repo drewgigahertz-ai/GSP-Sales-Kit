@@ -6,7 +6,8 @@
 //     Ctrl+Shift+E / M / B the Exceed / Meet / Budget laptop list
 //   Sales Kit only: Alt+1 Applications tab · Alt+2 Features tab · Ctrl+Shift+S that tab's selector
 // In the presentation, Ctrl+1 / Ctrl+2 / Ctrl+3 switch to its Reco Table / Applications / Features tab instead,
-// and Ctrl+Shift+S opens the application / feature list; the other shortcuts are paused there (it has its own keys).
+// and Ctrl+Shift+S opens the application / feature list; the other shortcuts are paused there (it has its own keys:
+// ← → slides, Space slideshow, B / 1 / 2 / 3 a feature's banner, Esc closes the banner, then the presentation).
 // Inside any open dropdown, the arrow keys, Enter and Esc work too (dropdown-keys.js).
 (function () {
   function page() {
