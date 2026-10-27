@@ -8224,6 +8224,15 @@
               }
             }
 
+            // The laptop has its own DV row but this app's cell is empty: show it as empty rather than
+            // letting the looser matches below borrow another laptop's value (e.g. any other "ACER" row).
+            const hasOwnDvRow = Array.isArray(store.skuHeaders) && store.skuHeaders.some(header =>
+              header && header.canonicalSku && canonicalCandidateTokens.includes(header.canonicalSku)
+            );
+            if (hasOwnDvRow) {
+              return { value: '', sheet: store.sheetName || 'DV', source: 'sheet' };
+            }
+
             // B. Match against store.skuHeaders (Columns B1 to EX1)
             if (store.skuHeaders && Array.isArray(store.skuHeaders)) {
               for (const sh of store.skuHeaders) {
@@ -8304,7 +8313,7 @@
 
     function formatAppUkspCell(matchResult, tierName) {
       if (!matchResult || !matchResult.value || String(matchResult.value).trim() === '') {
-        return `<div class="saleskit-metric-empty text-muted fst-italic" style="font-size: 0.80rem; padding: 4px 0;">No application data in 'DV'</div>`;
+        return `<div class="saleskit-metric-empty text-muted fst-italic" style="font-size: 0.80rem; padding: 4px 0;">Not applicable</div>`;
       }
 
       const raw = String(matchResult.value).trim();
