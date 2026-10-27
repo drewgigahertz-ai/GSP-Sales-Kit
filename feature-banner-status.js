@@ -1,7 +1,8 @@
-// Features dropdowns (Sales Kit and presentation): which of the result's 3 laptops (Exceed, Meet, Budget) have a
-// banner for a feature. Each feature shows 3 dots in that order (green: has a banner, red: none), and the list is
-// split into Recommended (at least one banner) and Not recommended (no banner on any of the 3). Before a result is
-// generated there are no laptops to check: one plain list with grey dots.
+// Features and Applications dropdowns (Sales Kit and presentation): for each item, 3 dots for the result's laptops
+// (Exceed, Meet, Budget, in that order). Features: green when that laptop has a banner for the feature.
+// Applications: green when that laptop has a value in DV for the application. Red otherwise. Each list is split
+// into Recommended (at least one green) and Not recommended (all red). Before a result is generated there are no
+// laptops to check: one plain list with grey dots.
 (function () {
   const TIERS = ['exceed', 'meet', 'budget'];
 
@@ -31,7 +32,8 @@
     }
 
     /* The row number badges (A3, A11, ...) all take the same width, so the dots line up. */
-    #salesKitFeaturesCheckboxesList .feature-checkbox-row .badge {
+    #salesKitFeaturesCheckboxesList .feature-checkbox-row .badge,
+    #salesKitAppsCheckboxesList .app-checkbox-row .badge {
       min-width: 2.9em;
       text-align: center;
     }
@@ -72,14 +74,24 @@
     }
   }
 
-  // { known, recommended, dots: [{ name, has }] } for a feature.
-  function statusOf(feature, list = laptops()) {
+  // { known, recommended, dots: [{ name, has, label }] }; has(laptop) says whether that laptop has the item.
+  function statusWith(has, list, labels) {
     if (!list.length) return { known: false, recommended: true, dots: TIERS.map(() => ({ name: '', has: null })) };
-    const dots = list.map((laptop) => ({
-      name: laptop.title || laptop.sku,
-      has: getUkspBanners(laptop.sku, feature).length > 0
-    }));
+    const dots = list.map((laptop) => {
+      const yes = has(laptop);
+      return { name: laptop.title || laptop.sku, has: yes, label: yes ? labels[0] : labels[1] };
+    });
     return { known: true, recommended: dots.some((dot) => dot.has), dots };
+  }
+
+  // A feature: does each laptop have a banner for it?
+  function statusOf(feature, list = laptops()) {
+    return statusWith((laptop) => getUkspBanners(laptop.sku, feature).length > 0, list, ['has banner', 'no banner']);
+  }
+
+  // An application: does each laptop have a value for it in DV (the same exact cell the table shows)?
+  function appStatusOf(app, list = laptops()) {
+    return statusWith((laptop) => Boolean(getDvAppValue(app, laptop)), list, ['has data', 'not applicable']);
   }
 
   function dotsElement(status) {
@@ -88,7 +100,7 @@
     status.dots.forEach((dot) => {
       const mark = document.createElement('span');
       mark.className = `feature-dot${dot.has === true ? ' has-banner' : dot.has === false ? ' no-banner' : ''}`;
-      if (dot.name) mark.title = `${dot.name}: ${dot.has ? 'has banner' : 'no banner'}`;
+      if (dot.name) mark.title = `${dot.name}: ${dot.label}`;
       wrap.appendChild(mark);
     });
     return wrap;
@@ -108,18 +120,25 @@
     return features.filter((feature) => statusOf(feature, list).recommended);
   }
 
-  // Sales Kit Features dropdown: dots on each row, rows split into the two groups (rows keep their order).
-  function groupSalesKitList() {
-    const container = document.getElementById('salesKitFeaturesCheckboxesList');
+  // Applications to tick with Select All: the recommended ones once a result exists, else all of them.
+  function recommendedAppsOnly(apps) {
+    const list = laptops();
+    if (!list.length) return apps;
+    return apps.filter((app) => appStatusOf(app, list).recommended);
+  }
+
+  // A Sales Kit dropdown: dots on each row, rows split into the two groups (rows keep their order).
+  // statusOfRow(row, list) gives the row's status.
+  function groupList(containerId, rowSelector, statusOfRow) {
+    const container = document.getElementById(containerId);
     if (!container) return;
     container.querySelectorAll('.feature-group-head, .feature-dots').forEach((element) => element.remove());
     const list = laptops();
-    const rows = [...container.querySelectorAll('.feature-checkbox-row')];
+    const rows = [...container.querySelectorAll(rowSelector)];
     const recommended = [];
     const notRecommended = [];
     rows.forEach((row) => {
-      const box = row.querySelector('input[type="checkbox"]');
-      const status = statusOf(box ? box.value : '', list);
+      const status = statusOfRow(row, list);
       row.classList.toggle('feature-is-not-recommended', status.known && !status.recommended);
       const badge = row.querySelector('.badge');
       row.insertBefore(dotsElement(status), badge);
@@ -130,6 +149,24 @@
       ...(recommended.length ? [groupHead(true), ...recommended] : []),
       ...(notRecommended.length ? [groupHead(false), ...notRecommended] : [])
     );
+  }
+
+  const checkboxValue = (row) => {
+    const box = row.querySelector('input[type="checkbox"]');
+    return box ? box.value : '';
+  };
+
+  // Sales Kit Features dropdown.
+  function groupSalesKitList() {
+    groupList('salesKitFeaturesCheckboxesList', '.feature-checkbox-row', (row, list) => statusOf(checkboxValue(row), list));
+  }
+
+  // Sales Kit Applications dropdown (each row's checkbox holds the application's id).
+  function groupSalesKitAppsList() {
+    groupList('salesKitAppsCheckboxesList', '.app-checkbox-row', (row, list) => {
+      const app = APP_DATABASE.find((entry) => entry.id === checkboxValue(row));
+      return app ? appStatusOf(app, list) : statusWith(() => false, [], []);
+    });
   }
 
   // When the result's laptops change (a new recommendation or a swapped laptop), every Recommended feature is
@@ -149,6 +186,7 @@
   }
 
   window.FeatureBannerStatus = {
-    statusOf, laptops, dotsElement, groupHead, recommendedOnly, groupSalesKitList, untickNotRecommendedForNewResult
+    statusOf, appStatusOf, laptops, dotsElement, groupHead, recommendedOnly, recommendedAppsOnly,
+    groupSalesKitList, groupSalesKitAppsList, untickNotRecommendedForNewResult
   };
 })();

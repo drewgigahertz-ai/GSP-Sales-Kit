@@ -152,7 +152,16 @@
   const SOURCES = {
     apps: {
       label: 'Applications',
-      items: () => APP_DATABASE.map((app) => ({ key: app.id, name: app.name, image: app.icon })),
+      // Data dots and Recommended / Not recommended groups (feature-banner-status.js).
+      items: () => {
+        const laptops = window.FeatureBannerStatus ? FeatureBannerStatus.laptops() : [];
+        return APP_DATABASE.map((app) => ({
+          key: app.id,
+          name: app.name,
+          image: app.icon,
+          banners: window.FeatureBannerStatus ? FeatureBannerStatus.appStatusOf(app, laptops) : null
+        }));
+      },
       selected: () => selectedSalesKitAppIds,
       toggle: (key) => handleSalesKitAppToggle(key),
       selectAll: () => selectAllSalesKitApps(),

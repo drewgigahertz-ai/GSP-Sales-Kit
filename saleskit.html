@@ -4939,6 +4939,9 @@
         containerSalesKit.appendChild(rowSk);
       });
 
+      // Data dots and Recommended / Not recommended groups (feature-banner-status.js).
+      if (window.FeatureBannerStatus) FeatureBannerStatus.groupSalesKitAppsList();
+
       updateSalesKitAppsDisplayText();
       filterSalesKitAppsMenu(document.getElementById('salesKitAppsSearchInput')?.value);
     }
@@ -4978,6 +4981,8 @@
         const isVis = (menu.style.display === 'block');
         menu.style.display = isVis ? 'none' : 'block';
         if (!isVis) {
+          // The result may have changed since the list was built: regroup it for the laptops shown now.
+          if (window.FeatureBannerStatus) FeatureBannerStatus.groupSalesKitAppsList();
           const inp = document.getElementById('salesKitAppsSearchInput');
           if (inp) {
             inp.value = '';
@@ -5053,7 +5058,9 @@
     }
 
     function selectAllSalesKitApps() {
-      selectedSalesKitAppIds = APP_DATABASE.map(a => a.id);
+      // Once a result exists, only the applications with data for at least one of its laptops.
+      const apps = window.FeatureBannerStatus ? FeatureBannerStatus.recommendedAppsOnly(APP_DATABASE) : APP_DATABASE;
+      selectedSalesKitAppIds = apps.map(a => a.id);
       buildSalesKitAppsCheckboxes();
       try { renderSalesKitMatrix(); } catch(e) {}
       saveAppStateToStorage();
