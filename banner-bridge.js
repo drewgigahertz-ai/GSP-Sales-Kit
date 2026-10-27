@@ -76,6 +76,9 @@
     } else if (channel === 'saleskit-banner-hotkey') {
       // Ctrl+1 / Ctrl+2 pressed while the Banner page has the keyboard (see hotkeys.js).
       if (typeof window.runSalesKitHotkey === 'function') window.runSalesKitHotkey(event.data.keys || {});
+    } else if (channel === 'saleskit-banner-help') {
+      // ? pressed on the Banner page: the shortcuts for that page (hotkey-help.js).
+      if (typeof window.openHotkeyHelp === 'function') window.openHotkeyHelp('banner');
     } else if (channel === 'saleskit-banner-activity') {
       // What the Banner page shows, for the server's Devices tab (see activity-tracker.js).
       window.bannerPageScreen = event.data.activity || null;

@@ -43,6 +43,13 @@
   ];
 
   document.addEventListener('keydown', (event) => {
+    // ? (not while typing): the shortcuts list, shown by SalesKit around this page (hotkey-help.js).
+    const typing = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement;
+    if (event.key === '?' && !typing && !event.ctrlKey && !event.altKey && !event.metaKey) {
+      event.preventDefault();
+      window.parent.postMessage({ channel: 'saleskit-banner-help' }, '*');
+      return;
+    }
     const ctrl = event.ctrlKey || event.metaKey;
     const key = KEYS.find((entry) => entry.code === event.code
       && Boolean(entry.ctrl) === ctrl && Boolean(entry.shift) === event.shiftKey && Boolean(entry.alt) === event.altKey);

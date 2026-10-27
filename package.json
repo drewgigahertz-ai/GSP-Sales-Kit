@@ -61,6 +61,7 @@
       "reco-promos.js",
       "price-notify.js",
       "updates.js",
+      "hotkey-help.js",
       "package.json"
     ],
     "publish": {
