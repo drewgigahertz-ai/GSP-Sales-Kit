@@ -7700,7 +7700,7 @@
           button.type = 'button';
           button.className = 'saleskit-presentation-view-banner';
           button.innerHTML = '<i class="bi bi-image me-1"></i>View banner';
-          button.title = `View banner (${index + 1}, or B for the first)`;
+          button.title = `View banner (B+${index + 1})`;
           button.appendChild(createFeatureBannerPreview(banner.url));
           button.addEventListener('click', () => openSalesKitPresentationBanner(banner, slide.title));
           cells[index + 1].appendChild(button);
@@ -7785,9 +7785,15 @@
       } else if (event.key === ' ') {
         event.preventDefault();
         toggleSalesKitSlideshow();
-      } else if (!event.ctrlKey && !event.altKey && !event.metaKey && ['b', 'B', '1', '2', '3'].includes(event.key)) {
-        // View banner (Features slides).
-        if (toggleSalesKitPresentationBannerByKey(event.key.toLowerCase())) event.preventDefault();
+      } else if (!event.ctrlKey && !event.altKey && !event.metaKey && (event.key === 'b' || event.key === 'B')) {
+        // View banner (Features slides): B, then 1 / 2 / 3.
+        event.preventDefault();
+        salesKitBannerKeyHeld = true;
+        salesKitBannerKeyAt = Date.now();
+      } else if (!event.ctrlKey && !event.altKey && !event.metaKey && ['1', '2', '3'].includes(event.key)
+        && (salesKitBannerKeyHeld || Date.now() - salesKitBannerKeyAt < 1500)) {
+        salesKitBannerKeyAt = 0;
+        if (openSalesKitPresentationBannerByNumber(Number(event.key))) event.preventDefault();
       }
     }
 
@@ -7808,19 +7814,18 @@
       }
     }
 
-    // Features slide: B opens the banner of the first laptop that has one (B again closes it); 1 / 2 / 3 open the
-    // banner of the first / second / third laptop column.
-    function toggleSalesKitPresentationBannerByKey(key) {
-      const bannerViewer = document.getElementById('salesKitPresentationBannerViewer');
-      const isOpen = Boolean(bannerViewer && bannerViewer.classList.contains('is-open'));
-      if (key === 'b' && isOpen) {
-        closeSalesKitPresentationBanner();
-        return true;
-      }
+    // Features slide: B+1 / B+2 / B+3 (hold B, or press B then the number) open the banner of the first / second /
+    // third laptop column.
+    let salesKitBannerKeyAt = 0;
+    let salesKitBannerKeyHeld = false;
+    document.addEventListener('keyup', event => {
+      if (event.key === 'b' || event.key === 'B') salesKitBannerKeyHeld = false;
+    });
+
+    function openSalesKitPresentationBannerByNumber(number) {
       const row = document.getElementById('salesKitPresentationRow');
       const cells = Array.from(row?.firstElementChild?.children || []).slice(1);
-      const buttons = cells.map(cell => cell.querySelector('.saleskit-presentation-view-banner'));
-      const button = key === 'b' ? buttons.find(Boolean) : buttons[Number(key) - 1];
+      const button = cells[number - 1] && cells[number - 1].querySelector('.saleskit-presentation-view-banner');
       if (!button) return false;
       button.click();
       return true;
