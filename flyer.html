@@ -110,28 +110,27 @@
   }
   .side-input:focus { border-color: #003ecb; box-shadow: 0 0 0 3px rgba(0, 62, 203, .12); }
 
-  /* The flyer's laptops, one group per target market; a click scrolls the flyer there. */
-  #flyerList { flex: 1; overflow-y: auto; }
-  .fl-market {
+  /* Step 3: checklist before printing; a click on a listed laptop scrolls the flyer to its target market. */
+  #flyerList { flex: 1; overflow-y: auto; padding-bottom: 8px; }
+  .ck-head {
     position: sticky; top: 0; z-index: 1;
-    padding: 7px 12px; background: #eef3fb; border-bottom: 1px solid #d9e3f0;
-    color: #0012b3; font-size: .68rem; font-weight: 800; letter-spacing: .045em; text-transform: uppercase; cursor: pointer;
+    padding: 10px 12px; background: #fff; border-bottom: 1px solid #d9e3f0;
+    color: #334155; font-size: .68rem; font-weight: 800; letter-spacing: .045em; text-transform: uppercase;
   }
-  .fl-item {
-    display: flex; align-items: center; gap: 8px;
-    padding: 9px 12px; border-bottom: 1px solid #eef1f6; border-left: 4px solid transparent; cursor: pointer;
+  .ck-head.ok { color: #15803d; }
+  .ck-head.warn { color: #b45309; }
+  .ck-row { display: flex; align-items: flex-start; gap: 8px; padding: 8px 12px 4px; }
+  .ck-row .bi { flex: none; margin-top: 1px; font-size: .85rem; }
+  .ck-row.ok .bi { color: #16a34a; }
+  .ck-row.warn .bi { color: #d97706; }
+  .ck-title { min-width: 0; font-size: .76rem; font-weight: 700; }
+  .ck-title small, .ck-item small { display: block; color: #64748b; font-size: .67rem; font-weight: 500; }
+  .ck-row.warn .ck-title small { color: #b45309; font-weight: 600; }
+  .ck-item {
+    margin: 2px 12px 2px 34px; padding: 5px 8px; border-left: 3px solid #fcd34d; border-radius: 0 6px 6px 0;
+    background: #fffbeb; font-size: .72rem; font-weight: 600; cursor: pointer;
   }
-  .fl-item:hover { background: #f4f8fd; border-left-color: #1a2cf0; }
-  .fl-tag {
-    flex: none; width: 52px; padding: 1px 0; border-radius: 4px; text-align: center;
-    font-size: .56rem; font-weight: 800; letter-spacing: .03em; color: #fff;
-  }
-  .fl-tag.exceed { background: #0012b3; }
-  .fl-tag.meet { background: #0a96e0; }
-  .fl-tag.budget { background: #16a34a; }
-  .fl-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .76rem; font-weight: 700; }
-  .fl-name small { display: block; overflow: hidden; text-overflow: ellipsis; color: #64748b; font-size: .66rem; font-weight: 500; }
-  .fl-price { flex: none; color: #0012b3; font-size: .72rem; font-weight: 800; }
+  .ck-item:hover { background: #fef3c7; border-left-color: #d97706; }
   .fl-empty { padding: 18px 12px; color: #64748b; font-size: .8rem; text-align: center; }
 
   #main { display: flex; min-width: 0; flex: 1; flex-direction: column; }
@@ -650,7 +649,7 @@ body.is-loading { overflow: hidden; }
     <input id="lookInput" class="side-input" type="text" placeholder="e.g. Juan Dela Cruz" autocomplete="off">
   </div>
   </div>
-  <div id="flyerList" aria-label="Laptops on the flyer"></div>
+  <div id="flyerList" aria-label="Check before printing"></div>
 </aside>
 
 <main id="main">
@@ -1010,28 +1009,65 @@ body.is-loading { overflow: hidden; }
     renderSide();
   }
 
-  // Sidebar: the flyer's laptops per target market (a click scrolls the flyer there) and the bar's summary.
+  // Sidebar step 3: what to fix before printing (a click on a laptop scrolls the flyer there), and the bar's summary.
   function renderSide() {
     var list = el("flyerList");
     if (!branchReady() || !sections.length) {
-      list.innerHTML = '<div class="fl-empty">' + (!loaded ? "Loading SalesKit data…" : branchReady() ? "No recommendations for this branch." : "Select a branch to see its laptops.") + "</div>";
+      list.innerHTML = '<div class="fl-empty">' + (!loaded ? "Loading SalesKit data…" : branchReady() ? "No recommendations for this branch." : "Select a branch to check its flyer.") + "</div>";
       el("flyerSummary").textContent = branchReady() ? branch + " · no recommendations" : "Select a branch to make its flyer";
       return;
     }
     var count = 0;
-    list.innerHTML = sections.map(function (section, i) {
-      var items = section.slots.map(function (model, s) {
-        if (!model) return "";
+    var checks = {
+      price: { title: "Price (SRP)", fix: "No 12MOS price", items: [] },
+      discount: { title: "Cash discount", fix: "No cash discount", items: [] },
+      picture: { title: "Picture", fix: "No picture", items: [] },
+      specs: { title: "Specs", fix: "Missing specs", items: [] },
+      slots: { title: "Exceed / Meet / Budget", fix: "Empty slot", items: [] }
+    };
+    var failed = {};
+    Array.from(document.querySelectorAll("#sections .card")).forEach(function (card) {
+      if (card.querySelector(".photo img.failed")) failed[card.querySelector(".model").textContent] = true;
+    });
+    sections.forEach(function (section, i) {
+      section.slots.forEach(function (model, s) {
+        if (!model) {
+          checks.slots.items.push({ market: i, name: section.title + " · " + SLOT_TAGS[s] });
+          return;
+        }
         count++;
         var p = laptopFor(model), pr = priceFor(model);
-        var tag = SLOT_TAGS[s];
-        return '<div class="fl-item" data-market="' + i + '">' +
-          '<span class="fl-tag ' + tag.toLowerCase() + '">' + tag + "</span>" +
-          '<span class="fl-name">' + esc(p ? (p.model || model) : model) + (p && p.partNumber ? "<small>" + esc(p.partNumber) + "</small>" : "") + "</span>" +
-          '<span class="fl-price">' + (pr ? money(pr.SRP) : "—") + "</span></div>";
+        var item = { market: i, name: p ? (p.model || model) : model };
+        if (!pr) checks.price.items.push(item);
+        else if (!(pr.Discount > 0)) checks.discount.items.push(item);
+        if (!p || !p.picture || Object.keys(failed).some(function (n) { return n.indexOf(item.name) === 0; })) checks.picture.items.push(item);
+        var missing = FIELDS.filter(function (f) { return !(p && p.specs && p.specs[f]); });
+        if (missing.length) checks.specs.items.push({ market: i, name: item.name, note: missing.join(", ") });
+      });
+    });
+    var info = data.branchDetails[key(branch)] || null;
+    var store = [];
+    if (!info || !info.storeName) store.push("Store name");
+    if (!info || !info.address) store.push("Address");
+    if (!el("contactInput").value.trim()) store.push("Contact No.");
+    if (!el("lookInput").value.trim()) store.push("Look for");
+
+    function row(ok, title, detail) {
+      return '<div class="ck-row ' + (ok ? "ok" : "warn") + '"><i class="bi ' + (ok ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") + '" aria-hidden="true"></i>' +
+        '<span class="ck-title">' + esc(title) + (detail ? "<small>" + esc(detail) + "</small>" : "") + "</span></div>";
+    }
+    var html = row(!store.length, "Store details", store.length ? "Missing: " + store.join(", ") : "Store name, address, contact and look for");
+    var issues = store.length ? 1 : 0;
+    Object.keys(checks).forEach(function (k) {
+      var c = checks[k];
+      if (c.items.length) issues++;
+      html += row(!c.items.length, c.title, c.items.length ? c.fix + ": " + c.items.length : "");
+      html += c.items.map(function (it) {
+        return '<div class="ck-item" data-market="' + it.market + '" title="Show on the flyer">' + esc(it.name) + (it.note ? "<small>" + esc(it.note) + "</small>" : "") + "</div>";
       }).join("");
-      return '<div class="fl-market" data-market="' + i + '">' + esc(section.title) + "</div>" + items;
-    }).join("");
+    });
+    list.innerHTML = '<div class="ck-head ' + (issues ? "warn" : "ok") + '"><span class="step-number">3</span>' +
+      (issues ? "Check before printing · " + issues + " to fix" : "Ready to print") + "</div>" + html;
     el("flyerSummary").textContent = branch + " · " + sections.length + " target market" + (sections.length === 1 ? "" : "s") + " · " + count + " laptop" + (count === 1 ? "" : "s");
   }
   // Contact No. and Look for: typed in the sidebar or on the flyer (both stay the same), and remembered per
@@ -1048,8 +1084,8 @@ body.is-loading { overflow: hidden; }
   }
   CONTACT_FIELDS.forEach(function (f) {
     function save(value) { try { if (branch) localStorage.setItem(contactKey(f[2]), value); } catch (e) {} }
-    el(f[0]).addEventListener("input", function () { el(f[1]).textContent = el(f[0]).value; save(el(f[0]).value); });
-    el(f[1]).addEventListener("input", function () { el(f[0]).value = el(f[1]).textContent; save(el(f[1]).textContent); });
+    el(f[0]).addEventListener("input", function () { el(f[1]).textContent = el(f[0]).value; save(el(f[0]).value); renderSide(); });
+    el(f[1]).addEventListener("input", function () { el(f[0]).value = el(f[1]).textContent; save(el(f[1]).textContent); renderSide(); });
   });
 
   el("flyerList").addEventListener("click", function (e) {
@@ -1078,7 +1114,7 @@ body.is-loading { overflow: hidden; }
     }));
     Promise.race([ready, new Promise(function (r) { setTimeout(r, 8000); })]).then(function () {
       setProgress(100);
-      setTimeout(function () { setLoading(false); }, 200);
+      setTimeout(function () { setLoading(false); renderSide(); }, 200);
     });
   }
 
