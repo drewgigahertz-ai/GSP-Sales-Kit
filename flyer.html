@@ -101,7 +101,14 @@
     margin-right: 6px; border-radius: 50%; background: #003ecb; color: #fff;
     font-size: .62rem; letter-spacing: 0; vertical-align: 1px;
   }
-  .step-hint { margin: 0; color: #64748b; font-size: .7rem; line-height: 1.45; }
+  .field-label { display: block; margin: 8px 0 4px; color: #64748b; font-size: .68rem; font-weight: 700; }
+  .filter-step .search-label + .field-label { margin-top: 0; }
+  .side-input {
+    width: 100%; min-height: 34px; padding: 0 9px;
+    border: 1px solid #cbd8eb; border-radius: 7px; outline: 0;
+    background: #fff; color: #1e293b; font-size: .74rem;
+  }
+  .side-input:focus { border-color: #003ecb; box-shadow: 0 0 0 3px rgba(0, 62, 203, .12); }
 
   /* The flyer's laptops, one group per target market; a click scrolls the flyer there. */
   #flyerList { flex: 1; overflow-y: auto; }
@@ -637,7 +644,10 @@ body.is-loading { overflow: hidden; }
   </div>
   <div class="filter-step">
     <span class="search-label"><span class="step-number">2</span>Contact details</span>
-    <p class="step-hint">Click <b>Contact No.</b> and <b>Look for</b> on the flyer to type them before you download or print.</p>
+    <label class="field-label" for="contactInput">Contact No.</label>
+    <input id="contactInput" class="side-input" type="text" placeholder="e.g. 0917 123 4567" autocomplete="off">
+    <label class="field-label" for="lookInput">Look for</label>
+    <input id="lookInput" class="side-input" type="text" placeholder="e.g. Juan Dela Cruz" autocomplete="off">
   </div>
   </div>
   <div id="flyerList" aria-label="Laptops on the flyer"></div>
@@ -957,6 +967,7 @@ body.is-loading { overflow: hidden; }
 
   function showBranchDetails() {
     var info = branch ? data.branchDetails[key(branch)] || null : null;
+    if (loadContactDetails.branch !== branch) { loadContactDetails.branch = branch; loadContactDetails(); }
     el("branchName").textContent = info ? info.storeName : "";
     el("branchAddress").textContent = info ? info.address : "";
     var logo = (info && info.logo) || data.logos.blue || "";
@@ -1023,6 +1034,24 @@ body.is-loading { overflow: hidden; }
     }).join("");
     el("flyerSummary").textContent = branch + " · " + sections.length + " target market" + (sections.length === 1 ? "" : "s") + " · " + count + " laptop" + (count === 1 ? "" : "s");
   }
+  // Contact No. and Look for: typed in the sidebar or on the flyer (both stay the same), and remembered per
+  // branch on this laptop.
+  var CONTACT_FIELDS = [["contactInput", "branchContact", "contact"], ["lookInput", "branchLook", "look"]];
+  function contactKey(field) { return "saleskit-flyer-" + field + "-" + key(branch); }
+  function loadContactDetails() {
+    CONTACT_FIELDS.forEach(function (f) {
+      var value = "";
+      try { value = branch ? localStorage.getItem(contactKey(f[2])) || "" : ""; } catch (e) {}
+      el(f[0]).value = value;
+      el(f[1]).textContent = value;
+    });
+  }
+  CONTACT_FIELDS.forEach(function (f) {
+    function save(value) { try { if (branch) localStorage.setItem(contactKey(f[2]), value); } catch (e) {} }
+    el(f[0]).addEventListener("input", function () { el(f[1]).textContent = el(f[0]).value; save(el(f[0]).value); });
+    el(f[1]).addEventListener("input", function () { el(f[0]).value = el(f[1]).textContent; save(el(f[1]).textContent); });
+  });
+
   el("flyerList").addEventListener("click", function (e) {
     var row = e.target.closest("[data-market]");
     var target = row && el("market-" + row.getAttribute("data-market"));
