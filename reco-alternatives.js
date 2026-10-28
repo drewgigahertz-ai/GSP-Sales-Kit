@@ -37,19 +37,19 @@
     .reco-alts-menu {
       position: fixed;
       z-index: 2000;
-      min-width: 300px;
-      max-width: 420px;
-      max-height: 340px;
+      width: 380px;
+      max-width: calc(100vw - 16px);
+      max-height: 380px;
       overflow-y: auto;
       margin: 0;
-      padding: 4px 0;
+      padding: 8px;
       list-style: none;
       background: #fff;
-      border: 1px solid #e2e8f0;
-      border-radius: 10px;
-      box-shadow: 0 10px 24px rgba(15, 23, 42, .14);
-      font-size: 0.78rem;
-      color: #334155;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      box-shadow: 0 14px 32px rgba(15, 23, 42, .18);
+      font-size: 0.9rem;
+      color: #0f172a;
       text-align: left;
     }
 
@@ -58,12 +58,22 @@
     }
 
     .reco-alts-menu .alts-head {
-      padding: 6px 12px 4px;
-      color: #94a3b8;
-      font-size: 0.68rem;
+      padding: 4px 6px 6px;
+      font-size: 0.72rem;
       font-weight: 800;
-      letter-spacing: .4px;
+      letter-spacing: .6px;
       text-transform: uppercase;
+    }
+
+    .reco-alts-menu .alts-head.is-reco {
+      color: #0012b3;
+    }
+
+    .reco-alts-menu .alts-head.is-alt {
+      margin-top: 8px;
+      padding-top: 10px;
+      border-top: 1px solid #e2e8f0;
+      color: #475569;
     }
 
     .reco-alts-menu button {
@@ -71,9 +81,11 @@
       width: 100%;
       justify-content: space-between;
       align-items: center;
-      gap: 10px;
-      padding: 6px 12px;
+      gap: 12px;
+      padding: 8px 10px;
       border: 0;
+      border-left: 4px solid transparent;
+      border-radius: 8px;
       background: none;
       font: inherit;
       color: inherit;
@@ -81,38 +93,75 @@
       cursor: pointer;
     }
 
+    .reco-alts-menu li + li > button.is-alt {
+      margin-top: 2px;
+    }
+
+    .reco-alts-menu button.is-reco {
+      background: #eef2ff;
+      border-left-color: #0012b3;
+    }
+
+    .reco-alts-menu button.is-alt {
+      border-left-color: #cbd5e1;
+    }
+
     .reco-alts-menu button:hover:not(:disabled),
     .reco-alts-menu button:focus-visible {
-      background: #f1f5ff;
+      background: #e0e7ff;
       outline: none;
     }
 
     .reco-alts-menu button:disabled {
       cursor: default;
-      opacity: .5;
+      opacity: .55;
     }
 
-    .reco-alts-menu button.is-shown {
+    .reco-alts-menu .alts-name {
+      display: block;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    .reco-alts-menu button.is-reco .alts-name {
       color: #0012b3;
-      font-weight: 700;
+    }
+
+    .reco-alts-menu .alts-name .bi {
+      margin-right: 5px;
+    }
+
+    .reco-alts-menu .alts-shown {
+      margin-left: 6px;
+      color: #15803d;
+      font-size: 0.72rem;
+      font-weight: 800;
+      white-space: nowrap;
     }
 
     .reco-alts-menu small {
       display: block;
-      color: #94a3b8;
+      margin-top: 2px;
+      color: #475569;
+      font-size: 0.74rem;
       font-weight: 500;
+      line-height: 1.35;
     }
 
     .reco-alts-menu .alts-stock {
       flex: none;
-      font-size: 0.68rem;
-      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: #dcfce7;
+      color: #166534;
+      font-size: 0.74rem;
+      font-weight: 800;
       white-space: nowrap;
-      color: #15803d;
     }
 
     .reco-alts-menu button:disabled .alts-stock {
-      color: #94a3b8;
+      background: #f1f5f9;
+      color: #64748b;
     }
   `;
   document.head.appendChild(style);
@@ -241,30 +290,47 @@
       });
     }
     const shownSku = (document.getElementById(tier + 'DisplayText') || {}).textContent || '';
-    const head = (text) => {
+    const head = (text, kind) => {
       const li = document.createElement('li');
-      li.className = 'alts-head';
+      li.className = `alts-head ${kind}`;
       li.textContent = text;
       return li;
     };
     menu.replaceChildren();
     choices.forEach((choice, index) => {
-      if (index === 0 && !choice.alternative) menu.appendChild(head('Recommended'));
-      if (choice.alternative && (index === 0 || !choices[index - 1].alternative)) menu.appendChild(head('Alternatives'));
+      if (index === 0 && !choice.alternative) menu.appendChild(head('Recommended', 'is-reco'));
+      if (choice.alternative && (index === 0 || !choices[index - 1].alternative)) {
+        menu.appendChild(head('Alternatives', index === 0 ? '' : 'is-alt'));
+      }
       const li = document.createElement('li');
       const button = document.createElement('button');
       button.type = 'button';
+      button.className = choice.alternative ? 'is-alt' : 'is-reco';
       button.setAttribute('role', 'option');
       button.disabled = choice.stock <= 0;
-      if (same(choice.prod.sku || choice.prod.cleanSku, shownSku)) {
+      const isShown = same(choice.prod.sku || choice.prod.cleanSku, shownSku);
+      if (isShown) {
         button.classList.add('is-shown');
         button.setAttribute('aria-selected', 'true');
       }
       const name = document.createElement('span');
-      name.textContent = choice.prod.title || choice.prod.sku;
+      const title = document.createElement('span');
+      title.className = 'alts-name';
+      if (!choice.alternative) {
+        const star = document.createElement('i');
+        star.className = 'bi bi-star-fill';
+        title.appendChild(star);
+      }
+      title.append(choice.prod.title || choice.prod.sku);
+      if (isShown) {
+        const shown = document.createElement('span');
+        shown.className = 'alts-shown';
+        shown.textContent = '✓ On card';
+        title.appendChild(shown);
+      }
       const sku = document.createElement('small');
       sku.textContent = choice.prod.sku || '';
-      name.appendChild(sku);
+      name.append(title, sku);
       const stock = document.createElement('span');
       stock.className = 'alts-stock';
       stock.textContent = choice.stock > 0 ? `${choice.stock} in stock` : 'No stock';
