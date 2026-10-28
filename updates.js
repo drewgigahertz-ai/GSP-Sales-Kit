@@ -3,6 +3,17 @@
 (function () {
   const RELEASES = [
     {
+      version: '1.0.19',
+      date: 'October 28, 2026',
+      changes: [
+        'Reco Table: each Exceed / Meet / Budget starts on the recommended laptop for your branch and segment, in SMT and OSD.',
+        'Reco Table: click a laptop’s name on the result to see the recommended laptop and its alternatives with stock, and pick one.',
+        'Reco Table (OSD): the Exceed / Meet / Budget lists show every laptop in stock; the recommended one is marked.',
+        'Flyers: when a laptop has more than one promo, click the arrow after its SRP to pick the promo price; the checklist reminds you until you do.',
+        'Flyers: Ctrl+Shift+C and Ctrl+Shift+L jump to Contact No. and Look for.'
+      ]
+    },
+    {
       version: '1.0.18',
       date: 'October 27, 2026',
       changes: [
