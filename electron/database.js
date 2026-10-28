@@ -24,6 +24,7 @@ const SHEET_TABLES = new Set([
   'uksp_transposed',
   'uksp_banner',
   'reco_table',
+  'reco_db',
   'logo'
 ]);
 
@@ -534,6 +535,8 @@ function getInitialData() {
     specsMap,
     criteriaSegmentData: { ...criteriaSegmentData, specsMap },
     recoTableData,
+    // Reco Table page: each branch's EXCEED / MEET / BUDGET and their alternatives per segment (DB sheet J–P).
+    recoDbData: getRows('reco_db'),
     // Flyers page: each branch's logo, store name and address (LOGO sheet E–I).
     branchDetails: makeBranchDetails(getRows('branch_details'), normalizeImageUrl),
     ukspPerSkuData,

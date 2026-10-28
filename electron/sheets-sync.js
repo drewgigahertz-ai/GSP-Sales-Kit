@@ -22,6 +22,7 @@ const { FEATURES_BANNER_SHEET, featuresBannerCollection } = require('./feature-b
 const { AGEING_BANNER_SHEET, ageingBannerCollection } = require('./ageing-banners');
 const { USABILITY_SHEET, usabilityCollection } = require('./app-usability');
 const { BRANCH_DETAILS_RANGE, branchDetailsCollection } = require('./branch-details');
+const { RECO_DB_SHEET, RECO_DB_RANGE, recoDbCollection } = require('./reco-db');
 
 function collectionName(sheetName) {
   return sheetName.toLowerCase().trim().replace(/[\/\s]+/g, '_');
@@ -198,6 +199,17 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
       valueRenderOption: 'FORMATTED_VALUE'
     });
     result.usability = usabilityCollection(response.data.values || []);
+  }
+
+  // Reco Table recommendations and alternatives per branch (see reco-db.js); skipped when the tab is missing.
+  const recoDbTitle = titles.find((name) => name.trim().toUpperCase() === RECO_DB_SHEET);
+  if (recoDbTitle) {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `'${recoDbTitle.replace(/'/g, "''")}'!${RECO_DB_RANGE}`,
+      valueRenderOption: 'FORMATTED_VALUE'
+    });
+    result.reco_db = recoDbCollection(response.data.values || []);
   }
 
   return result;

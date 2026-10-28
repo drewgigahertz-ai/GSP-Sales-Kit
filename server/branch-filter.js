@@ -31,13 +31,16 @@ function filterDataForBranch(data, branch) {
   const recoTableData = (data.recoTableData || [])
     .filter((row) => sameBranch(row.BR, code))
     .map((row) => ({ ...row, 'HO STOCK': '', 'OA STOCK': '' }));
+  // DB sheet recommendations: only this branch's rows.
+  const recoDbData = (data.recoDbData || []).filter((row) => sameBranch(row.branch, code));
 
   return {
     ...data,
     lockedBranch: code,
     locationsList: [code],
     criteriaSegmentData: { ...criteria, laptops, locations: [code] },
-    recoTableData
+    recoTableData,
+    recoDbData
   };
 }
 

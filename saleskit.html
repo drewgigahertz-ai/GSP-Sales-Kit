@@ -31,6 +31,7 @@
   <script src="./dropdown-keys.js" defer></script>
   <script src="./feature-banner-status.js"></script>
   <script src="./reco-promos.js"></script>
+  <script src="./reco-alternatives.js"></script>
   <script src="./presentation-picker.js" defer></script>
   <script src="./price-notify.js" defer></script>
   <script src="./updates.js" defer></script>
@@ -4348,6 +4349,8 @@
 
       if (selectedRecommendationMode === 'SMT') {
         buildSmtProductCatalog(targetHierarchy);
+        // DB sheet: each tier starts on its recommended laptop (reco-alternatives.js).
+        if (window.RecoAlternatives) RecoAlternatives.applyToCatalog(productCatalog, targetHierarchy);
         buildProductDropdowns();
         ['exceed', 'meet', 'budget'].forEach(tier => {
           selectProduct(tier, productCatalog[tier].find(product => product.smtDefault) || null);
@@ -4390,6 +4393,8 @@
       productCatalog.exceed = processTierLaptops(3);
       productCatalog.meet = processTierLaptops(2);
       productCatalog.budget = processTierLaptops(1);
+      // DB sheet: every laptop in stock is listed, and each tier starts on its recommended laptop (reco-alternatives.js).
+      if (window.RecoAlternatives) RecoAlternatives.applyToCatalog(productCatalog, targetHierarchy);
 
       buildProductDropdowns();
 
@@ -6142,7 +6147,8 @@
 
           const stock = getLaptopStock(prod, selectedLocation);
           const isHighlighted = isTop;
-          const highlightLabel = isSmt ? '' : (isTop ? '★ Highest Stock' : '');
+          const highlightLabel = isSmt || !isTop ? ''
+            : (window.RecoAlternatives && RecoAlternatives.isRecommended(tier, prod) ? '★ Recommended' : '★ Highest Stock');
           const stockBadge = isBranch
             ? `<span class="badge ${isHighlighted ? 'bg-success' : 'bg-success-subtle text-success border border-success-subtle'} rounded-pill px-2 py-0.5" style="font-size: 0.68rem; font-weight: 700; white-space: nowrap;">
                 <i class="bi bi-box-seam me-1"></i>${stock} in stock ${highlightLabel}
@@ -6215,6 +6221,8 @@
       const stockBadgeEl = document.getElementById('stock' + cap);
       // "N promos available" under the price when the laptop has several promo rows (reco-promos.js).
       if (window.RecoPromos) RecoPromos.show(tier, prod);
+      // The laptop's name lists DB's recommended laptop and its alternatives (reco-alternatives.js).
+      if (window.RecoAlternatives) RecoAlternatives.show(tier, prod);
 
       if (!prod) {
         if (displayInput) displayInput.textContent = `No ${tier.toUpperCase()} in stock for ${selectedLocation || 'branch'}`;
@@ -7022,7 +7030,9 @@
           useCORS: true,
           allowTaint: true,
           backgroundColor: '#ffffff',
-          logging: false
+          logging: false,
+          // No dropdown chevron after the laptop names in the image.
+          onclone: (doc) => doc.body.classList.add('reco-capturing')
         });
 
         const link = document.createElement('a');
@@ -7405,6 +7415,11 @@
       const wholeResult = result.cloneNode(true);
       wholeResult.removeAttribute('id');
       wholeResult.querySelectorAll('[id]').forEach(element => element.removeAttribute('id'));
+      // The presentation shows plain laptop names (the alternatives dropdown only works on the Reco Table).
+      wholeResult.querySelectorAll('.has-alts').forEach(element => {
+        element.classList.remove('has-alts', 'is-open');
+        element.removeAttribute('onclick');
+      });
       return {
         type: 'reco',
         title: 'Generated recommendation',
@@ -8918,6 +8933,7 @@
       applyHeaderLogo();
       applyApplicationLogo();
       if (Array.isArray(data.recoTableData)) window.RECO_TABLE_DATA = data.recoTableData;
+      if (Array.isArray(data.recoDbData)) window.RECO_DB_DATA = data.recoDbData;
       try {
         localStorage.setItem('ghz_cached_sheet_data', JSON.stringify(data));
       } catch (e) {}

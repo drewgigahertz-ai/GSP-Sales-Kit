@@ -18,6 +18,7 @@
     "electron/ageing-banners.js",
     "electron/app-usability.js",
     "electron/branch-details.js",
+    "electron/reco-db.js",
     "electron/embedded-config.json",
     "package.json",
     "!node_modules/electron-updater{,/**/*}",
