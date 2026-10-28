@@ -51,6 +51,8 @@
       title: 'Flyers',
       keys: [
         ['Ctrl + Shift + B', 'Branch'],
+        ['Ctrl + Shift + C', 'Contact No.'],
+        ['Ctrl + Shift + L', 'Look for'],
         ['Ctrl + D', 'Download (PDF or PNG)'],
         ['Ctrl + P', 'Print'],
         ['Ctrl + R', 'Refresh data']

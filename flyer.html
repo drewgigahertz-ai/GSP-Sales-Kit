@@ -18,6 +18,7 @@
   <link href="./node_modules/@fontsource/plus-jakarta-sans/800.css" rel="stylesheet">
   <script src="./node_modules/html2canvas/dist/html2canvas.min.js"></script>
   <script src="./node_modules/jspdf/dist/jspdf.umd.min.js"></script>
+  <script src="./flyer-promos.js"></script>
   <style>
   :root {
     /* Fonts (offline: the system sans-serif) */
@@ -644,9 +645,9 @@ body.is-loading { overflow: hidden; }
   <div class="filter-step">
     <span class="search-label"><span class="step-number">2</span>Contact details</span>
     <label class="field-label" for="contactInput">Contact No.</label>
-    <input id="contactInput" class="side-input" type="text" placeholder="e.g. 0917 123 4567" autocomplete="off">
+    <input id="contactInput" class="side-input" type="text" placeholder="e.g. 0917 123 4567" autocomplete="off" title="Contact No. (Ctrl+Shift+C)">
     <label class="field-label" for="lookInput">Look for</label>
-    <input id="lookInput" class="side-input" type="text" placeholder="e.g. Juan Dela Cruz" autocomplete="off">
+    <input id="lookInput" class="side-input" type="text" placeholder="e.g. Juan Dela Cruz" autocomplete="off" title="Look for (Ctrl+Shift+L)">
   </div>
   </div>
   <div id="flyerList" aria-label="Check before printing"></div>
@@ -899,11 +900,12 @@ body.is-loading { overflow: hidden; }
   // ---------- Laptops and prices ----------
   function laptopFor(desc) { return desc ? data.laptops[key(desc)] || null : null; }
 
-  // SRP = 12MOS; the special cash discount = 12MOS − cash. A branch's own price row wins over the regular one.
+  // SRP = 12MOS; the special cash discount = 12MOS − cash. A promo picked on the card (flyer-promos.js) wins,
+  // then the branch's own price row, then the regular one.
   function priceFor(desc) {
     var p = laptopFor(desc);
     if (!p) return null;
-    var price = (p.branchPrices && p.branchPrices[key(branch)]) || p.prices || null;
+    var price = FlyerPromos.chosen(desc) || (p.branchPrices && p.branchPrices[key(branch)]) || p.prices || null;
     if (!price || price.twelveMonths == null) return null;
     var srp = Number(price.twelveMonths);
     var discount = price.cash == null ? null : srp - Number(price.cash);
@@ -956,7 +958,7 @@ body.is-loading { overflow: hidden; }
       var v = p && p.specs ? p.specs[f] : "";
       return '<li><span class="k">' + f + '</span><span class="k">:</span><span class="v">' + (v ? esc(v) : "—") + "</span></li>";
     }).join("");
-    return '<div class="card' + (model ? "" : " empty") + '">' +
+    return '<div class="card' + (model ? "" : " empty") + '"' + (model ? ' data-model="' + esc(model) + '"' : "") + ">" +
       '<div class="photo">' + photo + '<div class="laptop_logo">' + logo + "</div></div>" +
       '<div class="model"><span>' + nameHtml + "</span></div>" +
       '<ul class="specs">' + specs + "</ul>" +
@@ -1002,6 +1004,7 @@ body.is-loading { overflow: hidden; }
           '<div class="row' + cls + '">' + section.slots.map(cardHtml).join("") + "</div>";
       }).join("");
       fitModelNames();
+      FlyerPromos.mark(el("sections"));
     }
     el("sheet").classList.toggle("no-branch", !branchReady());
     el("download").disabled = !branchReady() || !sections.length;
@@ -1020,6 +1023,7 @@ body.is-loading { overflow: hidden; }
     var count = 0;
     var checks = {
       price: { title: "Price (SRP)", fix: "No 12MOS price", items: [] },
+      promo: { title: "Promo price", fix: "Several promos, none picked (click the ˅ after the SRP)", items: [] },
       discount: { title: "Cash discount", fix: "No cash discount", items: [] },
       picture: { title: "Picture", fix: "No picture", items: [] },
       specs: { title: "Specs", fix: "Missing specs", items: [] },
@@ -1040,6 +1044,8 @@ body.is-loading { overflow: hidden; }
         var item = { market: i, name: p ? (p.model || model) : model };
         if (!pr) checks.price.items.push(item);
         else if (!(pr.Discount > 0)) checks.discount.items.push(item);
+        if (FlyerPromos.several(model) && !FlyerPromos.chosen(model) &&
+            !checks.promo.items.some(function (it) { return it.name === item.name; })) checks.promo.items.push(item);
         if (!p || !p.picture || Object.keys(failed).some(function (n) { return n.indexOf(item.name) === 0; })) checks.picture.items.push(item);
         var missing = FIELDS.filter(function (f) { return !(p && p.specs && p.specs[f]); });
         if (missing.length) checks.specs.items.push({ market: i, name: item.name, note: missing.join(", ") });
@@ -1086,6 +1092,24 @@ body.is-loading { overflow: hidden; }
     function save(value) { try { if (branch) localStorage.setItem(contactKey(f[2]), value); } catch (e) {} }
     el(f[0]).addEventListener("input", function () { el(f[1]).textContent = el(f[0]).value; save(el(f[0]).value); renderSide(); });
     el(f[1]).addEventListener("input", function () { el(f[0]).value = el(f[1]).textContent; save(el(f[1]).textContent); renderSide(); });
+  });
+
+  // A promo was picked for a laptop: its cards are drawn again (pictures are already saved), then the checklist.
+  FlyerPromos.init({
+    laptop: laptopFor, branch: function () { return branch; }, key: key, esc: esc, money: money,
+    onPick: function (desc) {
+      Array.prototype.forEach.call(el("sections").querySelectorAll(".card[data-model]"), function (card) {
+        if (key(card.getAttribute("data-model")) !== key(desc)) return;
+        var tmp = document.createElement("div");
+        tmp.innerHTML = cardHtml(card.getAttribute("data-model"));
+        var fresh = tmp.firstChild;
+        card.parentNode.replaceChild(fresh, card);
+        fillPictures(fresh);
+      });
+      fitModelNames();
+      FlyerPromos.mark(el("sections"));
+      renderSide();
+    }
   });
 
   el("flyerList").addEventListener("click", function (e) {
@@ -1244,7 +1268,8 @@ body.is-loading { overflow: hidden; }
     if (on) el("wrap").scrollTop = 0;
   }
 
-  // ---------- Keys: Ctrl+1–4 switch SalesKit tabs; ? shows the shortcuts ----------
+  // ---------- Keys: Ctrl+1–4 switch SalesKit tabs; Ctrl+Shift+B / C / L branch, contact, look for; ? shows the shortcuts ----------
+  function focusField(id) { var f = el(id); f.focus(); f.select(); }
   document.addEventListener("keydown", function (e) {
     var ctrl = e.ctrlKey || e.metaKey;
     var typing = e.target instanceof HTMLInputElement || (e.target && e.target.isContentEditable);
@@ -1258,6 +1283,8 @@ body.is-loading { overflow: hidden; }
     else if (!e.shiftKey && e.code === "KeyP") { e.preventDefault(); el("print").click(); }
     else if (!e.shiftKey && e.code === "KeyR") { e.preventDefault(); el("reload").click(); }
     else if (e.shiftKey && e.code === "KeyB") { e.preventDefault(); openBranch(); }
+    else if (e.shiftKey && e.code === "KeyC") { e.preventDefault(); focusField("contactInput"); }
+    else if (e.shiftKey && e.code === "KeyL") { e.preventDefault(); focusField("lookInput"); }
   });
 
   // A picture that cannot be shown is left blank (no broken-image icon on the flyer).

@@ -53,6 +53,7 @@
       "banner.html",
       "flyer.html",
       "flyer-bridge.js",
+      "flyer-promos.js",
       "banner-bridge.js",
       "banner-color.js",
       "banner-hotkeys.js",

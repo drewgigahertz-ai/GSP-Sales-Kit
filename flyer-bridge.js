@@ -59,7 +59,11 @@
         },
         prices: price(item),
         branchPrices: Object.fromEntries(Object.entries((item && item.branchPrices) || {})
-          .map(([branch, view]) => [key(branch), price(view)]).filter(([, view]) => view))
+          .map(([branch, view]) => [key(branch), price(view)]).filter(([, view]) => view)),
+        // Every NEW PRICING row of the laptop, for the promo picker on its card (flyer-promos.js).
+        promoRows: ((item && item.promoRows) || []).filter((row) => row.hasPrice).map((row) => ({
+          title: row.title, branch: row.branch || '', dates: row.dates || '', cash: row.cash, twelveMonths: row.twelveMonths
+        }))
       };
     });
 
