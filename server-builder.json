@@ -21,7 +21,6 @@
     "electron/reco-db.js",
     "electron/embedded-config.json",
     "package.json",
-    "!node_modules/electron-updater{,/**/*}",
     "!node_modules/html2canvas{,/**/*}",
     "!node_modules/@fontsource/outfit{,/**/*}"
   ],
@@ -31,7 +30,13 @@
       "to": "mydata.db"
     }
   ],
-  "publish": null,
+  "publish": {
+    "provider": "github",
+    "owner": "drewgigahertz-ai",
+    "repo": "GSP-Sales-Kit",
+    "releaseType": "release",
+    "channel": "server"
+  },
   "win": {
     "target": "nsis",
     "icon": "build/icon.ico"

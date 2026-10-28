@@ -835,6 +835,7 @@
       <button class="nav-tab" data-view="users" role="tab"><i class="bi bi-people"></i> Users</button>
       <button class="nav-tab" data-view="prices" role="tab"><i class="bi bi-tags"></i> Price changes</button>
       <button class="nav-tab" data-view="backups" role="tab"><i class="bi bi-archive"></i> Backups</button>
+      <button class="nav-tab" data-view="updates" role="tab"><i class="bi bi-cloud-arrow-down"></i> Updates <span class="nav-badge" id="updateBadge" hidden>1</span></button>
     </nav>
     <div class="status-pill" id="statusPill"><span class="status-dot"></span><span id="statusText">Starting…</span></div>
   </header>
@@ -1034,6 +1035,34 @@
         </div>
       </section>
       <p class="muted-small mt-3"><i class="bi bi-info-circle"></i> A backup is saved automatically before every sync that changes data, and includes the user accounts. The newest 10 are kept. Restoring replaces the current data, and every SalesKit laptop reloads it automatically.</p>
+    </section>
+
+    <!-- UPDATES: this server's own updates (server/updater.js) -->
+    <section class="view" id="view-updates" hidden>
+      <section class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title"><i class="bi bi-cloud-arrow-down"></i> Server updates</h2>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-primary btn-icon" id="checkServerUpdate"><i class="bi bi-arrow-clockwise"></i> Check now</button>
+            <button class="btn btn-sm btn-brand btn-icon" id="installServerUpdate" hidden><i class="bi bi-arrow-repeat"></i> Restart and update</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="field">
+            <div class="label">This server</div>
+            <div class="sync-headline" id="serverVersion">—</div>
+          </div>
+          <div class="field">
+            <div class="label">Update</div>
+            <div class="sync-headline" id="serverUpdateHeadline">—</div>
+            <div class="sync-detail" id="serverUpdateDetail"></div>
+            <div class="progress mt-2" id="serverUpdateProgressWrap" hidden>
+              <div class="progress-bar progress-bar-striped progress-bar-animated" id="serverUpdateProgressBar" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <p class="muted-small mt-3"><i class="bi bi-info-circle"></i> The server checks GitHub every hour and downloads a new version in the background. It installs when you click Restart and update, by itself tonight between 11 PM and 5 AM (not during a sync), or when you quit the server. SalesKit laptops lose the server for about 30 seconds while it restarts, then reconnect on their own. Settings, users and data are kept.</p>
     </section>
 
     <!-- OVERVIEW -->

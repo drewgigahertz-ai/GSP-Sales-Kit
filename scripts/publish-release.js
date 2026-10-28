@@ -15,12 +15,21 @@ const headers = {
   'X-GitHub-Api-Version': '2022-11-28'
 };
 
-// Local file → name on GitHub (electron-builder writes the hyphenated name into latest.yml).
-const installer = `${pkg.build.productName} Setup ${version}.exe`;
+// Local file → name on GitHub (electron-builder writes the hyphenated name into latest.yml / server.yml).
+// SalesKit Server is in the same release, on its own "server" channel (server.yml), so it updates itself too.
+const serverBuild = require('../server-builder.json');
+const serverDist = path.join(__dirname, '..', serverBuild.directories.output);
+const installerFiles = (folder, productName, updateFile) => {
+  const installer = `${productName} Setup ${version}.exe`;
+  return [
+    [folder, installer, installer.replace(/ /g, '-')],
+    [folder, `${installer}.blockmap`, `${installer}.blockmap`.replace(/ /g, '-')],
+    [folder, updateFile, updateFile]
+  ];
+};
 const files = [
-  [installer, installer.replace(/ /g, '-')],
-  [`${installer}.blockmap`, `${installer}.blockmap`.replace(/ /g, '-')],
-  ['latest.yml', 'latest.yml']
+  ...installerFiles(dist, pkg.build.productName, 'latest.yml'),
+  ...installerFiles(serverDist, serverBuild.productName, `${serverBuild.publish.channel}.yml`)
 ];
 
 function fail(message) {
@@ -44,12 +53,14 @@ async function github(url, options = {}, attempts = 3) {
 
 (async () => {
   if (!process.env.GH_TOKEN) fail('GH_TOKEN is not set.');
-  for (const [local] of files) {
-    if (!fs.existsSync(path.join(dist, local))) fail(`${local} was not built. Run the build first.`);
+  for (const [folder, local] of files) {
+    if (!fs.existsSync(path.join(folder, local))) fail(`${local} was not built. Run the build first.`);
   }
-  const updateInfo = fs.readFileSync(path.join(dist, 'latest.yml'), 'utf8');
-  if (!updateInfo.startsWith(`version: ${version}\n`) && !updateInfo.startsWith(`version: ${version}\r\n`)) {
-    fail(`dist/latest.yml is not for version ${version}. The build did not finish; run it again.`);
+  for (const [folder, local] of files.filter(([, name]) => name.endsWith('.yml'))) {
+    const updateInfo = fs.readFileSync(path.join(folder, local), 'utf8');
+    if (!updateInfo.startsWith(`version: ${version}\n`) && !updateInfo.startsWith(`version: ${version}\r\n`)) {
+      fail(`${path.basename(folder)}/${local} is not for version ${version}. The build did not finish; run it again.`);
+    }
   }
 
   // One published release per version: reuse it, or create it once.
@@ -69,8 +80,8 @@ async function github(url, options = {}, attempts = 3) {
   }
 
   const existing = new Map((release.body.assets || []).map((asset) => [asset.name, asset]));
-  for (const [local, remote] of files) {
-    const data = fs.readFileSync(path.join(dist, local));
+  for (const [folder, local, remote] of files) {
+    const data = fs.readFileSync(path.join(folder, local));
     const current = existing.get(remote);
     if (current && current.state === 'uploaded' && current.size === data.length) {
       console.log(`  ✓ ${remote} already uploaded`);

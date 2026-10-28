@@ -15,6 +15,7 @@ const { hasFullAccess, filterDataForBranch, withHomeBranch } = require('./branch
 const { createClientReleaseWatcher } = require('./client-release');
 const { createCompressedData } = require('./compressed-data');
 const { createPriceWatch } = require('./price-watch');
+const { createServerUpdater } = require('./updater');
 const { version: APP_VERSION } = require('../package.json');
 
 const APP_NAME = 'GigaHertz SalesKit Server';
@@ -49,6 +50,7 @@ let users;
 let devicesPushTimer = null;
 let headerLogo = '';
 let clientRelease;
+let serverUpdater;
 let activity;
 let priceWatch;
 // Laptops listening on /api/events for price changes.
@@ -156,7 +158,8 @@ function getState() {
     rejectedCount: devices ? devices.rejectedList().length : 0,
     userCount: users ? users.list().length : 0,
     allowWithoutLogin: settings.allowWithoutLogin,
-    clientRelease: clientRelease ? clientReleaseSummary() : null
+    clientRelease: clientRelease ? clientReleaseSummary() : null,
+    serverUpdate: serverUpdater ? serverUpdater.get() : null
   };
 }
 
@@ -529,6 +532,9 @@ function updateTrayMenu() {
     { type: 'separator' },
     { label: 'Open dashboard', click: showWindow },
     { label: activeSync ? 'Syncing…' : 'Sync now', enabled: !activeSync, click: () => syncNow() },
+    ...(serverUpdater && serverUpdater.get().state === 'ready'
+      ? [{ label: `Restart and update to ${serverUpdater.get().version}`, enabled: !activeSync, click: () => serverUpdater.installNow() }]
+      : []),
     { type: 'separator' },
     { label: 'Quit server', click: () => app.quit() }
   ]));
@@ -568,6 +574,15 @@ ipcMain.handle('server:get-logos', () => ({ header: headerLogo }));
 ipcMain.handle('server:check-client-release', async () => {
   await clientRelease.checkNow();
   return getState();
+});
+// Updates tab: look for a new server version now, or install the downloaded one.
+ipcMain.handle('server:check-server-update', () => {
+  serverUpdater.checkNow();
+  return getState();
+});
+ipcMain.handle('server:install-server-update', () => {
+  if (activeSync) return { ok: false, error: 'A sync is running. Try again when it finishes.' };
+  return { ok: serverUpdater.installNow() };
 });
 // Price changes tab: every kept change, and deleting chosen ones (laptops' Price changes lists read them from here).
 ipcMain.handle('server:price-changes', async () => (priceWatch ? priceWatch.all() : []));
@@ -802,6 +817,11 @@ if (!app.requestSingleInstanceLock()) {
       }
     });
     clientRelease.start();
+    serverUpdater = createServerUpdater({
+      onStatus: () => pushState(),
+      canInstall: () => !activeSync,
+      log
+    });
     Menu.setApplicationMenu(null);
     createWindow();
     createTray();
@@ -820,6 +840,7 @@ if (!app.requestSingleInstanceLock()) {
     scheduleSync();
     if (settings.serviceAccountPath) syncNow('startup');
     if (PRICE_WATCH) startPriceWatch();
+    serverUpdater.start();
     pushState();
   });
 
@@ -828,6 +849,7 @@ if (!app.requestSingleInstanceLock()) {
     clearInterval(syncTimer);
     if (priceWatch) priceWatch.stop();
     if (clientRelease) clientRelease.stop();
+    if (serverUpdater) serverUpdater.stop();
     if (activity) activity.close();
     stopApi();
     database.closeDatabase();

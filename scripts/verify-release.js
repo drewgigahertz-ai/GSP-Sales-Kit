@@ -4,9 +4,15 @@ const { version } = require('../package.json');
 const { owner, repo } = require('../package.json').build.publish;
 
 const tag = `v${version}`;
-// The name electron-builder writes into latest.yml (spaces become hyphens).
+// The names electron-builder writes into latest.yml / server.yml (spaces become hyphens). SalesKit Server
+// updates itself from the same release (server.yml).
+const serverBuild = require('../server-builder.json');
 const installer = `${require('../package.json').build.productName} Setup ${version}.exe`.replace(/ /g, '-');
-const required = [installer, `${installer}.blockmap`, 'latest.yml'];
+const serverInstaller = `${serverBuild.productName} Setup ${version}.exe`.replace(/ /g, '-');
+const required = [
+  installer, `${installer}.blockmap`, 'latest.yml',
+  serverInstaller, `${serverInstaller}.blockmap`, `${serverBuild.publish.channel}.yml`
+];
 
 (async () => {
   const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases?per_page=30`, {

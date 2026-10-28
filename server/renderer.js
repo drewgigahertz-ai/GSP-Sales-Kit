@@ -209,8 +209,37 @@ function renderClientRelease() {
   $('clientReleaseDetail').textContent = parts.join(' · ');
 }
 
+// Updates tab: this server's version and its own update (server/updater.js).
+function renderServerUpdate() {
+  const update = state.serverUpdate || { state: 'disabled' };
+  const ready = update.state === 'ready';
+  $('serverVersion').textContent = `SalesKit Server ${state.version}`;
+  $('updateBadge').hidden = !ready;
+  $('installServerUpdate').hidden = !ready;
+  $('installServerUpdate').disabled = state.syncing;
+  $('checkServerUpdate').disabled = ['disabled', 'checking', 'downloading', 'ready'].includes(update.state);
+  $('serverUpdateProgressWrap').hidden = update.state !== 'downloading';
+  $('serverUpdateProgressBar').style.width = `${Math.max(5, update.percent || 0)}%`;
+  const headlines = {
+    disabled: 'Updates work in the installed server only',
+    idle: 'Up to date',
+    checking: 'Checking GitHub…',
+    downloading: `Downloading ${update.version || 'update'}… ${update.percent || 0}%`,
+    ready: `Version ${update.version} is ready to install`,
+    error: 'Could not check for updates'
+  };
+  $('serverUpdateHeadline').textContent = headlines[update.state] || '—';
+  const parts = [];
+  if (ready) parts.push(state.syncing ? 'Waiting for the sync to finish' : 'Installs tonight at 11 PM, or click Restart and update');
+  if (update.state === 'error' && update.error) parts.push(update.error);
+  if (update.state === 'disabled') parts.push('Started with npm; install the server to get updates');
+  if (update.checkedAt) parts.push(`checked ${timeAgo(update.checkedAt)}`);
+  $('serverUpdateDetail').textContent = parts.join(' · ');
+}
+
 function render(nextState) {
   state = nextState;
+  renderServerUpdate();
   renderStatus();
   renderConnection();
   renderSync();
@@ -879,6 +908,13 @@ $('clearPriceChanges').addEventListener('click', (event) => {
   run(event.currentTarget, api.clearPriceChanges, 'Price-change history cleared').then((next) => next && render(next));
 });
 $('checkClientRelease').addEventListener('click', (event) => run(event.currentTarget, api.checkClientRelease).then((next) => next && render(next)));
+$('checkServerUpdate').addEventListener('click', (event) => run(event.currentTarget, api.checkServerUpdate).then((next) => next && render(next)));
+$('installServerUpdate').addEventListener('click', (event) => {
+  if (!confirm('Restart the server and install the update now? SalesKit laptops lose the server for about 30 seconds.')) return;
+  run(event.currentTarget, api.installServerUpdate).then((result) => {
+    if (result && !result.ok) toast(result.error || 'The update is not ready yet.', true);
+  });
+});
 $('chooseKey').addEventListener('click', (event) => run(event.currentTarget, api.chooseKey).then((next) => next && render(next)));
 $('copyToken').addEventListener('click', (event) => run(event.currentTarget, api.copyToken, 'Token copied'));
 $('copyClientConfig').addEventListener('click', (event) => run(event.currentTarget, () => api.copyClientConfig(), 'Client config copied'));
