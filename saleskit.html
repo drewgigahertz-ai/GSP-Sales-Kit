@@ -6182,28 +6182,12 @@
     }
 
     // ============================================================
-    // GENERATED RESULT COLUMN ORDERING (highest price left, lowest
-    // price right). Runs after every product selection so the three
-    // columns always reflect the current prices, regardless of tier.
+    // GENERATED RESULT COLUMN ORDERING: always Exceed, Meet, Budget
+    // (left to right), whatever the prices are.
     // ============================================================
-    function reorderRecoColumnsByPrice() {
-      const cols = [
-        { id: 'colExceed', priceId: 'priceExceed' },
-        { id: 'colMeet', priceId: 'priceMeet' },
-        { id: 'colBudget', priceId: 'priceBudget' }
-      ];
-
-      const withPrices = cols.map(c => {
-        const priceEl = document.getElementById(c.priceId);
-        const raw = priceEl ? priceEl.textContent : '0';
-        const num = parseFloat(String(raw).replace(/[^0-9.]/g, '')) || 0;
-        return { ...c, price: num };
-      });
-
-      withPrices.sort((a, b) => b.price - a.price);
-
-      withPrices.forEach((c, index) => {
-        const colEl = document.getElementById(c.id);
+    function placeRecoColumns() {
+      ['colExceed', 'colMeet', 'colBudget'].forEach((id, index) => {
+        const colEl = document.getElementById(id);
         if (colEl) colEl.style.order = index;
       });
     }
@@ -6258,7 +6242,7 @@
             </div>
           `;
         }
-        reorderRecoColumnsByPrice();
+        placeRecoColumns();
         applySpecRanking();
         try { renderSalesKitMatrix(); } catch(e) {}
         return;
@@ -6365,7 +6349,7 @@
         selectedSkus[tier] = prod ? (prod.sku || prod.title) : '';
       }
 
-      reorderRecoColumnsByPrice();
+      placeRecoColumns();
       applySpecRanking();
       try { updateMatchedFeaturesInRecoResults(); } catch(e) {}
       try { renderSalesKitMatrix(); } catch(e) {}
