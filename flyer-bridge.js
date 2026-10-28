@@ -46,6 +46,7 @@
       const guide = (item && item.specs) || {};
       laptops[id] = {
         model: modelName(item && item.brandModel) || modelName(spec && spec.title) || row.item,
+        partNumber: clean(spec && spec.modelCode),
         picture: (spec && spec.image) || '',
         brandLogo: (item && item.brandPicture) || '',
         specs: {

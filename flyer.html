@@ -898,6 +898,11 @@ body.is-loading { overflow: hidden; }
       (showCash ? '<span class="lab">Special Cash<br>Discount!</span>' : '<span class="lab lab-empty"></span>') +
       '<span class="amt">' + (showCash ? money(pr.Discount) : "") + "</span></div>";
     var name = p ? (p.model || model) : (model || "Model name");
+    // Part number (SPECS Model Code) after the brand and model, unless the name already has it.
+    var pn = p && p.partNumber ? String(p.partNumber).trim() : "";
+    if (norm(name).indexOf(norm(pn)) !== -1) pn = "";
+    // The part number stays on one line (no break at its hyphen).
+    var nameHtml = "<span>" + esc(name) + (pn ? ' <span style="white-space:nowrap">' + esc(pn) + "</span>" : "") + "</span>";
     var photo = p && p.picture ? '<img data-src="' + esc(p.picture) + '" alt="' + esc(name) + '">' : "<span>" + (model ? "No image" : "") + "</span>";
     var logo = p && p.brandLogo ? '<img data-src="' + esc(p.brandLogo) + '" alt="">' : "";
     var specs = FIELDS.map(function (f) {
@@ -906,7 +911,7 @@ body.is-loading { overflow: hidden; }
     }).join("");
     return '<div class="card' + (model ? "" : " empty") + '">' +
       '<div class="photo">' + photo + '<div class="laptop_logo">' + logo + "</div></div>" +
-      '<div class="model"><span>' + esc(name) + "</span></div>" +
+      '<div class="model"><span>' + nameHtml + "</span></div>" +
       '<ul class="specs">' + specs + "</ul>" +
       '<div class="srp"><span class="lab">SRP</span><span class="val">' + (pr ? money(pr.SRP) : "—") + "</span></div>" +
       cash + "</div>";
@@ -922,6 +927,20 @@ body.is-loading { overflow: hidden; }
     else img.hidden = true;
   }
 
+  // A model name with its part number that doesn't fit its band in two lines gets smaller text (down to 8px).
+  function fitModelNames() {
+    Array.from(el("sections").querySelectorAll(".model > span")).forEach(function (span) {
+      if (!span.clientHeight) return; // the tab is hidden; done again when it is shown (resize)
+      span.style.fontSize = "";
+      var size = parseFloat(getComputedStyle(span).fontSize);
+      while (span.scrollHeight > span.clientHeight && size > 8) {
+        size -= 0.5;
+        span.style.fontSize = size + "px";
+      }
+    });
+  }
+  window.addEventListener("resize", fitModelNames);
+
   function render() {
     showBranchDetails();
     if (!branchReady()) {
@@ -934,6 +953,7 @@ body.is-loading { overflow: hidden; }
         return '<div class="banner' + cls + '"><span>' + esc(section.title) + "</span></div>" +
           '<div class="row' + cls + '">' + section.slots.map(cardHtml).join("") + "</div>";
       }).join("");
+      fitModelNames();
     }
     el("sheet").classList.toggle("no-branch", !branchReady());
     el("download").disabled = !branchReady() || !sections.length;
