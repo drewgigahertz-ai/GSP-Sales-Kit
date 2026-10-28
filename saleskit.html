@@ -4715,7 +4715,7 @@
       currentActiveView = normKey;
 
       // Update all navigation tabs
-      const tabIds = ['tabAvailability', 'tabRecoTable', 'tabSalesKit', 'tabBanner', 'tabMixMatch', 'tabUksp', 'tabAttachment'];
+      const tabIds = new Set(['tabAvailability', 'tabMixMatch', 'tabUksp', 'tabAttachment', ...Object.values(VIEW_MAP).map(v => v.tab)]);
       tabIds.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.remove('active');
@@ -4726,7 +4726,7 @@
       if (activeTabEl) activeTabEl.classList.add('active');
 
       // Standalone sub-views
-      const standaloneViews = ['viewAvailability', 'viewBanner', 'viewMixMatch', 'viewUksp', 'viewAttachment'];
+      const standaloneViews = new Set(Object.values(VIEW_MAP).map(v => v.view).filter(id => id !== 'viewRecoTable'));
       standaloneViews.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.remove('active');
