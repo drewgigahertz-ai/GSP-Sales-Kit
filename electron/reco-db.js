@@ -12,7 +12,8 @@ function text(value) {
 
 // Sheet values (J2:P) → collection for database.replaceSheetsData (table reco_db).
 function recoDbCollection(values = []) {
-  const rows = values.flatMap((row) => {
+  // Ids keep the sheet row (J2 is row 2), so the Data health tab can point to it.
+  const rows = values.flatMap((row, index) => {
     const data = {
       tag: text(row[0]).toUpperCase(),
       item: text(row[1]),
@@ -22,12 +23,12 @@ function recoDbCollection(values = []) {
       hierarchy: text(row[5]),
       tag_number: text(row[6])
     };
-    return data.tag && data.item && data.branch ? [data] : [];
+    return data.tag && data.item && data.branch ? [{ id: `item_${String(index + 2).padStart(4, '0')}`, data }] : [];
   });
   return {
     collection: 'reco_db',
     columns: ['tag', 'item', 'segment', 'branch', 'target_market', 'hierarchy', 'tag_number'],
-    rows: rows.map((data, index) => ({ id: `item_${String(index + 1).padStart(4, '0')}`, data }))
+    rows
   };
 }
 

@@ -237,9 +237,112 @@ function renderServerUpdate() {
   $('serverUpdateDetail').textContent = parts.join(' · ');
 }
 
+// ---------- Data health: sheet problems after each sync (server/data-health.js) ----------
+
+let healthCheckedAt = null;
+
+function healthBadge() {
+  const total = state.dataHealth ? state.dataHealth.total : 0;
+  $('healthBadge').hidden = !total;
+  $('healthBadge').textContent = total;
+  // A new check (after a sync) while the tab is open: show it.
+  if (currentView === 'health' && state.dataHealth && state.dataHealth.checkedAt !== healthCheckedAt) loadHealth();
+}
+
+async function loadHealth(recheck = false, button = null) {
+  const report = await run(button, () => api.getDataHealth(recheck), recheck ? 'Checked again' : '');
+  if (report) renderHealth(report);
+}
+
+function healthCopyCell(tr, item) {
+  const cell = tr.insertCell();
+  cell.className = 'text-end';
+  const copy = document.createElement('button');
+  copy.className = 'btn btn-sm btn-light btn-icon';
+  copy.title = 'Copy the item code';
+  copy.innerHTML = '<i class="bi bi-clipboard"></i> Copy';
+  copy.addEventListener('click', () => run(copy, () => api.copyText(item), 'Item code copied'));
+  cell.appendChild(copy);
+}
+
+function healthFlag(cell, ok, okText, badText) {
+  const span = document.createElement('span');
+  span.className = `health-flag ${ok ? 'good' : 'bad'}`;
+  span.textContent = ok ? okText : badText;
+  cell.appendChild(span);
+}
+
+function healthEmpty(rows, columns, message) {
+  rows.innerHTML = `<tr><td colspan="${columns}" class="empty text-center py-4">${message}</td></tr>`;
+}
+
+function healthCount(id, count) {
+  $(id).textContent = count;
+  $(id).classList.toggle('is-alert', count > 0);
+}
+
+function renderHealth(report) {
+  healthCheckedAt = report.checkedAt;
+  $('healthHeadline').textContent = report.total
+    ? `${report.total} problem${report.total === 1 ? '' : 's'} to fix in the sheets`
+    : 'No problems found';
+  $('healthDetail').textContent = `${report.recommendedCount} recommended laptops checked · ${formatTime(report.checkedAt, true)} (${timeAgo(report.checkedAt)})`;
+
+  healthCount('healthMissingCount', report.missing.length);
+  const missingRows = $('healthMissingRows');
+  missingRows.replaceChildren();
+  if (!report.missing.length) healthEmpty(missingRows, 6, 'Every recommended laptop is in LAPTOP RAW and BANNER SPECS.');
+  report.missing.forEach((entry) => {
+    const tr = missingRows.insertRow();
+    tr.insertCell().textContent = entry.item;
+    healthFlag(tr.insertCell(), entry.laptopRaw, 'Listed', 'Missing');
+    healthFlag(tr.insertCell(), entry.bannerSpecs, 'Listed', 'Missing');
+    healthFlag(tr.insertCell(), entry.hasPrice, 'Has a price', 'No price');
+    const used = tr.insertCell();
+    used.className = 'muted-small';
+    used.textContent = entry.usedIn;
+    healthCopyCell(tr, entry.item);
+  });
+
+  healthCount('healthDuplicateCount', report.duplicates.length);
+  const duplicateRows = $('healthDuplicateRows');
+  duplicateRows.replaceChildren();
+  if (!report.duplicates.length) healthEmpty(duplicateRows, 3, 'No item is listed twice in SPECS with different prices.');
+  report.duplicates.forEach((entry) => {
+    const tr = duplicateRows.insertRow();
+    tr.insertCell().textContent = entry.item;
+    tr.insertCell().textContent = entry.rows
+      .map(({ row, price }) => `${row ? `Row ${row}` : 'A row'}: ${price ? `₱${Number(price).toLocaleString('en-PH')}` : 'no price'}`)
+      .join(' · ');
+    healthCopyCell(tr, entry.item);
+  });
+
+  const media = [
+    ...report.noPicture.map((entry) => ({ ...entry, missing: 'Picture' })),
+    ...report.noOs.map((entry) => ({ ...entry, missing: 'OS' }))
+  ].sort((a, b) => a.item.localeCompare(b.item));
+  healthCount('healthMediaCount', media.length);
+  const mediaRows = $('healthMediaRows');
+  mediaRows.replaceChildren();
+  if (!media.length) healthEmpty(mediaRows, 5, 'Every recommended laptop has a picture and an OS.');
+  media.forEach((entry) => {
+    const tr = mediaRows.insertRow();
+    tr.insertCell().textContent = entry.item;
+    healthFlag(tr.insertCell(), false, '', entry.missing);
+    tr.insertCell().textContent = entry.where;
+    const used = tr.insertCell();
+    used.className = 'muted-small';
+    used.textContent = entry.usedIn;
+    healthCopyCell(tr, entry.item);
+  });
+}
+
+$('recheckHealth').addEventListener('click', (event) => loadHealth(true, event.currentTarget));
+
 function render(nextState) {
   state = nextState;
   renderServerUpdate();
+  healthBadge();
   renderStatus();
   renderConnection();
   renderSync();
@@ -298,6 +401,7 @@ function showView(view) {
   if (view === 'devices') loadDevices();
   if (view === 'users') loadUsers();
   if (view === 'prices') loadPriceChanges();
+  if (view === 'health') loadHealth();
 }
 
 document.querySelectorAll('.nav-tab').forEach((tab) => tab.addEventListener('click', () => showView(tab.dataset.view)));

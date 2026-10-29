@@ -727,6 +727,7 @@ module.exports = {
   getImageUrls,
   getInitialData,
   getStatus,
+  getRows,
   getTableData,
   listBranches,
   listTables,

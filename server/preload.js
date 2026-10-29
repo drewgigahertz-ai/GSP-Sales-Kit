@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('salesKitServer', {
   deletePriceChanges: (items) => ipcRenderer.invoke('server:delete-price-changes', items),
   checkClientRelease: () => ipcRenderer.invoke('server:check-client-release'),
   checkServerUpdate: () => ipcRenderer.invoke('server:check-server-update'),
+  getDataHealth: (recheck) => ipcRenderer.invoke('server:data-health', Boolean(recheck)),
   installServerUpdate: () => ipcRenderer.invoke('server:install-server-update'),
   chooseKey: () => ipcRenderer.invoke('server:choose-key'),
   updateSettings: (changes) => ipcRenderer.invoke('server:update-settings', changes),

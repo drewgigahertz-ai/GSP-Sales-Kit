@@ -430,6 +430,45 @@
       text-align: center;
     }
 
+    .nav-badge.is-alert {
+      background: #f87171;
+      color: #450a0a;
+    }
+
+    /* Data health tab */
+    .health-count {
+      margin-left: 6px;
+      padding: 1px 8px;
+      border-radius: 999px;
+      background: #e2e8f0;
+      color: #334155;
+      font-size: 0.72rem;
+    }
+
+    .health-count.is-alert {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+
+    .health-flag {
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .health-flag.bad { color: #b91c1c; }
+    .health-flag.good { color: #15803d; }
+
+    /* Long laptop names and notes wrap, so every column fits the window. */
+    #view-health .list-table td:first-child,
+    #view-health .list-table td.muted-small {
+      white-space: normal;
+    }
+
+    #view-health .list-table td:first-child {
+      min-width: 260px;
+      font-weight: 600;
+    }
+
     .view[hidden] {
       display: none !important;
     }
@@ -831,6 +870,7 @@
     <nav class="nav-tabs-top" role="tablist">
       <button class="nav-tab active" data-view="overview" role="tab"><i class="bi bi-speedometer2"></i> Overview</button>
       <button class="nav-tab" data-view="data" role="tab"><i class="bi bi-table"></i> Data</button>
+      <button class="nav-tab" data-view="health" role="tab"><i class="bi bi-clipboard2-pulse"></i> Data health <span class="nav-badge is-alert" id="healthBadge" hidden>0</span></button>
       <button class="nav-tab" data-view="devices" role="tab"><i class="bi bi-laptop"></i> Devices <span class="nav-badge" id="onlineBadge" hidden>0</span></button>
       <button class="nav-tab" data-view="users" role="tab"><i class="bi bi-people"></i> Users</button>
       <button class="nav-tab" data-view="prices" role="tab"><i class="bi bi-tags"></i> Price changes</button>
@@ -1035,6 +1075,56 @@
         </div>
       </section>
       <p class="muted-small mt-3"><i class="bi bi-info-circle"></i> A backup is saved automatically before every sync that changes data, and includes the user accounts. The newest 10 are kept. Restoring replaces the current data, and every SalesKit laptop reloads it automatically.</p>
+    </section>
+
+    <!-- DATA HEALTH: sheet problems found after each sync (server/data-health.js) -->
+    <section class="view" id="view-health" hidden>
+      <section class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title"><i class="bi bi-clipboard2-pulse"></i> Data health</h2>
+          <button class="btn btn-sm btn-outline-primary btn-icon" id="recheckHealth"><i class="bi bi-arrow-clockwise"></i> Check again</button>
+        </div>
+        <div class="panel-body">
+          <div class="sync-headline" id="healthHeadline">Not checked yet</div>
+          <div class="sync-detail" id="healthDetail"></div>
+        </div>
+      </section>
+      <section class="panel mt-3">
+        <div class="panel-head">
+          <h2 class="panel-title"><i class="bi bi-exclamation-triangle"></i> Recommended laptops missing from LAPTOP RAW or BANNER SPECS <span class="health-count" id="healthMissingCount"></span></h2>
+        </div>
+        <p class="muted-small px-3 mb-2">These show no price, brand logo or OS on the Reco Table, Banner and Flyers until a row is added.</p>
+        <div class="table-responsive">
+          <table class="list-table">
+            <thead><tr><th>Laptop</th><th>LAPTOP RAW</th><th>BANNER SPECS</th><th>NEW PRICING</th><th>Recommended in</th><th></th></tr></thead>
+            <tbody id="healthMissingRows"></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="panel mt-3">
+        <div class="panel-head">
+          <h2 class="panel-title"><i class="bi bi-files"></i> Same item twice in SPECS with different prices <span class="health-count" id="healthDuplicateCount"></span></h2>
+        </div>
+        <p class="muted-small px-3 mb-2">The app may show either price. Keep one price for the item in every row.</p>
+        <div class="table-responsive">
+          <table class="list-table">
+            <thead><tr><th>Laptop</th><th>SPECS rows and prices</th><th></th></tr></thead>
+            <tbody id="healthDuplicateRows"></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="panel mt-3">
+        <div class="panel-head">
+          <h2 class="panel-title"><i class="bi bi-image"></i> Recommended laptops with no picture or no OS <span class="health-count" id="healthMediaCount"></span></h2>
+        </div>
+        <div class="table-responsive">
+          <table class="list-table">
+            <thead><tr><th>Laptop</th><th>Missing</th><th>Where to fix</th><th>Recommended in</th><th></th></tr></thead>
+            <tbody id="healthMediaRows"></tbody>
+          </table>
+        </div>
+      </section>
+      <p class="muted-small mt-3"><i class="bi bi-info-circle"></i> Checked after every sync. Fix the sheet, then Sync now (or wait for the next sync) and the list updates.</p>
     </section>
 
     <!-- UPDATES: this server's own updates (server/updater.js) -->

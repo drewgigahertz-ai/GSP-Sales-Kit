@@ -16,6 +16,7 @@ const { createClientReleaseWatcher } = require('./client-release');
 const { createCompressedData } = require('./compressed-data');
 const { createPriceWatch } = require('./price-watch');
 const { createServerUpdater } = require('./updater');
+const { buildDataHealth } = require('./data-health');
 const { version: APP_VERSION } = require('../package.json');
 
 const APP_NAME = 'GigaHertz SalesKit Server';
@@ -51,6 +52,8 @@ let devicesPushTimer = null;
 let headerLogo = '';
 let clientRelease;
 let serverUpdater;
+// Data health tab: sheet problems found in the synced data (server/data-health.js), checked after each sync.
+let dataHealth = null;
 let activity;
 let priceWatch;
 // Laptops listening on /api/events for price changes.
@@ -159,7 +162,8 @@ function getState() {
     userCount: users ? users.list().length : 0,
     allowWithoutLogin: settings.allowWithoutLogin,
     clientRelease: clientRelease ? clientReleaseSummary() : null,
-    serverUpdate: serverUpdater ? serverUpdater.get() : null
+    serverUpdate: serverUpdater ? serverUpdater.get() : null,
+    dataHealth: dataHealth ? { total: dataHealth.total, checkedAt: dataHealth.checkedAt } : null
   };
 }
 
@@ -172,6 +176,15 @@ function clientReleaseSummary() {
     deviceCount: seen.length,
     upToDate: latest.version ? seen.filter((device) => device.version === latest.version).length : 0
   };
+}
+
+function checkDataHealth() {
+  try {
+    dataHealth = buildDataHealth(database.getRows);
+    if (dataHealth.total) log('warning', `Data health: ${dataHealth.total} sheet problem${dataHealth.total === 1 ? '' : 's'} to fix (see the Data health tab).`);
+  } catch (error) {
+    log('error', `Data health check failed: ${error.message}`);
+  }
 }
 
 function bumpDataVersion() {
@@ -411,6 +424,7 @@ async function runSync(reason) {
     log('success', summary.changed
       ? `Sync finished: ${summary.updatedCount} rows updated, ${summary.deletedCount} removed`
       : 'Sync finished: no changes');
+    checkDataHealth();
     return finish({ ok: true, changed: summary.changed, updatedCount: summary.updatedCount, deletedCount: summary.deletedCount });
   } catch (error) {
     log('error', `Sync failed: ${error.message}`);
@@ -574,6 +588,14 @@ ipcMain.handle('server:get-logos', () => ({ header: headerLogo }));
 ipcMain.handle('server:check-client-release', async () => {
   await clientRelease.checkNow();
   return getState();
+});
+// Data health tab: the last report, or a fresh check.
+ipcMain.handle('server:data-health', (_event, recheck) => {
+  if (recheck || !dataHealth) {
+    checkDataHealth();
+    pushState();
+  }
+  return dataHealth;
 });
 // Updates tab: look for a new server version now, or install the downloaded one.
 ipcMain.handle('server:check-server-update', () => {
@@ -833,6 +855,7 @@ if (!app.requestSingleInstanceLock()) {
       backups = createBackupStore(path.join(app.getPath('userData'), 'backups'), database);
       startApi();
       loadLogos();
+      checkDataHealth();
     } catch (error) {
       apiError = error.message;
       log('error', `Could not start the server: ${error.message}`);
