@@ -152,11 +152,12 @@
       text-overflow: ellipsis; white-space: nowrap; }
     .alt-quick .l3-features { position: absolute; top: 742px; left: 1020px; display: grid; width: 520px;
       grid-template-columns: 1fr 1fr; gap: 10px; }
-    .alt-quick .l3-feature { display: flex; height: 50px; align-items: center; justify-content: center; gap: 10px;
-      padding: 0 12px; border-radius: 12px; background: #e6ebfb; color: #0d1b4d; font-size: 14px; font-weight: 800;
-      text-transform: uppercase; text-align: center; }
+    /* Every check mark at the same spot, the name left-aligned beside it (a long name wraps beside the mark). */
+    .alt-quick .l3-feature { display: flex; height: 50px; align-items: center; justify-content: flex-start; gap: 12px;
+      padding: 0 16px 0 20px; border-radius: 12px; background: #e6ebfb; color: #0d1b4d; font-size: 14px; font-weight: 800;
+      line-height: 1.2; text-transform: uppercase; text-align: left; }
     .alt-quick .l3-feature.is-wide { grid-column: span 2; }
-    .alt-quick .l3-feature i { color: #1a2cf0; font-size: 20px; }
+    .alt-quick .l3-feature i { flex: none; color: #1a2cf0; font-size: 20px; line-height: 1; }
   `;
   document.head.appendChild(style);
 
