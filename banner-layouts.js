@@ -2,7 +2,8 @@
 // of the same laptop for 20 seconds each (Layout 2: slanted spec boxes and four feature boxes; Layout 3: a big
 // price on blue with a Quick Specs list), and starts again. Pause (or the clearance banner) goes back to the main
 // banner. The layouts read what the main banner shows (texts, pictures, price codes), so a laptop, branch, promo
-// or colour picked while playing shows on every layout. Ctrl+Shift+L plays / pauses, also in fullscreen.
+// or colour picked while playing shows on every layout. Ctrl+Shift+L plays / pauses, also in fullscreen. The
+// Layout switch (Main / 2 / 3) shows one layout by hand.
 (function () {
   const $ = (id) => document.getElementById(id);
   const SEQUENCE = [
@@ -37,6 +38,14 @@
     #slideshowButton.is-playing { background: #003ecb; color: #fff; }
     #slideshowButton:disabled { opacity: .5; cursor: default; }
     #slideshowButton:focus-visible { outline: 3px solid rgba(0, 62, 203, .28); outline-offset: 2px; }
+    #layoutSwitch { display: inline-flex; flex: 0 0 auto; align-items: center; overflow: hidden; border: 1px solid #003ecb;
+      border-radius: 6px; font-size: .72rem; font-weight: 700; }
+    #layoutSwitch span { padding: 0 8px; color: #475569; }
+    #layoutSwitch button { min-height: 30px; padding: 4px 10px; border: 0; border-left: 1px solid #c7d2fe; background: #fff;
+      color: #003ecb; font: inherit; cursor: pointer; }
+    #layoutSwitch button.is-active { background: #003ecb; color: #fff; }
+    #layoutSwitch button:disabled { opacity: .5; cursor: default; }
+    #layoutSwitch button:focus-visible { outline: 3px solid rgba(0, 62, 203, .28); outline-offset: -3px; }
 
     #stage .alt-layout { position: absolute; inset: 0; z-index: 5; overflow: hidden; }
     #stage .alt-layout[hidden] { display: none; }
@@ -277,6 +286,29 @@
     shown = view;
     if (view !== 'main') render(view);
     Object.entries(layers).forEach(([name, layer]) => { layer.hidden = name !== view; });
+    updateSwitch();
+  }
+
+  // Layout switch: view one layout by hand (stops the slideshow on that layout).
+  function updateSwitch() {
+    const choices = document.querySelectorAll('#layoutSwitch button');
+    choices.forEach((choice) => {
+      const active = choice.dataset.layout === shown;
+      choice.classList.toggle('is-active', active);
+      choice.setAttribute('aria-pressed', String(active));
+      choice.disabled = isClearance();
+    });
+  }
+
+  function choose(view) {
+    if (isClearance()) return;
+    if (playing) {
+      playing = false;
+      clearTimeout(timer);
+      timer = null;
+      updateButton();
+    }
+    show(view);
   }
 
   function schedule() {
@@ -330,18 +362,33 @@
     else play();
   }
 
-  // The button, next to Fullscreen.
+  // The layout switch and the Play button, next to Fullscreen.
+  const layoutSwitch = document.createElement('div');
+  layoutSwitch.id = 'layoutSwitch';
+  layoutSwitch.setAttribute('role', 'group');
+  layoutSwitch.setAttribute('aria-label', 'Banner layout');
+  layoutSwitch.innerHTML = '<span>Layout</span>'
+    + '<button type="button" data-layout="main" title="Main banner">Main</button>'
+    + '<button type="button" data-layout="specs" title="Layout 2: slanted spec boxes and feature boxes">2</button>'
+    + '<button type="button" data-layout="quick" title="Layout 3: big price with Quick Specs">3</button>';
+  layoutSwitch.addEventListener('click', (event) => {
+    const choice = event.target.closest('button[data-layout]');
+    if (choice && !choice.disabled) choose(choice.dataset.layout);
+  });
+  $('fullscreenButton').insertAdjacentElement('beforebegin', layoutSwitch);
   const button = document.createElement('button');
   button.id = 'slideshowButton';
   button.type = 'button';
   button.addEventListener('click', toggle);
   $('fullscreenButton').insertAdjacentElement('beforebegin', button);
   updateButton();
+  updateSwitch();
 
-  // The clearance banner stops the slideshow; a change on the main banner (another laptop, branch, promo,
-  // colour, a picture that finished loading) redraws the layout on screen.
+  // The clearance banner stops the slideshow and goes back to the main layout; a change on the main banner (another
+  // laptop, branch, promo, colour, a picture that finished loading) redraws the layout on screen.
   new MutationObserver(() => {
-    if (playing && isClearance()) pause();
+    if (isClearance() && (playing || shown !== 'main')) pause();
+    updateSwitch();
   }).observe($('wrap'), { attributes: true, attributeFilter: ['class'] });
   let redraw = null;
   new MutationObserver((records) => {
@@ -351,5 +398,5 @@
     redraw = setTimeout(() => render(shown), 150);
   }).observe(stage, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['src', 'hidden', 'style', 'data-segment'] });
 
-  window.BannerLayouts = { play, pause, toggle, isPlaying: () => playing, show };
+  window.BannerLayouts = { play, pause, toggle, isPlaying: () => playing, show: choose };
 })();
