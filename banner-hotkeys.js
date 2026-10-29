@@ -40,7 +40,11 @@
     { alt: true, code: 'Digit2', run: () => click(document.querySelector('#bannerViewSwitch [data-view="generated"]')) },
     { ctrl: true, code: 'KeyR', run: () => click($('refreshBannerButton')) },
     { ctrl: true, shift: true, code: 'KeyF', run: () => click($('fullscreenButton')) },
-    { ctrl: true, shift: true, code: 'KeyL', run: () => window.BannerLayouts && window.BannerLayouts.toggle() }
+    { ctrl: true, shift: true, code: 'KeyL', run: () => window.BannerLayouts && window.BannerLayouts.toggle() },
+    // Slideshow layouts by hand (banner-layouts.js): Main, Layout 2, Layout 3.
+    { alt: true, code: 'Digit3', run: () => click(document.querySelector('#layoutSwitch [data-layout="main"]')) },
+    { alt: true, code: 'Digit4', run: () => click(document.querySelector('#layoutSwitch [data-layout="specs"]')) },
+    { alt: true, code: 'Digit5', run: () => click(document.querySelector('#layoutSwitch [data-layout="quick"]')) }
   ];
 
   document.addEventListener('keydown', (event) => {

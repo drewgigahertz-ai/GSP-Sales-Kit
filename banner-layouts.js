@@ -377,9 +377,9 @@
   layoutSwitch.setAttribute('role', 'group');
   layoutSwitch.setAttribute('aria-label', 'Banner layout');
   layoutSwitch.innerHTML = '<span>Layout</span>'
-    + '<button type="button" data-layout="main" title="Main banner">Main</button>'
-    + '<button type="button" data-layout="specs" title="Layout 2: slanted spec boxes and feature boxes">2</button>'
-    + '<button type="button" data-layout="quick" title="Layout 3: big price with Quick Specs">3</button>';
+    + '<button type="button" data-layout="main" title="Main banner (Alt+3)">Main</button>'
+    + '<button type="button" data-layout="specs" title="Layout 2: slanted spec boxes and feature boxes (Alt+4)">2</button>'
+    + '<button type="button" data-layout="quick" title="Layout 3: big price with Quick Specs (Alt+5)">3</button>';
   layoutSwitch.addEventListener('click', (event) => {
     const choice = event.target.closest('button[data-layout]');
     if (choice && !choice.disabled) choose(choice.dataset.layout);
