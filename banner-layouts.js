@@ -57,10 +57,11 @@
     .alt-brand { position: absolute; display: flex; align-items: center; justify-content: flex-end; width: 260px; height: 100px;
       color: #1a2cf0; font-size: 40px; font-weight: 900; }
     .alt-brand img { max-width: 100%; max-height: 100%; object-fit: contain; }
-    .alt-promo { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center;
-      overflow: hidden; padding: 10px; background: #fff; text-align: center; }
+    /* The box fits its picture: same height, as wide as the picture (a wide picture up to the full width). */
+    .alt-promo { position: absolute; display: flex; width: fit-content; flex-direction: column; align-items: center;
+      justify-content: center; overflow: hidden; padding: 6px 10px; background: #fff; text-align: center; }
     /* A thin dark blue outline that follows the picture's own shape, so its white lettering reads on the white box. */
-    .alt-promo img { max-width: 100%; max-height: 100%; object-fit: contain;
+    .alt-promo img { width: auto; object-fit: contain;
       filter: drop-shadow(0 0 1px #0f2a8a) drop-shadow(0 0 1px #0f2a8a) drop-shadow(0 0 1.5px #0f2a8a); }
     .alt-promo-sub { color: #1d3fb8; font-size: 18px; font-weight: 800; letter-spacing: 5px; }
     .alt-promo-title { color: #1a2cf0; font-weight: 900; line-height: 1; padding: 0 20px; }
@@ -86,7 +87,10 @@
     .alt-specs .l2-low small { display: block; font-size: 14px; font-weight: 700; }
     .alt-specs .l2-monthly { width: 380px; padding: 14px 0; background: #fff; color: #1d3fb8; font-size: 44px; font-weight: 900; text-align: center; }
     .alt-specs .l2-monthly i { font-size: 20px; font-weight: 700; }
-    .alt-specs .l2-promo { top: 45px; left: 602px; width: 696px; height: 236px; border: 4px solid #1a2cf0; }
+    /* Centred in the space left of the brand logo (x 602 to 1298). */
+    .alt-specs .l2-promo { top: 45px; left: 950px; min-width: 320px; max-width: 696px; height: 236px; transform: translateX(-50%);
+      border: 4px solid #1a2cf0; }
+    .alt-specs .l2-promo img { height: 216px; max-width: 668px; }
     .alt-specs .alt-brand { top: 64px; right: 40px; }
     .alt-specs .l2-specs { position: absolute; top: 330px; left: 600px; display: grid; grid-template-columns: 440px 440px;
       column-gap: 30px; row-gap: 18px; }
@@ -130,8 +134,10 @@
     .alt-quick .l3-codes { margin-top: 26px; color: rgba(255, 255, 255, .75); font-family: Arial, 'Segoe UI', sans-serif;
       font-size: 12px; line-height: 1.6; word-spacing: 2px; }
     .alt-quick .alt-brand { top: 40px; right: 46px; }
-    .alt-quick .l3-promo { top: 142px; left: 1020px; width: 520px; height: 168px; border-left: 8px solid #e0262f;
-      border-radius: 22px; box-shadow: 0 12px 30px rgba(20, 40, 120, .12); }
+    /* Centred over the Quick Specs card (520 px wide, from x 1020). */
+    .alt-quick .l3-promo { top: 142px; left: 1280px; min-width: 280px; max-width: 520px; height: 168px; transform: translateX(-50%);
+      border-left: 8px solid #e0262f; border-radius: 22px; box-shadow: 0 12px 30px rgba(20, 40, 120, .12); }
+    .alt-quick .l3-promo img { height: 156px; max-width: 494px; }
     .alt-quick .l3-promo .alt-promo-sub { color: #334155; font-size: 15px; letter-spacing: 6px; }
     .alt-quick .l3-heading { position: absolute; left: 1020px; display: flex; align-items: center; gap: 14px; color: #1a2cf0;
       font-size: 16px; font-weight: 800; letter-spacing: 6px; }
