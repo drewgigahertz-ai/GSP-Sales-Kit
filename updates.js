@@ -3,6 +3,17 @@
 (function () {
   const RELEASES = [
     {
+      version: '1.0.20',
+      date: 'October 29, 2026',
+      changes: [
+        'Banner: Play slideshow (Ctrl+Shift+L) shows the banner for 40 seconds, then two other layouts for 20 seconds each, so store screens do not burn in. Pause goes back to the main banner.',
+        'Banner: the Layout buttons (Main / 2 / 3, or Alt+3 / Alt+4 / Alt+5) show each layout by hand.',
+        'Banner: promo pictures get a thin outline, so white lettering can be read; downloads keep it.',
+        'Reco Table: the alternatives list is easier to read, with the recommended laptop marked by a star.',
+        'Reco Table: a laptop’s picture no longer changes to the previous laptop’s picture.'
+      ]
+    },
+    {
       version: '1.0.19',
       date: 'October 28, 2026',
       changes: [
