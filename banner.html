@@ -474,6 +474,9 @@
       min-width: 0;
       min-height: 0;
       object-fit: contain;
+      /* A thin dark blue outline around the picture's own shape, so white lettering reads on the light banner
+         (as on the slideshow layouts, banner-layouts.js). */
+      filter: drop-shadow(0 0 1px #0f2a8a) drop-shadow(0 0 1px #0f2a8a) drop-shadow(0 0 1.5px #0f2a8a);
     }
 
     /* Customer Profiling steps: 1 Branch, 2 Laptop. */
@@ -1592,6 +1595,7 @@
           url = item.ageingBanner;
         } else {
           const shapes = markSlantedShapes($('stage'));
+          const outlined = bakeOutlinedPictures($('stage'));
           const fits = markFittedPictures($('stage'));
           const canvas = await html2canvas($('stage'), {
             scale: 2,
@@ -1604,6 +1608,7 @@
               shown.style.left = '0';
               shown.style.top = '0';
               drawSlantedShapes(shown, shapes);
+              drawOutlinedPictures(shown, outlined);
               drawFittedPictures(shown, fits);
             }
           });
@@ -1616,6 +1621,7 @@
       } finally {
         $('stage').querySelectorAll('[data-shape]').forEach((element) => element.removeAttribute('data-shape'));
         $('stage').querySelectorAll('[data-fit]').forEach((element) => element.removeAttribute('data-fit'));
+        $('stage').querySelectorAll('[data-outlined]').forEach((element) => element.removeAttribute('data-outlined'));
         button.disabled = false;
       }
     }
@@ -1666,6 +1672,39 @@
         fits.push({ width, height, left, top, right: width - drawnWidth - left, bottom: height - drawnHeight - top });
       });
       return fits;
+    }
+
+    // The picture library ignores CSS filters too, so the promo pictures' dark blue outline would be lost. Each
+    // filtered picture is drawn once with its filter (outline widths scaled to the picture's own size) and marked
+    // (data-outlined); the copy shows that drawing instead. A picture that cannot be read back is left as it is.
+    function bakeOutlinedPictures(stage) {
+      const outlined = [];
+      stage.querySelectorAll('img').forEach((image) => {
+        const filter = getComputedStyle(image).filter;
+        if (!filter || filter === 'none' || !image.naturalWidth || !image.clientWidth || !image.clientHeight) return;
+        try {
+          const shown = Math.min(image.clientWidth / image.naturalWidth, image.clientHeight / image.naturalHeight);
+          const canvas = document.createElement('canvas');
+          canvas.width = image.naturalWidth;
+          canvas.height = image.naturalHeight;
+          const context = canvas.getContext('2d');
+          context.filter = filter.replace(/([\d.]+)px/g, (match, value) => `${Number(value) / shown}px`);
+          context.drawImage(image, 0, 0);
+          const url = canvas.toDataURL('image/png');
+          image.dataset.outlined = String(outlined.length);
+          outlined.push(url);
+        } catch {}
+      });
+      return outlined;
+    }
+
+    function drawOutlinedPictures(copy, outlined) {
+      copy.querySelectorAll('img[data-outlined]').forEach((image) => {
+        const url = outlined[Number(image.dataset.outlined)];
+        if (!url) return;
+        image.src = url;
+        image.style.filter = 'none';
+      });
     }
 
     function drawFittedPictures(copy, fits) {
