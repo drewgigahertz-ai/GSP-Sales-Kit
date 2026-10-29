@@ -44,6 +44,7 @@
         ['Alt + 1 / Alt + 2', 'Clearance / Generated banner'],
         ['Ctrl + D', 'Download banner'],
         ['Ctrl + Shift + F', 'Fullscreen'],
+        ['Ctrl + Shift + L', 'Play / pause the slideshow'],
         ['Ctrl + R', 'Refresh data']
       ]
     },

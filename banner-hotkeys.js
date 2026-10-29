@@ -39,7 +39,8 @@
     { alt: true, code: 'Digit1', run: () => click(document.querySelector('#bannerViewSwitch [data-view="ageing"]')) },
     { alt: true, code: 'Digit2', run: () => click(document.querySelector('#bannerViewSwitch [data-view="generated"]')) },
     { ctrl: true, code: 'KeyR', run: () => click($('refreshBannerButton')) },
-    { ctrl: true, shift: true, code: 'KeyF', run: () => click($('fullscreenButton')) }
+    { ctrl: true, shift: true, code: 'KeyF', run: () => click($('fullscreenButton')) },
+    { ctrl: true, shift: true, code: 'KeyL', run: () => window.BannerLayouts && window.BannerLayouts.toggle() }
   ];
 
   document.addEventListener('keydown', (event) => {

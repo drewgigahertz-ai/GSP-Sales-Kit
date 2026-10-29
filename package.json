@@ -59,6 +59,7 @@
       "banner-bridge.js",
       "banner-color.js",
       "banner-hotkeys.js",
+      "banner-layouts.js",
       "activity-tracker.js",
       "branch-mode.js",
       "hotkeys.js",
