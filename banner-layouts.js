@@ -57,12 +57,13 @@
     .alt-brand { position: absolute; display: flex; align-items: center; justify-content: flex-end; width: 260px; height: 100px;
       color: #1a2cf0; font-size: 40px; font-weight: 900; }
     .alt-brand img { max-width: 100%; max-height: 100%; object-fit: contain; }
-    /* Deep blue, so the white lettering in promo pictures reads (it disappears on white). */
     .alt-promo { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center;
-      overflow: hidden; padding: 10px; background: linear-gradient(135deg, #0f2a8a 0%, #1a3fd0 100%); text-align: center; }
-    .alt-promo img { max-width: 100%; max-height: 100%; object-fit: contain; }
-    .alt-promo-sub { color: #bcd0ff; font-size: 18px; font-weight: 800; letter-spacing: 5px; }
-    .alt-promo-title { color: #fff; font-weight: 900; line-height: 1; padding: 0 20px; }
+      overflow: hidden; padding: 10px; background: #fff; text-align: center; }
+    /* A thin dark blue outline that follows the picture's own shape, so its white lettering reads on the white box. */
+    .alt-promo img { max-width: 100%; max-height: 100%; object-fit: contain;
+      filter: drop-shadow(0 0 1px #0f2a8a) drop-shadow(0 0 1px #0f2a8a) drop-shadow(0 0 1.5px #0f2a8a); }
+    .alt-promo-sub { color: #1d3fb8; font-size: 18px; font-weight: 800; letter-spacing: 5px; }
+    .alt-promo-title { color: #1a2cf0; font-weight: 900; line-height: 1; padding: 0 20px; }
 
     /* Layout 2: slanted spec boxes, four feature boxes */
     .alt-specs { background: linear-gradient(115deg, #f6f9fe 0%, #e4eefb 100%); }
@@ -131,7 +132,7 @@
     .alt-quick .alt-brand { top: 40px; right: 46px; }
     .alt-quick .l3-promo { top: 142px; left: 1020px; width: 520px; height: 168px; border-left: 8px solid #e0262f;
       border-radius: 22px; box-shadow: 0 12px 30px rgba(20, 40, 120, .12); }
-    .alt-quick .l3-promo .alt-promo-sub { font-size: 15px; letter-spacing: 6px; }
+    .alt-quick .l3-promo .alt-promo-sub { color: #334155; font-size: 15px; letter-spacing: 6px; }
     .alt-quick .l3-heading { position: absolute; left: 1020px; display: flex; align-items: center; gap: 14px; color: #1a2cf0;
       font-size: 16px; font-weight: 800; letter-spacing: 6px; }
     .alt-quick .l3-heading::before { width: 28px; height: 4px; background: #e0262f; content: ""; }
