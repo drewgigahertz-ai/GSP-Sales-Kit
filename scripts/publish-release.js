@@ -16,20 +16,27 @@ const headers = {
 };
 
 // Local file → name on GitHub (electron-builder writes the hyphenated name into latest.yml / server.yml).
-// SalesKit Server is in the same release, on its own "server" channel (server.yml), so it updates itself too.
+// SalesKit only; the server has its own release (publish-server.js). --with-server also puts the server in this
+// release, once: servers from 1.0.20 and older still look for their update here (npm run release:handover).
 const serverBuild = require('../server-builder.json');
 const serverDist = path.join(__dirname, '..', serverBuild.directories.output);
-const installerFiles = (folder, productName, updateFile) => {
-  const installer = `${productName} Setup ${version}.exe`;
+const withServer = process.argv.includes('--with-server');
+// (The server installer is already built with hyphens: server-builder.json → nsis.artifactName.)
+const installerFiles = (folder, productName, fileVersion, updateFile) => {
+  const installer = folder === serverDist
+    ? serverBuild.nsis.artifactName.replace('${version}', fileVersion).replace('${ext}', 'exe')
+    : `${productName} Setup ${fileVersion}.exe`;
   return [
-    [folder, installer, installer.replace(/ /g, '-')],
-    [folder, `${installer}.blockmap`, `${installer}.blockmap`.replace(/ /g, '-')],
-    [folder, updateFile, updateFile]
+    [folder, installer, installer.replace(/ /g, '-'), fileVersion],
+    [folder, `${installer}.blockmap`, `${installer}.blockmap`.replace(/ /g, '-'), fileVersion],
+    [folder, updateFile, updateFile, fileVersion]
   ];
 };
 const files = [
-  ...installerFiles(dist, pkg.build.productName, 'latest.yml'),
-  ...installerFiles(serverDist, serverBuild.productName, `${serverBuild.publish.channel}.yml`)
+  ...installerFiles(dist, pkg.build.productName, version, 'latest.yml'),
+  ...(withServer
+    ? installerFiles(serverDist, serverBuild.productName, serverBuild.extraMetadata.version, `${serverBuild.publish.channel}.yml`)
+    : [])
 ];
 
 function fail(message) {
@@ -56,10 +63,10 @@ async function github(url, options = {}, attempts = 3) {
   for (const [folder, local] of files) {
     if (!fs.existsSync(path.join(folder, local))) fail(`${local} was not built. Run the build first.`);
   }
-  for (const [folder, local] of files.filter(([, name]) => name.endsWith('.yml'))) {
+  for (const [folder, local, , fileVersion] of files.filter(([, name]) => name.endsWith('.yml'))) {
     const updateInfo = fs.readFileSync(path.join(folder, local), 'utf8');
-    if (!updateInfo.startsWith(`version: ${version}\n`) && !updateInfo.startsWith(`version: ${version}\r\n`)) {
-      fail(`${path.basename(folder)}/${local} is not for version ${version}. The build did not finish; run it again.`);
+    if (!updateInfo.startsWith(`version: ${fileVersion}\n`) && !updateInfo.startsWith(`version: ${fileVersion}\r\n`)) {
+      fail(`${path.basename(folder)}/${local} is not for version ${fileVersion}. The build did not finish; run it again.`);
     }
   }
 

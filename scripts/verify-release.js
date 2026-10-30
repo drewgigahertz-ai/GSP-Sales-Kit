@@ -4,14 +4,16 @@ const { version } = require('../package.json');
 const { owner, repo } = require('../package.json').build.publish;
 
 const tag = `v${version}`;
-// The names electron-builder writes into latest.yml / server.yml (spaces become hyphens). SalesKit Server
-// updates itself from the same release (server.yml).
+// The names electron-builder writes into latest.yml (spaces become hyphens). With --with-server (the one-time
+// handover, see publish-release.js) the server's files must be in this release too.
 const serverBuild = require('../server-builder.json');
 const installer = `${require('../package.json').build.productName} Setup ${version}.exe`.replace(/ /g, '-');
-const serverInstaller = `${serverBuild.productName} Setup ${version}.exe`.replace(/ /g, '-');
+const serverInstaller = serverBuild.nsis.artifactName.replace('${version}', serverBuild.extraMetadata.version).replace('${ext}', 'exe');
 const required = [
   installer, `${installer}.blockmap`, 'latest.yml',
-  serverInstaller, `${serverInstaller}.blockmap`, `${serverBuild.publish.channel}.yml`
+  ...(process.argv.includes('--with-server')
+    ? [serverInstaller, `${serverInstaller}.blockmap`, `${serverBuild.publish.channel}.yml`]
+    : [])
 ];
 
 (async () => {

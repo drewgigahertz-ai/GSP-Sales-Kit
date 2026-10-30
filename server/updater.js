@@ -1,5 +1,6 @@
-// SalesKit Server updates itself from the same GitHub releases as SalesKit, through its own "server" channel
-// (server.yml beside SalesKit's latest.yml). A new version downloads in the background; it installs when
+// SalesKit Server updates itself from its own GitHub release, "server-updates" (server.yml there, published by
+// npm run release:server; see server-builder.json → publish), so server and SalesKit laptops update separately.
+// A new version downloads in the background; it installs when
 // "Restart and update" is clicked, by itself at night (11 PM–5 AM, when no sync is running), or when the server
 // is quit. The installer runs silently and starts the server again; settings and data in AppData are kept.
 const { app } = require('electron');
@@ -76,7 +77,7 @@ function createServerUpdater({ onStatus = () => {}, canInstall = () => true, bef
       // A finished download stays installable; otherwise show the error and try again at the next check.
       if (status.state === 'ready') return;
       const message = /server\.yml/i.test(error.message || '')
-        ? 'The newest GitHub release has no server update.'
+        ? 'No server update has been published yet.'
         : (error.message || String(error)).split('\n')[0];
       setStatus({ state: 'error', error: message, checkedAt: new Date().toISOString() });
     });

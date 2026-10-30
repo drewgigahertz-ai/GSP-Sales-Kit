@@ -3,6 +3,7 @@
   "productName": "GigaHertz SalesKit Server",
   "extraMetadata": {
     "name": "saleskit-server",
+    "version": "1.0.21",
     "main": "server/main.js"
   },
   "directories": {
@@ -31,10 +32,8 @@
     }
   ],
   "publish": {
-    "provider": "github",
-    "owner": "drewgigahertz-ai",
-    "repo": "GSP-Sales-Kit",
-    "releaseType": "release",
+    "provider": "generic",
+    "url": "https://github.com/drewgigahertz-ai/GSP-Sales-Kit/releases/download/server-updates",
     "channel": "server"
   },
   "win": {
@@ -46,6 +45,7 @@
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "SalesKit Server"
+    "shortcutName": "SalesKit Server",
+    "artifactName": "GigaHertz-SalesKit-Server-Setup-${version}.${ext}"
   }
 }
