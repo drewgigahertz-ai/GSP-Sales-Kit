@@ -3,6 +3,13 @@
 (function () {
   const RELEASES = [
     {
+      version: '1.0.21',
+      date: 'October 30, 2026',
+      changes: [
+        'SalesKit Server: account management is easier for head office (search users, and new passwords can be shown and copied when they are set). Nothing changes on this laptop.'
+      ]
+    },
+    {
       version: '1.0.20',
       date: 'October 29, 2026',
       changes: [
