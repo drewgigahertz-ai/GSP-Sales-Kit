@@ -690,16 +690,29 @@ function branchLabel(branch) {
   return branch === 'HO' ? 'HO (all branches)' : branch;
 }
 
+// The last user list from the server; the search box filters it by name, username or branch.
+let allUsers = [];
+
 function renderUsers(list) {
+  allUsers = list;
   const active = list.filter((user) => !user.disabled).length;
-  $('userSummary').textContent = `${list.length} user${list.length === 1 ? '' : 's'} · ${active} active`;
+  const query = $('userSearch').value.trim().toLowerCase();
+  const shown = query
+    ? list.filter((user) => [user.displayName, user.username, user.branch, branchLabel(user.branch)]
+      .some((value) => String(value || '').toLowerCase().includes(query)))
+    : list;
+  $('userSummary').textContent = `${query ? `${shown.length} of ` : ''}${list.length} user${list.length === 1 ? '' : 's'} · ${active} active`;
   const rows = $('userRows');
   rows.replaceChildren();
   if (!list.length) {
     rows.innerHTML = '<tr><td colspan="7" class="empty text-center py-4">No users yet. Add the first one above.</td></tr>';
     return;
   }
-  list.forEach((user) => {
+  if (!shown.length) {
+    rows.innerHTML = '<tr><td colspan="7" class="empty text-center py-4">No user matches this search.</td></tr>';
+    return;
+  }
+  shown.forEach((user) => {
     const tr = rows.insertRow();
     const badge = document.createElement('span');
     badge.className = `state-badge ${user.disabled ? 'state-rejected' : 'state-online'}`;
@@ -732,7 +745,7 @@ function renderUsers(list) {
       element.addEventListener('click', () => handler(element));
       box.appendChild(element);
     };
-    button('<i class="bi bi-key"></i> Password', 'btn-light', 'Set a new password', () => askPassword(user));
+    button('<i class="bi bi-key"></i> Password', 'btn-light', 'Reset the password (shown so you can give it to the user)', () => askPassword(user));
     if (user.activeSessions) {
       button('<i class="bi bi-box-arrow-right"></i>', 'btn-light', 'Sign out now', (element) =>
         run(element, () => api.signOutUser(user.username), `${user.displayName} signed out`).then((next) => next && renderUsers(next)));
@@ -788,11 +801,47 @@ function editBranch(user, cell) {
   input.addEventListener('blur', () => finish(true));
 }
 
+$('userSearch').addEventListener('input', () => renderUsers(allUsers));
+
+// Password boxes: show / hide, a random password that is easy to read out (no 0/O, 1/l/I), and Copy.
+// Passwords are stored as one-way hashes, so they can only be seen here, while being set.
+const PASSWORD_LETTERS = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+function randomPassword(length = 10) {
+  const values = crypto.getRandomValues(new Uint32Array(length));
+  return Array.from(values, (value) => PASSWORD_LETTERS[value % PASSWORD_LETTERS.length]).join('');
+}
+
+function revealPassword(id, show) {
+  const input = $(id);
+  input.type = show ? 'text' : 'password';
+  document.querySelectorAll(`[data-reveal="${id}"]`).forEach((button) => {
+    button.innerHTML = show ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
+    button.title = show ? 'Hide the password' : 'Show the password';
+  });
+}
+
+document.addEventListener('click', (event) => {
+  const reveal = event.target.closest('[data-reveal]');
+  const generate = event.target.closest('[data-generate]');
+  const copy = event.target.closest('[data-copy]');
+  if (reveal) revealPassword(reveal.dataset.reveal, $(reveal.dataset.reveal).type === 'password');
+  if (generate) {
+    $(generate.dataset.generate).value = randomPassword();
+    revealPassword(generate.dataset.generate, true);
+  }
+  if (copy) {
+    const value = $(copy.dataset.copy).value;
+    if (!value) toast('Type or generate a password first', true);
+    else run(copy, () => api.copyText(value), 'Password copied');
+  }
+});
+
 let passwordUser = null;
 function askPassword(user) {
   passwordUser = user;
   $('passwordDialogFor').textContent = `For ${user.displayName} (${user.username}). They will be asked to log in again.`;
   $('passwordInput').value = '';
+  revealPassword('passwordInput', false);
   $('passwordDialog').showModal();
   $('passwordInput').focus();
 }
@@ -817,6 +866,7 @@ $('addUserForm').addEventListener('submit', async (event) => {
   }), 'User added');
   if (!next) return;
   event.target.reset();
+  revealPassword('newPassword', false);
   renderUsers(next);
 });
 

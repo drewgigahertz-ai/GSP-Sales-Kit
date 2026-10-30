@@ -430,6 +430,27 @@
       text-align: center;
     }
 
+    /* Users tab: password boxes with Show / Generate / Copy, and the user search. */
+    .password-field {
+      display: flex;
+      gap: 4px;
+    }
+
+    .password-field .form-control {
+      min-width: 0;
+      flex: 1;
+      font-family: Consolas, 'Courier New', monospace;
+    }
+
+    .password-field .btn {
+      flex: none;
+      white-space: nowrap;
+    }
+
+    .user-search {
+      width: 240px;
+    }
+
     .nav-badge.is-alert {
       background: #f87171;
       color: #450a0a;
@@ -819,7 +840,7 @@
     .data-tag.is-old { color: var(--warn); }
 
     .password-dialog {
-      width: min(380px, calc(100vw - 32px));
+      width: min(500px, calc(100vw - 32px));
       padding: 20px;
       border: 1px solid var(--line);
       border-radius: 14px;
@@ -989,7 +1010,7 @@
               <label class="label" for="newUsername">Username</label>
               <input class="form-control form-control-sm" id="newUsername" placeholder="e.g. maria.santos" required pattern="[A-Za-z0-9._-]{3,32}" spellcheck="false">
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
               <label class="label" for="newDisplayName">Full name</label>
               <input class="form-control form-control-sm" id="newDisplayName" placeholder="e.g. Maria Santos">
             </div>
@@ -998,9 +1019,13 @@
               <input class="form-control form-control-sm" id="newBranch" list="branchOptions" placeholder="ALB, or ALL" required spellcheck="false" title="The user only sees this branch. ALL = every branch (managers).">
               <datalist id="branchOptions"></datalist>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-3">
               <label class="label" for="newPassword">Password</label>
-              <input class="form-control form-control-sm" id="newPassword" type="password" minlength="8" required autocomplete="new-password">
+              <div class="password-field">
+                <input class="form-control form-control-sm" id="newPassword" type="password" minlength="8" required autocomplete="new-password" spellcheck="false">
+                <button class="btn btn-sm btn-light" type="button" data-reveal="newPassword" title="Show the password"><i class="bi bi-eye"></i></button>
+                <button class="btn btn-sm btn-light" type="button" data-generate="newPassword" title="Make a random password and show it"><i class="bi bi-magic"></i></button>
+              </div>
             </div>
             <div class="col-md-2">
               <button class="btn btn-sm btn-brand btn-icon w-100" type="submit"><i class="bi bi-plus-lg"></i> Add user</button>
@@ -1012,7 +1037,10 @@
       <section class="panel mt-3">
         <div class="panel-head">
           <h2 class="panel-title"><i class="bi bi-people"></i> Users</h2>
-          <span class="muted-small" id="userSummary"></span>
+          <div class="d-flex align-items-center gap-2">
+            <span class="muted-small" id="userSummary"></span>
+            <input class="form-control form-control-sm user-search" id="userSearch" type="search" placeholder="Search name, username or branch" spellcheck="false" autocomplete="off">
+          </div>
         </div>
         <div class="table-responsive">
           <table class="list-table">
@@ -1320,7 +1348,13 @@
     <form method="dialog" id="passwordForm">
       <h3 class="panel-title mb-1"><i class="bi bi-key"></i> New password</h3>
       <p class="muted-small mb-3" id="passwordDialogFor"></p>
-      <input class="form-control form-control-sm" id="passwordInput" type="password" minlength="8" required autocomplete="new-password" placeholder="At least 8 characters">
+      <div class="password-field">
+        <input class="form-control form-control-sm" id="passwordInput" type="password" minlength="8" required autocomplete="new-password" placeholder="At least 8 characters" spellcheck="false">
+        <button class="btn btn-sm btn-light" type="button" data-reveal="passwordInput" title="Show the password"><i class="bi bi-eye"></i></button>
+        <button class="btn btn-sm btn-light btn-icon" type="button" data-generate="passwordInput" title="Make a random password and show it"><i class="bi bi-magic"></i> Generate</button>
+        <button class="btn btn-sm btn-light btn-icon" type="button" data-copy="passwordInput" title="Copy the password"><i class="bi bi-clipboard"></i> Copy</button>
+      </div>
+      <p class="muted-small mt-2 mb-0">Copy it before saving and give it to the user: passwords cannot be shown again after this.</p>
       <div class="d-flex justify-content-end gap-2 mt-3">
         <button class="btn btn-sm btn-light" type="button" id="passwordCancel">Cancel</button>
         <button class="btn btn-sm btn-brand btn-icon" type="submit"><i class="bi bi-check2"></i> Save password</button>
