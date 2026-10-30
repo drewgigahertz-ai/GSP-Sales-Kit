@@ -1,14 +1,9 @@
 // "What's new": an Updates button in the header (next to Price changes) opens the list of changes per version.
 // It also opens by itself once after the app updates. Add the new version at the top of RELEASES when releasing.
 (function () {
+  // Only what changes on the laptops: SalesKit Server changes are released and listed on the server, not here.
+  // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
-    {
-      version: '1.0.21',
-      date: 'October 30, 2026',
-      changes: [
-        'SalesKit Server: account management is easier for head office (search users, and new passwords can be shown and copied when they are set). Nothing changes on this laptop.'
-      ]
-    },
     {
       version: '1.0.20',
       date: 'October 29, 2026',
