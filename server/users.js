@@ -1,5 +1,8 @@
 // SalesKit user accounts and login sessions. Accounts live in the server database (table __saleskit_users);
-// passwords are stored as salted scrypt hashes, never as text.
+// logins are checked against salted scrypt hashes. So head office can look up a forgotten password in the Users
+// tab, a copy is also kept encrypted by Windows for the account the server runs under (secrets: Electron
+// safeStorage, see main.js); it is only ever shown in the server window, never sent to SalesKit laptops.
+// Passwords set before that copy existed cannot be shown until they are reset.
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 
@@ -35,7 +38,8 @@ function checkPassword(password) {
 
 // database: needs loadUsers(), saveUser(user) and deleteUser(username).
 // legacyFile: an older users.json to import once (renamed to users.json.imported afterwards).
-function createUserStore(database, { legacyFile = '' } = {}) {
+// secrets: { encrypt(text) → string or null, decrypt(string) → text or null } for the viewable password copy.
+function createUserStore(database, { legacyFile = '', secrets = null } = {}) {
   let users = database.loadUsers();
 
   if (!Object.keys(users).length && legacyFile && fs.existsSync(legacyFile)) {
@@ -63,9 +67,29 @@ function createUserStore(database, { legacyFile = '' } = {}) {
   }
 
   function publicUser(user) {
-    const { passwordHash, ...rest } = user;
+    const { passwordHash, passwordCopy, ...rest } = user;
     const activeSessions = [...sessions.values()].filter((session) => session.username === user.username).length;
-    return { ...rest, activeSessions };
+    return { ...rest, activeSessions, passwordViewable: Boolean(passwordCopy) };
+  }
+
+  // The encrypted copy of a password being set (none when Windows encryption is not available).
+  function passwordCopyOf(password) {
+    try {
+      return (secrets && secrets.encrypt(String(password))) || null;
+    } catch {
+      return null;
+    }
+  }
+
+  // A user's current password for the Users tab, or null when only the hash is kept (set before the copy existed).
+  function revealPassword(username) {
+    const user = get(username);
+    if (!user.passwordCopy || !secrets) return null;
+    try {
+      return secrets.decrypt(user.passwordCopy);
+    } catch {
+      return null;
+    }
   }
 
   function get(username) {
@@ -89,6 +113,7 @@ function createUserStore(database, { legacyFile = '' } = {}) {
       displayName: String(displayName || '').trim() || name,
       branch: branchCode,
       passwordHash: hashPassword(password),
+      passwordCopy: passwordCopyOf(password),
       disabled: false,
       createdAt: new Date().toISOString(),
       lastLogin: null
@@ -116,6 +141,7 @@ function createUserStore(database, { legacyFile = '' } = {}) {
     const user = get(username);
     checkPassword(password);
     user.passwordHash = hashPassword(password);
+    user.passwordCopy = passwordCopyOf(password);
     save(user);
     signOut(user.username);
     return publicUser(user);
@@ -195,7 +221,7 @@ function createUserStore(database, { legacyFile = '' } = {}) {
     sessions.delete(String(sessionKey || ''));
   }
 
-  return { list, create, update, setPassword, remove, signOut, login, logout, userForSession, reload };
+  return { list, create, update, setPassword, revealPassword, remove, signOut, login, logout, userForSession, reload };
 }
 
 module.exports = { createUserStore };

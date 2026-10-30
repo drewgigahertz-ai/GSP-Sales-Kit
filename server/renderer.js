@@ -705,11 +705,11 @@ function renderUsers(list) {
   const rows = $('userRows');
   rows.replaceChildren();
   if (!list.length) {
-    rows.innerHTML = '<tr><td colspan="7" class="empty text-center py-4">No users yet. Add the first one above.</td></tr>';
+    rows.innerHTML = '<tr><td colspan="8" class="empty text-center py-4">No users yet. Add the first one above.</td></tr>';
     return;
   }
   if (!shown.length) {
-    rows.innerHTML = '<tr><td colspan="7" class="empty text-center py-4">No user matches this search.</td></tr>';
+    rows.innerHTML = '<tr><td colspan="8" class="empty text-center py-4">No user matches this search.</td></tr>';
     return;
   }
   shown.forEach((user) => {
@@ -726,6 +726,7 @@ function renderUsers(list) {
     };
     addCell(user.displayName, 'device-name');
     addCell(user.username, 'muted-small');
+    passwordCell(tr.insertCell(), user);
     const branch = addCell(branchLabel(user.branch), 'fw-semibold');
     branch.title = 'Click to change the branch';
     branch.style.cursor = 'pointer';
@@ -802,6 +803,59 @@ function editBranch(user, cell) {
 }
 
 $('userSearch').addEventListener('input', () => renderUsers(allUsers));
+
+// Password column: hidden dots, the eye shows the user's current password (asked from the server each time), Copy.
+// Passwords set before the server kept a copy cannot be shown: "Reset to view" opens the Password dialog.
+function passwordCell(cell, user) {
+  if (!user.passwordViewable) {
+    const reset = document.createElement('button');
+    reset.className = 'btn btn-sm btn-link p-0 muted-small';
+    reset.textContent = 'Reset to view';
+    reset.title = 'This password was set before passwords could be viewed. Set a new one to see it here.';
+    reset.addEventListener('click', () => askPassword(user));
+    cell.appendChild(reset);
+    return;
+  }
+  const box = document.createElement('span');
+  box.className = 'user-password';
+  const value = document.createElement('code');
+  value.textContent = '••••••••';
+  const eye = document.createElement('button');
+  eye.className = 'btn btn-sm btn-light';
+  eye.title = 'Show the password';
+  eye.innerHTML = '<i class="bi bi-eye"></i>';
+  const copy = document.createElement('button');
+  copy.className = 'btn btn-sm btn-light';
+  copy.title = 'Copy the password';
+  copy.innerHTML = '<i class="bi bi-clipboard"></i>';
+  let shown = false;
+  const fetchPassword = async (button) => {
+    const password = await run(button, () => api.revealPassword(user.username));
+    if (!password) toast('This password cannot be shown. Set a new one to see it here.', true);
+    return password;
+  };
+  eye.addEventListener('click', async () => {
+    if (shown) {
+      shown = false;
+      value.textContent = '••••••••';
+      eye.innerHTML = '<i class="bi bi-eye"></i>';
+      eye.title = 'Show the password';
+      return;
+    }
+    const password = await fetchPassword(eye);
+    if (!password) return;
+    shown = true;
+    value.textContent = password;
+    eye.innerHTML = '<i class="bi bi-eye-slash"></i>';
+    eye.title = 'Hide the password';
+  });
+  copy.addEventListener('click', async () => {
+    const password = await fetchPassword(copy);
+    if (password) run(copy, () => api.copyText(password), 'Password copied');
+  });
+  box.append(value, eye, copy);
+  cell.appendChild(box);
+}
 
 // Password boxes: show / hide, a random password that is easy to read out (no 0/O, 1/l/I), and Copy.
 // Passwords are stored as one-way hashes, so they can only be seen here, while being set.

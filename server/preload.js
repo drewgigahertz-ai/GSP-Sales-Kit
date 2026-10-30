@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('salesKitServer', {
   createUser: (details) => ipcRenderer.invoke('server:create-user', details),
   updateUser: (username, changes) => ipcRenderer.invoke('server:update-user', username, changes),
   setUserPassword: (username, password) => ipcRenderer.invoke('server:set-user-password', username, password),
+  revealPassword: (username) => ipcRenderer.invoke('server:reveal-password', username),
   signOutUser: (username) => ipcRenderer.invoke('server:sign-out-user', username),
   removeUser: (username) => ipcRenderer.invoke('server:remove-user', username),
   getLogos: () => ipcRenderer.invoke('server:get-logos'),

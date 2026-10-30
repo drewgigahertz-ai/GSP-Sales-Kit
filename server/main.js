@@ -1,5 +1,5 @@
 // GigaHertz SalesKit Server: syncs Google Sheets into SQLite and shares the data with SalesKit clients on the LAN.
-const { app, BrowserWindow, Menu, Tray, clipboard, dialog, ipcMain, nativeImage, net, shell } = require('electron');
+const { app, BrowserWindow, Menu, Tray, clipboard, dialog, ipcMain, nativeImage, net, safeStorage, shell } = require('electron');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -756,6 +756,8 @@ ipcMain.handle('server:update-user', (_event, username, changes) => userAction((
   if (changes && changes.disabled !== undefined) log('warning', `User ${user.username} ${user.disabled ? 'disabled and signed out' : 'enabled'}`);
   return users.list();
 }));
+// Users tab: a user's current password (null when it was set before copies were kept; reset it to view it).
+ipcMain.handle('server:reveal-password', (_event, username) => users.revealPassword(username));
 ipcMain.handle('server:set-user-password', (_event, username, password) => userAction(() => {
   users.setPassword(username, password);
   log('info', `Password changed for ${username}; their SalesKit asks them to log in again`);
@@ -851,7 +853,14 @@ if (!app.requestSingleInstanceLock()) {
 
     try {
       openServerDatabase();
-      users = createUserStore(database, { legacyFile: path.join(app.getPath('userData'), 'users.json') });
+      users = createUserStore(database, {
+        legacyFile: path.join(app.getPath('userData'), 'users.json'),
+        // Viewable password copies (Users tab), encrypted by Windows for the account the server runs under.
+        secrets: {
+          encrypt: (text) => (safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(text).toString('base64') : null),
+          decrypt: (stored) => safeStorage.decryptString(Buffer.from(stored, 'base64'))
+        }
+      });
       backups = createBackupStore(path.join(app.getPath('userData'), 'backups'), database);
       startApi();
       loadLogos();

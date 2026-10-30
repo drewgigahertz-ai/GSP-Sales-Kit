@@ -451,6 +451,22 @@
       width: 240px;
     }
 
+    .user-password {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .user-password code {
+      min-width: 92px;
+      color: #0f172a;
+      font-size: 0.8rem;
+    }
+
+    .user-password .btn {
+      padding: 1px 6px;
+    }
+
     .nav-badge.is-alert {
       background: #f87171;
       color: #450a0a;
@@ -1044,7 +1060,7 @@
         </div>
         <div class="table-responsive">
           <table class="list-table">
-            <thead><tr><th>Status</th><th>Name</th><th>Username</th><th>Branch</th><th>Last login</th><th>Signed in now</th><th></th></tr></thead>
+            <thead><tr><th>Status</th><th>Name</th><th>Username</th><th>Password</th><th>Branch</th><th>Last login</th><th>Signed in now</th><th></th></tr></thead>
             <tbody id="userRows"></tbody>
           </table>
         </div>
@@ -1354,7 +1370,7 @@
         <button class="btn btn-sm btn-light btn-icon" type="button" data-generate="passwordInput" title="Make a random password and show it"><i class="bi bi-magic"></i> Generate</button>
         <button class="btn btn-sm btn-light btn-icon" type="button" data-copy="passwordInput" title="Copy the password"><i class="bi bi-clipboard"></i> Copy</button>
       </div>
-      <p class="muted-small mt-2 mb-0">Copy it before saving and give it to the user: passwords cannot be shown again after this.</p>
+      <p class="muted-small mt-2 mb-0">After saving, the password can be seen again with the eye in the Users list.</p>
       <div class="d-flex justify-content-end gap-2 mt-3">
         <button class="btn btn-sm btn-light" type="button" id="passwordCancel">Cancel</button>
         <button class="btn btn-sm btn-brand btn-icon" type="submit"><i class="bi bi-check2"></i> Save password</button>
