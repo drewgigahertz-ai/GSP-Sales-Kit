@@ -40,7 +40,12 @@
     ".capps-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; padding: 6px 4px 0;",
     "  border-top: 1px solid #e2e8f0; color: #64748b; font-size: 11px; }",
     ".capps-foot button { padding: 0; border: 0; background: none; color: #1d4ed8; font: inherit; font-weight: 700; cursor: pointer; }",
-    ".capps-foot button[hidden] { display: none; }"
+    ".capps-foot button[hidden] { display: none; }",
+    /* Customer section only: the branch's sections are dimmed on screen and left out of the print and download */
+    ".cust-only-opt { display: flex; align-items: center; gap: 7px; margin: 0 0 8px; font-size: 12px; font-weight: 700; cursor: pointer; }",
+    ".cust-only #sections > .banner, .cust-only #sections > .row { opacity: .3; }",
+    ".capturing.cust-only #sections > .banner, .capturing.cust-only #sections > .row { display: none; }",
+    "@media print { .cust-only #sections > .banner, .cust-only #sections > .row { display: none; } }"
   ].join("\n");
   document.head.appendChild(style);
 
@@ -61,6 +66,17 @@
   // Reco Table and its segment stay as they are. New applications chosen on the Reco Table replace them.
   var chosenApps = null;
   var recoAppsKey = "";
+  // Print / download only the customer's section; ticked each time a customer name starts.
+  var onlyCustomer = true;
+  var hadName = false;
+
+  function only() { return Boolean(name()) && onlyCustomer; }
+
+  function applyOnly() {
+    if (name() && !hadName) onlyCustomer = true;
+    hadName = Boolean(name());
+    document.body.classList.toggle("cust-only", only());
+  }
 
   function appName(app) { return typeof app === "string" ? app : app.name; }
 
@@ -93,6 +109,7 @@
 
   function drawPicker() {
     var box = document.getElementById("customerApps");
+    applyOnly();
     if (!box) return;
     box.hidden = !name();
     if (box.hidden) { pickerOpen = false; box.innerHTML = ""; return; }
@@ -100,7 +117,9 @@
     var all = (customer.allApps && customer.allApps.length ? customer.allApps : customer.apps || []);
     var q = pickerQuery.trim().toLowerCase();
     var listed = all.filter(function (app) { return !q || appName(app).toLowerCase().indexOf(q) !== -1; });
-    box.innerHTML = '<label class="field-label">Applications on the flyer</label>' +
+    box.innerHTML = '<label class="cust-only-opt" title="Print and download only the Prepared for section">' +
+      '<input type="checkbox" data-cust-only' + (onlyCustomer ? " checked" : "") + "> Customer section only</label>" +
+      '<label class="field-label">Applications on the flyer</label>' +
       '<button type="button" class="side-input capps-btn" aria-haspopup="listbox" aria-expanded="' + pickerOpen + '"' +
       ' title="Choose the applications shown on the flyer (the segment does not change)">' +
       "<span>" + (shown.length ? esc(shown.join(", ")) : "None") + "</span><b>" + shown.length + "</b></button>" +
@@ -135,7 +154,13 @@
   });
 
   document.addEventListener("change", function (e) {
-    var app = e.target && e.target.getAttribute && e.target.getAttribute("data-app");
+    if (e.target && e.target.hasAttribute && e.target.hasAttribute("data-cust-only")) {
+      onlyCustomer = e.target.checked;
+      applyOnly();
+      hooks.changed();
+      return;
+    }
+    var app =e.target && e.target.getAttribute && e.target.getAttribute("data-app");
     if (app === null || app === undefined) return;
     var names = shownApps().map(appName).filter(function (n) { return n !== app; });
     if (e.target.checked) names.push(app);
@@ -226,5 +251,5 @@
     }
   });
 
-  window.FlyerCustomer = { init: init, set: set, name: name, section: section, html: html };
+  window.FlyerCustomer = { init: init, set: set, name: name, section: section, html: html, only: only };
 })();

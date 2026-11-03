@@ -995,6 +995,12 @@ body.is-loading { overflow: hidden; }
   }
   window.addEventListener("resize", fitModelNames);
 
+  // The branch's section for the customer's segment is left out while the customer's section shows it.
+  function isCustomerSegment(section) {
+    var cust = FlyerCustomer.section();
+    return !!cust && norm(cust.title) === norm(section.title);
+  }
+
   function render() {
     showBranchDetails();
     if (!branchReady()) {
@@ -1008,6 +1014,7 @@ body.is-loading { overflow: hidden; }
         return i === -1 ? 0 : i;
       };
       el("sections").innerHTML = FlyerCustomer.html(cardHtml, colourIndex) + sections.map(function (section, i) {
+        if (isCustomerSegment(section)) return "";
         var cls = " s" + (i % 5);
         return '<div class="banner' + cls + '" id="market-' + i + '"><span>' + esc(section.title) + "</span></div>" +
           '<div class="row' + cls + '">' + section.slots.map(cardHtml).join("") + "</div>";
@@ -1043,9 +1050,11 @@ body.is-loading { overflow: hidden; }
     Array.from(document.querySelectorAll("#sections .card")).forEach(function (card) {
       if (card.querySelector(".photo img.failed")) failed[card.querySelector(".model").textContent] = true;
     });
-    // The customer's section (Reco Table) is checked too; its market id is "cust".
+    // The customer's section (Reco Table) is checked too; its market id is "cust". With "Customer section only",
+    // only it is printed, so only it is checked.
     var checked = (FlyerCustomer.section() ? [FlyerCustomer.section()] : [])
-      .concat(sections.map(function (section, i) { return { title: section.title, slots: section.slots, market: i }; }));
+      .concat(FlyerCustomer.only() ? [] : sections.map(function (section, i) { return { title: section.title, slots: section.slots, market: i }; })
+        .filter(function (section) { return !isCustomerSegment(section); }));
     checked.forEach(function (section) {
       var i = section.market;
       section.slots.forEach(function (model, s) {
@@ -1232,7 +1241,7 @@ body.is-loading { overflow: hidden; }
 
   function downloadSheet(type) {
     closeModal();
-    var name = "Flyer-" + String(branch || "sheet").replace(/[^\w-]+/g, "_");
+    var name = "Flyer-" + String((FlyerCustomer.only() ? FlyerCustomer.name() : branch) || "sheet").replace(/[^\w-]+/g, "_");
     var scale = 2;
     // Only the toolbar shows the work: the loading look (faded, one screen tall) would end up in the picture.
     el("flyerStatus").textContent = "Preparing the download…";

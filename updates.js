@@ -10,7 +10,9 @@
       changes: [
         'Flyers: laptop names, part numbers and specs (OS included) now come from one sheet, LAPTOP DATABASE.',
         'Flyers: laptops that were missing a price (such as the Acer Nitro V ANV15-42-R2UH) now show their SRP and brand logo.',
-        'Flyers: the checklist lists laptops marked End of life, or not in LAPTOP DATABASE.'
+        'Flyers: the checklist lists laptops marked End of life, or not in LAPTOP DATABASE.',
+        'Flyers: with a customer name, the customer’s segment is no longer repeated below the "Prepared for" section.',
+        'Flyers: "Customer section only" (under Customer name) prints and downloads just the "Prepared for" section.'
       ]
     },
     {
