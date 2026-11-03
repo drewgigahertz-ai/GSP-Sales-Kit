@@ -1,8 +1,11 @@
-// Who each application is for (server side). The USABILITY sheet lists:
-//   A: Apps, B: Usability (who uses it), C: Description (what it is).
+// Who each application is for (server side). The DV sheet's columns I–K list (the USABILITY tab, with the same
+// three columns in A–C, is read only when DV has none):
+//   Apps, Usability (who uses it), Description (what it is).
 // Applications are matched by name, without regard to case or spacing; shown under the app name on Sales Kit.
 
 const USABILITY_SHEET = 'USABILITY';
+const USABILITY_DV_SHEET = 'DV';
+const USABILITY_DV_RANGE = 'I:K';
 
 function text(value) {
   return value === null || value === undefined ? '' : String(value).trim();
@@ -12,7 +15,12 @@ function nameKey(value) {
   return text(value).replace(/\s+/g, ' ').toLowerCase();
 }
 
-// Sheet values → collection for database.replaceSheetsData (table usability).
+// The header row: "Apps" in the first column.
+function isUsabilityHeader(row) {
+  return nameKey((row || [])[0]) === 'apps';
+}
+
+// Sheet values (first column: Apps) → collection for database.replaceSheetsData (table usability).
 function usabilityCollection(values = []) {
   const rows = values.slice(1).flatMap((row) => {
     const app = text(row[0]);
@@ -35,4 +43,4 @@ function createUsabilityLookup(rows) {
   return (name) => byName.get(nameKey(name)) || null;
 }
 
-module.exports = { USABILITY_SHEET, usabilityCollection, createUsabilityLookup };
+module.exports = { USABILITY_SHEET, USABILITY_DV_SHEET, USABILITY_DV_RANGE, isUsabilityHeader, usabilityCollection, createUsabilityLookup };

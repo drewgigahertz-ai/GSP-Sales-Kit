@@ -1,4 +1,4 @@
-// Banner page data (server side): reads the LAPTOP RAW, BANNER SPECS, DB PHOTOS and NEW PRICING sheets,
+// Banner page data (server side): reads the LAPTOP RAW, BANNER SPECS (LAPTOP DB when it has rows, see laptop-database.js), DB PHOTOS and NEW PRICING sheets,
 // keeps only what a banner shows, and builds one entry per laptop for SalesKit.
 // NEW PRICING is the basis of all pricing (Banner page, Reco Table and Sales Kit, and the price-change
 // notifications); only the columns listed below are kept.

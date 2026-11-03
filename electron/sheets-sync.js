@@ -20,10 +20,10 @@ const REQUEST_TIMEOUT_MS = 3 * 60 * 1000;
 const { BANNER_SHEETS, normalizeBannerSheets } = require('./banner-data');
 const { FEATURES_BANNER_SHEET, featuresBannerCollection } = require('./feature-banners');
 const { AGEING_BANNER_SHEET, ageingBannerCollection } = require('./ageing-banners');
-const { USABILITY_SHEET, usabilityCollection } = require('./app-usability');
+const { USABILITY_SHEET, USABILITY_DV_SHEET, USABILITY_DV_RANGE, usabilityCollection, isUsabilityHeader } = require('./app-usability');
 const { BRANCH_DETAILS_RANGE, branchDetailsCollection } = require('./branch-details');
 const { RECO_DB_SHEET, RECO_DB_RANGE, recoDbCollection } = require('./reco-db');
-const { LAPTOP_DATABASE_SHEET, LAPTOP_DATABASE_RANGE, laptopDatabaseCollection } = require('./laptop-database');
+const { LAPTOP_DATABASE_SHEET, LAPTOP_DATABASE_RANGE, laptopDatabaseCollection, bannerSpecsCollection } = require('./laptop-database');
 
 function collectionName(sheetName) {
   return sheetName.toLowerCase().trim().replace(/[\/\s]+/g, '_');
@@ -151,8 +151,23 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
       onProgress({ phase: 'warning', message: `Pricing spreadsheet could not be read (${error.message}); using the main spreadsheet.` });
     }
   }
+  // Laptop specs (see laptop-database.js): LAPTOP DB gives the Flyers page its names and specs, and the Banner page
+  // its specs in place of BANNER SPECS (still read when LAPTOP DB is missing or empty).
+  let laptopDbValues = null;
+  const laptopDatabaseTitle = titles.find((name) => name.trim().toUpperCase() === LAPTOP_DATABASE_SHEET);
+  if (laptopDatabaseTitle) {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `'${laptopDatabaseTitle.replace(/'/g, "''")}'!${LAPTOP_DATABASE_RANGE}`,
+      valueRenderOption: 'FORMATTED_VALUE'
+    });
+    result.laptop_database = laptopDatabaseCollection(response.data.values || []);
+    if (result.laptop_database.rows.length) laptopDbValues = response.data.values;
+  }
+
   const bannerValues = {};
   for (const sheetName of Object.values(BANNER_SHEETS)) {
+    if (laptopDbValues && sheetName === BANNER_SHEETS.banner_specs) continue;
     const pricingTitle = sheetName === BANNER_SHEETS.banner_prices
       ? pricingTitles.find((name) => name.trim().toUpperCase() === sheetName)
       : null;
@@ -168,6 +183,7 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
     onProgress({ phase: 'sheets', completed: SHEETS.length, total: SHEETS.length, sheet: sheetName });
   }
   Object.assign(result, normalizeBannerSheets(bannerValues));
+  if (laptopDbValues) result.banner_specs = bannerSpecsCollection(laptopDbValues);
 
   // Feature banners by short name (see feature-banners.js); skipped like the Banner sheets when missing.
   const featuresBannerTitle = titles.find((name) => name.trim().toUpperCase() === FEATURES_BANNER_SHEET);
@@ -191,9 +207,22 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
     result.ageing_banner = ageingBannerCollection(response.data.values || []);
   }
 
-  // Who each application is for (see app-usability.js); skipped when the tab is missing.
-  const usabilityTitle = titles.find((name) => name.trim().toUpperCase() === USABILITY_SHEET);
-  if (usabilityTitle) {
+  // Who each application is for (see app-usability.js): DV columns I–K, else the USABILITY tab; skipped when
+  // neither has it.
+  const dvTitle = titles.find((name) => name.trim().toUpperCase() === USABILITY_DV_SHEET);
+  let dvUsability = null;
+  if (dvTitle) {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `'${dvTitle.replace(/'/g, "''")}'!${USABILITY_DV_RANGE}`,
+      valueRenderOption: 'FORMATTED_VALUE'
+    });
+    const values = response.data.values || [];
+    if (isUsabilityHeader(values[0]) && values.length > 1) dvUsability = usabilityCollection(values);
+  }
+  const usabilityTitle = !dvUsability && titles.find((name) => name.trim().toUpperCase() === USABILITY_SHEET);
+  if (dvUsability) result.usability = dvUsability;
+  else if (usabilityTitle) {
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: `'${usabilityTitle.replace(/'/g, "''")}'!A:C`,
@@ -211,19 +240,6 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
       valueRenderOption: 'FORMATTED_VALUE'
     });
     result.reco_db = recoDbCollection(response.data.values || []);
-  }
-
-  // Flyers page specs (see laptop-database.js): in the pricing spreadsheet (else the main one); skipped when the
-  // tab is missing.
-  const pricingLaptopDatabase = pricingTitles.find((name) => name.trim().toUpperCase() === LAPTOP_DATABASE_SHEET);
-  const laptopDatabaseTitle = pricingLaptopDatabase || titles.find((name) => name.trim().toUpperCase() === LAPTOP_DATABASE_SHEET);
-  if (laptopDatabaseTitle) {
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: pricingLaptopDatabase ? pricingSpreadsheetId : spreadsheetId,
-      range: `'${laptopDatabaseTitle.replace(/'/g, "''")}'!${LAPTOP_DATABASE_RANGE}`,
-      valueRenderOption: 'FORMATTED_VALUE'
-    });
-    result.laptop_database = laptopDatabaseCollection(response.data.values || []);
   }
 
   return result;

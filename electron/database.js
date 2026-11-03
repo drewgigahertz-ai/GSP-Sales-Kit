@@ -543,7 +543,7 @@ function getInitialData() {
     recoDbData: getRows('reco_db'),
     // Flyers page: each branch's logo, store name and address (LOGO sheet E–I).
     branchDetails: makeBranchDetails(getRows('branch_details'), normalizeImageUrl),
-    // Flyers page: each laptop's name, part number and specs (LAPTOP DATABASE sheet of GST PRICING).
+    // Flyers page: each laptop's name, part number and specs (LAPTOP DB sheet).
     laptopDatabase: makeLaptopDatabase(getRows('laptop_database')),
     ukspPerSkuData,
     ukspBannerData,

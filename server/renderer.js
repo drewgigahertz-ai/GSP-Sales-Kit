@@ -293,8 +293,8 @@ function renderHealth(report) {
   missingRows.replaceChildren();
   if (!report.missing.length) {
     healthEmpty(missingRows, 4, report.laptopDatabaseSynced
-      ? 'Every recommended laptop is in LAPTOP DATABASE.'
-      : 'LAPTOP DATABASE has not been synced yet (it is read from the pricing spreadsheet at the next sync).');
+      ? 'Every recommended laptop is in LAPTOP DB.'
+      : 'LAPTOP DB has not been synced yet (it is read at the next sync).');
   }
   report.missing.forEach((entry) => {
     const tr = missingRows.insertRow();

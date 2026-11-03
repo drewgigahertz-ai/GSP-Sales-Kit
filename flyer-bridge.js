@@ -31,7 +31,7 @@
   const priceKey = (value) => String(value || '').normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
 
   // A laptop as the flyer shows it: model, part number, picture, brand logo, specs and prices. Name, part number
-  // and specs come from LAPTOP DATABASE (GST PRICING); a laptop not in it, or a blank cell there, falls back to
+  // and specs come from LAPTOP DB; a laptop not in it, or a blank cell there, falls back to
   // LAPTOP RAW / BANNER SPECS and SPECS. Prices come from NEW PRICING, also for laptops not in LAPTOP RAW.
   function laptopEntry(itemCode, { items, specsMap, laptopDb, extraPrices }) {
     const item = items.get(key(itemCode)) || null;
@@ -101,7 +101,7 @@
       // B2: the white header logo; C2: the blue one, used when a branch has no logo of its own.
       logos: { header: data.headerLogoUrl || '', blue: data.bannerLogoUrl || '' },
       homeBranch: data.homeBranch || '',
-      // False with a server older than LAPTOP DATABASE (the checklist then does not flag laptops missing from it).
+      // False with a server older than LAPTOP DB (the checklist then does not flag laptops missing from it).
       hasLaptopDatabase: Boolean((data.laptopDatabase || []).length)
     };
   }
