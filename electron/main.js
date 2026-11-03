@@ -12,6 +12,7 @@ const { createDataLoader } = require('./data-loader');
 const { createActivityReporter } = require('./activity');
 const { getDeviceInfo } = require('./device-info');
 const { createPriceStream } = require('./price-stream');
+const { createRememberLogin } = require('./remember-login');
 
 // SalesKit is a client: it loads its data from the SalesKit Server, which does the Google Sheets sync.
 
@@ -27,6 +28,7 @@ let dataLoader;
 let updateResume;
 let logoCache;
 let activityReporter;
+let rememberLogin;
 
 function reportSyncProgress(progress) {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -49,8 +51,9 @@ let workingServerUrl = '';
 // Fingerprint of the data the window shows: the server's per-branch ETag, or its data version (older servers).
 let loadedDataVersion = null;
 
-// Signed-in user for this run of SalesKit ({ key, user }). Users log in every time SalesKit opens; it is only
-// kept across the restart that installs an update (see update-resume.js).
+// Signed-in user for this run of SalesKit ({ key, user }). Users log in when SalesKit opens, unless they chose
+// "Remember me on this laptop" (remember-login.js); it is also kept across the restart that installs an update
+// (see update-resume.js).
 let session = null;
 let onLoginPage = true;
 
@@ -68,7 +71,8 @@ async function serverConnection() {
 }
 
 // withMeta: return { status, etag, body } instead of the body; a 304 (Not Modified) is then not an error.
-async function requestServer(pathname, { timeoutMs = 8000, method = 'GET', body, headers: extraHeaders = {}, withMeta = false } = {}) {
+async function requestServer(pathname, options = {}) {
+  const { timeoutMs = 8000, method = 'GET', body, headers: extraHeaders = {}, withMeta = false, retried = false } = options;
   const { serverUrls } = getConfig();
   if (!serverUrls.length) throw new Error('SalesKit has no server address. Add it to electron/embedded-config.json and rebuild.');
   const { urls: ordered, headers: connectionHeaders } = await serverConnection();
@@ -95,8 +99,12 @@ async function requestServer(pathname, { timeoutMs = 8000, method = 'GET', body,
     if (withMeta && response.status === 304) return { status: 304, etag: response.headers.get('etag'), body: null };
     const result = await response.json().catch(() => ({}));
     if (!response.ok) {
-      // The session ended (server restarted, password changed, or signed out by the administrator).
-      if (result.code === 'login_required' && pathname !== '/api/login' && !onLoginPage) showLogin('Please log in again.');
+      // The session ended (server restarted, password changed, or signed out by the administrator). With a
+      // remembered password, SalesKit signs in again by itself and repeats the request.
+      if (result.code === 'login_required' && pathname !== '/api/login' && !onLoginPage) {
+        if (!retried && await signInRemembered() === 'ok') return requestServer(pathname, { ...options, retried: true });
+        showLogin('Please log in again.');
+      }
       throw Object.assign(new Error(result.error || `SalesKit Server returned HTTP ${response.status}.`), { code: result.code, status: response.status });
     }
     return withMeta ? { status: response.status, etag: response.headers.get('etag'), body: result } : result;
@@ -231,6 +239,52 @@ function startPriceStream() {
 
 let loginMessage = '';
 
+// Signs in with the password remembered on this laptop. Returns 'ok', 'none' (nothing remembered), 'rejected'
+// (wrong password or user removed: it is forgotten), 'unreachable' or 'failed' (e.g. locked for a while).
+let rememberedSignIn = null;
+function signInRemembered() {
+  if (rememberedSignIn) return rememberedSignIn;
+  rememberedSignIn = (async () => {
+    const saved = rememberLogin && rememberLogin.load();
+    if (!saved) return 'none';
+    try {
+      const result = await requestServer('/api/login', { method: 'POST', body: saved });
+      session = { key: result.sessionKey, user: result.user };
+      if (priceStream) priceStream.reconnect();
+      return 'ok';
+    } catch (error) {
+      if (error.code === 'unreachable') return 'unreachable';
+      if (error.code === 'invalid') {
+        rememberLogin.forget();
+        return 'rejected';
+      }
+      return 'failed';
+    }
+  })().finally(() => { rememberedSignIn = null; });
+  return rememberedSignIn;
+}
+
+// Opened offline with a remembered password: signs in once the server answers, then the page reloads its data.
+let offlineRetry = null;
+function retrySignInWhileOffline() {
+  clearInterval(offlineRetry);
+  offlineRetry = setInterval(async () => {
+    if (session || !rememberLogin.load()) {
+      clearInterval(offlineRetry);
+      return;
+    }
+    const outcome = await signInRemembered();
+    if (outcome === 'unreachable') return;
+    clearInterval(offlineRetry);
+    if (outcome === 'ok') {
+      if (activityReporter) activityReporter.reset();
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('data:changed');
+    } else {
+      showLogin('Please log in again.');
+    }
+  }, 60 * 1000);
+}
+
 function showLogin(message = '') {
   session = null;
   if (priceStream) priceStream.reconnect();
@@ -254,16 +308,21 @@ ipcMain.handle('auth:info', async () => {
     version: app.getVersion(),
     message,
     offlineAvailable: dataLoader.hasSaved(),
+    // A remembered password: the page signs in by itself (auth:auto-login). Sign out forgets it.
+    autoLogin: Boolean(rememberLogin.load()),
+    openAtStartup: rememberLogin.opensAtStartup(),
     // The GigaHertz header logo from the last saved data, if its image is in the local cache.
     logo: (await logoCache.cachedLogos()).header
   };
 });
 
 // Returns { ok: true, user } or { ok: false, error, unreachable }.
-ipcMain.handle('auth:login', async (_event, username, password) => {
+ipcMain.handle('auth:login', async (_event, username, password, remember = false) => {
   try {
     const result = await requestServer('/api/login', { method: 'POST', body: { username: String(username || ''), password: String(password || '') } });
     session = { key: result.sessionKey, user: result.user };
+    if (remember) rememberLogin.save(String(username), String(password));
+    else rememberLogin.forget();
     if (activityReporter) activityReporter.reset();
     // The page keeps its own copy of the data; drop it so a shared laptop never shows the previous user's branches.
     await mainWindow.webContents.executeJavaScript("localStorage.removeItem('ghz_cached_sheet_data')").catch(() => {});
@@ -272,6 +331,36 @@ ipcMain.handle('auth:login', async (_event, username, password) => {
   } catch (error) {
     return { ok: false, error: error.code === 'unreachable' ? 'The SalesKit server cannot be reached. Check your internet connection.' : error.message, unreachable: error.code === 'unreachable' };
   }
+});
+
+// Signs in with the remembered password when SalesKit opens. Returns { ok, user } (SalesKit opens), or
+// { ok: false, error, unreachable } for the login page to show. Offline with saved data, SalesKit opens with it
+// and signs in once the server answers.
+ipcMain.handle('auth:auto-login', async () => {
+  const outcome = await signInRemembered();
+  if (outcome === 'ok') {
+    if (activityReporter) activityReporter.reset();
+    await mainWindow.webContents.executeJavaScript("localStorage.removeItem('ghz_cached_sheet_data')").catch(() => {});
+    showSalesKit();
+    return { ok: true, user: session.user };
+  }
+  if (outcome === 'unreachable' && dataLoader.hasSaved()) {
+    showSalesKit();
+    retrySignInWhileOffline();
+    return { ok: true, offline: true };
+  }
+  return {
+    ok: false,
+    unreachable: outcome === 'unreachable',
+    error: outcome === 'rejected' ? 'Your saved password no longer works. Please log in again.'
+      : outcome === 'unreachable' ? 'The SalesKit server cannot be reached. Check your internet connection.'
+        : 'Could not sign in by yourself. Please log in.'
+  };
+});
+
+ipcMain.handle('auth:open-at-startup', (_event, on) => {
+  rememberLogin.setOpensAtStartup(Boolean(on));
+  return rememberLogin.opensAtStartup();
 });
 
 // Only offered while the server cannot be reached: SalesKit opens with the last saved data.
@@ -285,6 +374,9 @@ ipcMain.handle('auth:user', () => (session ? session.user : null));
 
 ipcMain.handle('auth:logout', async () => {
   if (session) await requestServer('/api/logout', { method: 'POST', body: {} }).catch(() => {});
+  // Signing out also forgets the remembered password (e.g. a laptop passed to someone else).
+  rememberLogin.forget();
+  clearInterval(offlineRetry);
   showLogin('You signed out.');
   return true;
 });
@@ -432,6 +524,10 @@ app.whenReady().then(() => {
   // Logo addresses come from the small meta file, so the large saved data is not read for them.
   logoCache = createLogoCache({ userDataDir: app.getPath('userData'), imageCache, snapshotCache: { load: () => dataLoader.loadMeta() } });
   updateResume = createUpdateResume(path.join(app.getPath('userData'), 'update-resume.bin'));
+  rememberLogin = createRememberLogin({
+    credentialsPath: path.join(app.getPath('userData'), 'remember-login.bin'),
+    settingsPath: path.join(app.getPath('userData'), 'startup-settings.json')
+  });
   // Restarted to install an update: open SalesKit signed in as before. (If the server no longer
   // knows the session, the first data request shows the login screen.)
   session = updateResume.take();

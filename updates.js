@@ -12,7 +12,9 @@
         'Flyers: laptops that were missing a price (such as the Acer Nitro V ANV15-42-R2UH) now show their SRP and brand logo.',
         'Flyers: the checklist lists laptops marked End of life, or not in LAPTOP DATABASE.',
         'Flyers: with a customer name, the customer’s segment is no longer repeated below the "Prepared for" section.',
-        'Flyers: "Customer section only" (under Customer name) prints and downloads just the "Prepared for" section.'
+        'Flyers: "Customer section only" (under Customer name) prints and downloads just the "Prepared for" section.',
+        'Sign in: "Remember me on this laptop" signs you in by itself when SalesKit opens. Sign out forgets the password.',
+        'SalesKit opens by itself when Windows starts (turn it off with "Open when Windows starts" on the sign-in page).'
       ]
     },
     {

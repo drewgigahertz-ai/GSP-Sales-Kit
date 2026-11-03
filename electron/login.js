@@ -16,7 +16,8 @@ function setBusy(busy) {
     : '<i class="bi bi-box-arrow-in-right"></i> Sign in';
 }
 
-// Remember only the username on this laptop (never the password).
+// The last username is kept here; the password only with "Remember me on this laptop" (encrypted, in the main
+// process: remember-login.js).
 function rememberUsername(name) {
   try {
     localStorage.setItem(USERNAME_KEY, name);
@@ -47,7 +48,7 @@ $('loginForm').addEventListener('submit', async (event) => {
   if (!username || !password) return;
   setBusy(true);
   showMessage('');
-  const result = await window.saleskit.login(username, password);
+  const result = await window.saleskit.login(username, password, $('rememberMe').checked);
   if (result && result.ok) {
     rememberUsername(username);
     return; // SalesKit opens.
@@ -56,6 +57,10 @@ $('loginForm').addEventListener('submit', async (event) => {
   showMessage(result ? result.error : 'Sign in failed.');
   $('offline').hidden = !(result && result.unreachable && offlineAvailable);
   $('password').select();
+});
+
+$('openAtStartup').addEventListener('change', async () => {
+  $('openAtStartup').checked = await window.saleskit.setOpenAtStartup($('openAtStartup').checked);
 });
 
 $('continueOffline').addEventListener('click', async () => {
@@ -72,8 +77,17 @@ $('continueOffline').addEventListener('click', async () => {
     $('brandLogo').hidden = false;
     $('brandName').hidden = true;
   }
-  if (info.message) showMessage(info.message, 'info');
+  $('openAtStartup').checked = info.openAtStartup;
   const remembered = lastUsername();
   $('username').value = remembered;
+  // A remembered password: sign in by itself (SalesKit opens); the form shows only if that does not work.
+  if (info.autoLogin) {
+    setBusy(true);
+    const result = await window.saleskit.autoLogin();
+    if (result && result.ok) return;
+    setBusy(false);
+    showMessage(result ? result.error : 'Please log in.');
+    $('offline').hidden = !(result && result.unreachable && offlineAvailable);
+  } else if (info.message) showMessage(info.message, 'info');
   (remembered ? $('password') : $('username')).focus();
 })();
