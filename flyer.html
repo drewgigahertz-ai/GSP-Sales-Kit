@@ -645,6 +645,8 @@ body.is-loading { overflow: hidden; }
   </div>
   <div class="filter-step">
     <span class="search-label"><span class="step-number">2</span>Contact details</span>
+    <label class="field-label" for="customerInput">Customer name</label>
+    <input id="customerInput" class="side-input" type="text" placeholder="e.g. Maria Santos" autocomplete="off" maxlength="60" title="Prepared for (same as Customer name on the Reco Table)">
     <label class="field-label" for="contactInput">Contact No.</label>
     <input id="contactInput" class="side-input" type="text" placeholder="e.g. 0917 123 4567" autocomplete="off" title="Contact No. (Ctrl+Shift+C)">
     <label class="field-label" for="lookInput">Look for</label>
@@ -1120,6 +1122,14 @@ body.is-loading { overflow: hidden; }
       FlyerPromos.mark(el("sections"));
       renderSide();
     }
+  });
+
+  // Customer name typed on the flyer (flyer-customer.js): redraw when the section appears or goes, otherwise
+  // only the checklist; the name goes back to the Reco Table.
+  FlyerCustomer.init({
+    redraw: function () { render(); fillPictures(el("sections")); },
+    changed: renderSide,
+    sendName: function (name) { toParent({ channel: "saleskit-flyer-customer-name", name: name }); }
   });
 
   el("flyerList").addEventListener("click", function (e) {

@@ -2,6 +2,7 @@
 // laptops on the result (Exceed / Meet / Budget) and the chosen applications are passed to the Flyers tab
 // (flyer-bridge.js → updateFlyerCustomer), which puts a "Prepared for" section at the top of the flyer while a
 // name is entered. The name is kept for this session of the app (not after it is closed: the next customer starts blank).
+// The name can also be typed on the Flyers tab; this box then follows (setName).
 (function () {
   const $ = (id) => document.getElementById(id);
   const STORE_KEY = 'ghz_customer_name';
@@ -83,7 +84,8 @@
     try {
       hierarchy = currentHierarchy;
       segment = getSmtTargetMarket(currentHierarchy);
-      apps = APP_DATABASE.filter((app) => selectedAppIds.includes(app.id)).map((app) => app.name);
+      // Name and logo of each chosen application (the flyer shows the logos).
+      apps = APP_DATABASE.filter((app) => selectedAppIds.includes(app.id)).map((app) => ({ name: app.name, icon: app.icon || '' }));
     } catch {}
     const laptops = {};
     TIERS.forEach((tier) => {
@@ -120,6 +122,13 @@
     if ($(id)) new MutationObserver(send).observe($(id), { childList: true, characterData: true, subtree: true });
   });
 
-  window.RecoCustomer = { current, send };
+  // A name typed on the Flyers tab: the box follows; nothing is sent back (the flyer already shows it).
+  function setName(value) {
+    input.value = String(value || '');
+    clear.hidden = !input.value;
+    saveName(input.value);
+  }
+
+  window.RecoCustomer = { current, send, setName };
   send();
 })();

@@ -173,6 +173,11 @@
         send({ channel: 'saleskit-flyer-status', message: 'Could not refresh. Check the connection to the server.', busy: false });
       }, 90 * 1000);
       window.refreshAllData({ silent: false });
+    } else if (channel === 'saleskit-flyer-customer-name') {
+      // The customer name typed on the flyer: the Reco Table's box follows (without sending it back).
+      const name = String(event.data.name || '').slice(0, 60);
+      if (customer) customer = { ...customer, name };
+      if (window.RecoCustomer) window.RecoCustomer.setName(name);
     } else if (channel === 'saleskit-flyer-hotkey') {
       // Ctrl+1–4 pressed while the Flyers page has the keyboard (see hotkeys.js).
       if (typeof window.runSalesKitHotkey === 'function') window.runSalesKitHotkey(event.data.keys || {});
