@@ -1,7 +1,8 @@
 // "What's new": an Updates button in the header (next to Price changes) opens the list of changes per version.
 // It also opens by itself once after the app updates. Add the new version at the top of RELEASES when releasing.
 (function () {
-  // Only what changes on the laptops: SalesKit Server changes are released and listed on the server, not here.
+  // Only what changes on the laptops: SalesKit Server changes, and changes to which sheets the data comes from, are
+  // not listed here.
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
