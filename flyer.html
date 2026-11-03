@@ -1036,6 +1036,7 @@ body.is-loading { overflow: hidden; }
       discount: { title: "Cash discount", fix: "No cash discount", items: [] },
       picture: { title: "Picture", fix: "No picture", items: [] },
       specs: { title: "Specs", fix: "Missing specs", items: [] },
+      database: { title: "LAPTOP DATABASE", fix: "Not listed or end of life", items: [] },
       slots: { title: "Exceed / Meet / Budget", fix: "Empty slot", items: [] }
     };
     var failed = {};
@@ -1062,6 +1063,9 @@ body.is-loading { overflow: hidden; }
         if (!p || !p.picture || Object.keys(failed).some(function (n) { return n.indexOf(item.name) === 0; })) checks.picture.items.push(item);
         var missing = FIELDS.filter(function (f) { return !(p && p.specs && p.specs[f]); });
         if (missing.length) checks.specs.items.push({ market: i, name: item.name, note: missing.join(", ") });
+        // LAPTOP DATABASE (GST PRICING) is where the flyer's names and specs come from.
+        if (data.hasLaptopDatabase && p && (!p.inLaptopDatabase || p.endOfLife))
+          checks.database.items.push({ market: i, name: item.name, note: p.inLaptopDatabase ? "End of life" : "Not in LAPTOP DATABASE" });
       });
     });
     var info = data.branchDetails[key(branch)] || null;
@@ -1170,7 +1174,7 @@ body.is-loading { overflow: hidden; }
     if (m.channel === "saleskit-flyer-data") {
       data = {
         rows: m.rows || [], laptops: m.laptops || {}, branchDetails: m.branchDetails || {},
-        logos: m.logos || {}, homeBranch: m.homeBranch || ""
+        logos: m.logos || {}, homeBranch: m.homeBranch || "", hasLaptopDatabase: !!m.hasLaptopDatabase
       };
       loaded = true;
       var branches = branchList();

@@ -27,39 +27,54 @@
   // "HP HP LAPTOP" (brand + a model that already starts with it) → "HP LAPTOP".
   const modelName = (value) => clean(value).replace(/^(\S+)\s+\1(?=\s|$)/i, '$1');
 
-  // A laptop as the flyer shows it: model, part number, picture, brand logo, specs and prices.
-  function laptopEntry(itemCode, items, specsMap) {
+  // The server's matchKey (banner-data.js), for bannerData.extraPrices.
+  const priceKey = (value) => String(value || '').normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
+
+  // A laptop as the flyer shows it: model, part number, picture, brand logo, specs and prices. Name, part number
+  // and specs come from LAPTOP DATABASE (GST PRICING); a laptop not in it, or a blank cell there, falls back to
+  // LAPTOP RAW / BANNER SPECS and SPECS. Prices come from NEW PRICING, also for laptops not in LAPTOP RAW.
+  function laptopEntry(itemCode, { items, specsMap, laptopDb, extraPrices }) {
     const item = items.get(key(itemCode)) || null;
+    const db = laptopDb.get(key(itemCode)) || null;
+    const priced = item || extraPrices[priceKey(itemCode)] || null;
     const lower = itemCode.toLowerCase();
     const spec = specsMap[lower] || specsMap[lower.replace(/^lap[-_\s]*/, '')] || null;
     const guide = (item && item.specs) || {};
+    const dbSpecs = (db && db.specs) || {};
     return {
-      model: modelName(item && item.brandModel) || modelName(spec && spec.title) || itemCode,
-      partNumber: clean(spec && spec.modelCode),
+      model: modelName(db && [db.brand, db.model].filter(Boolean).join(' '))
+        || modelName(item && item.brandModel) || modelName(spec && spec.title) || itemCode,
+      partNumber: clean(db && db.partNumber) || clean(spec && spec.modelCode),
       picture: (spec && spec.image) || '',
-      brandLogo: (item && item.brandPicture) || '',
+      brandLogo: (priced && priced.brandPicture) || '',
       specs: {
-        Processor: clean(guide.PROCESSOR) || clean(spec && spec.cpu),
-        Graphics: clean(guide.GRAPHICS) || clean(spec && spec.graphics),
-        Storage: clean(guide.STORAGE) || clean(spec && spec.storage),
-        Memory: clean(guide.MEMORY) || clean(spec && spec.memory),
-        Resolution: clean(guide.RESOLUTION) || clean(spec && spec.resolution),
-        OS: clean(guide.OS)
+        Processor: clean(dbSpecs.Processor) || clean(guide.PROCESSOR) || clean(spec && spec.cpu),
+        Graphics: clean(dbSpecs.Graphics) || clean(guide.GRAPHICS) || clean(spec && spec.graphics),
+        Storage: clean(dbSpecs.Storage) || clean(guide.STORAGE) || clean(spec && spec.storage),
+        Memory: clean(dbSpecs.Memory) || clean(guide.MEMORY) || clean(spec && spec.memory),
+        Resolution: clean(dbSpecs.Resolution) || clean(guide.RESOLUTION) || clean(spec && spec.resolution),
+        OS: clean(dbSpecs.OS) || clean(guide.OS)
       },
-      prices: price(item),
-      branchPrices: Object.fromEntries(Object.entries((item && item.branchPrices) || {})
+      // For the flyer's checklist.
+      inLaptopDatabase: Boolean(db),
+      endOfLife: Boolean(db && db.endOfLife),
+      prices: price(priced),
+      branchPrices: Object.fromEntries(Object.entries((priced && priced.branchPrices) || {})
         .map(([branch, view]) => [key(branch), price(view)]).filter(([, view]) => view)),
       // Every NEW PRICING row of the laptop, for the promo picker on its card (flyer-promos.js).
-      promoRows: ((item && item.promoRows) || []).filter((row) => row.hasPrice).map((row) => ({
+      promoRows: ((priced && priced.promoRows) || []).filter((row) => row.hasPrice).map((row) => ({
         title: row.title, branch: row.branch || '', dates: row.dates || '', cash: row.cash, twelveMonths: row.twelveMonths
       }))
     };
   }
 
   function lookups(data) {
+    const bannerData = data.bannerData || {};
     return {
-      items: new Map(((data.bannerData && data.bannerData.items) || []).map((item) => [key(item.itemCode), item])),
-      specsMap: data.specsMap || {}
+      items: new Map((bannerData.items || []).map((item) => [key(item.itemCode), item])),
+      specsMap: data.specsMap || {},
+      laptopDb: new Map((data.laptopDatabase || []).map((laptop) => [key(laptop.item), laptop])),
+      extraPrices: bannerData.extraPrices || {}
     };
   }
 
@@ -71,11 +86,11 @@
       item: clean(row['ITEM DESCRIPTION'])
     })).filter((row) => row.branch && row.item);
 
-    const { items, specsMap } = lookups(data);
+    const lookup = lookups(data);
     const laptops = {};
     rows.forEach((row) => {
       const id = key(row.item);
-      if (!laptops[id]) laptops[id] = laptopEntry(row.item, items, specsMap);
+      if (!laptops[id]) laptops[id] = laptopEntry(row.item, lookup);
     });
 
     return {
@@ -85,7 +100,9 @@
       branchDetails: data.branchDetails || {},
       // B2: the white header logo; C2: the blue one, used when a branch has no logo of its own.
       logos: { header: data.headerLogoUrl || '', blue: data.bannerLogoUrl || '' },
-      homeBranch: data.homeBranch || ''
+      homeBranch: data.homeBranch || '',
+      // False with a server older than LAPTOP DATABASE (the checklist then does not flag laptops missing from it).
+      hasLaptopDatabase: Boolean((data.laptopDatabase || []).length)
     };
   }
 
@@ -97,9 +114,9 @@
   function customerMessage() {
     const laptops = {};
     if (customer && lastData) {
-      const { items, specsMap } = lookups(lastData);
+      const lookup = lookups(lastData);
       Object.values(customer.laptops || {}).filter(Boolean).forEach((itemCode) => {
-        laptops[key(itemCode)] = laptopEntry(itemCode, items, specsMap);
+        laptops[key(itemCode)] = laptopEntry(itemCode, lookup);
       });
     }
     return { channel: 'saleskit-flyer-customer', customer, laptops };

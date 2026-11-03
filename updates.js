@@ -5,6 +5,15 @@
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
+      version: '1.0.24',
+      date: 'November 3, 2026',
+      changes: [
+        'Flyers: laptop names, part numbers and specs (OS included) now come from one sheet, LAPTOP DATABASE.',
+        'Flyers: laptops that were missing a price (such as the Acer Nitro V ANV15-42-R2UH) now show their SRP and brand logo.',
+        'Flyers: the checklist lists laptops marked End of life, or not in LAPTOP DATABASE.'
+      ]
+    },
+    {
       version: '1.0.23',
       date: 'November 3, 2026',
       changes: [

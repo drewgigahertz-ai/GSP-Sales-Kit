@@ -8,6 +8,7 @@ const { buildBannerData, matchKey } = require('./banner-data');
 const { createFeatureBannerResolver } = require('./feature-banners');
 const { createUsabilityLookup } = require('./app-usability');
 const { makeBranchDetails } = require('./branch-details');
+const { makeLaptopDatabase } = require('./laptop-database');
 
 const SHEET_TABLES = new Set([
   'banner_laptops',
@@ -25,6 +26,7 @@ const SHEET_TABLES = new Set([
   'uksp_banner',
   'reco_table',
   'reco_db',
+  'laptop_database',
   'logo'
 ]);
 
@@ -487,7 +489,9 @@ function getInitialData() {
     photos: getRows('banner_photos'),
     prices: getRows('banner_prices'),
     ageing: getRows('ageing_banner'),
-    reco: recoTableData
+    reco: recoTableData,
+    // Laptops on the Flyers page that are not in LAPTOP RAW still get their NEW PRICING prices (extraPrices).
+    extraPriceItems: getRows('laptop_database').map(({ item, brand }) => ({ item, brand }))
   }, normalizeImageUrl);
   const priceByItem = new Map(bannerData.items.filter((item) => item.hasPrice && item.cash !== null)
     .map((item) => [matchKey(item.itemCode), item.cash]));
@@ -539,6 +543,8 @@ function getInitialData() {
     recoDbData: getRows('reco_db'),
     // Flyers page: each branch's logo, store name and address (LOGO sheet E–I).
     branchDetails: makeBranchDetails(getRows('branch_details'), normalizeImageUrl),
+    // Flyers page: each laptop's name, part number and specs (LAPTOP DATABASE sheet of GST PRICING).
+    laptopDatabase: makeLaptopDatabase(getRows('laptop_database')),
     ukspPerSkuData,
     ukspBannerData,
     appUkspData: applicationMatrix,

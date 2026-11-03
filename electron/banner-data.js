@@ -399,7 +399,26 @@ function buildBannerData(rows, imageUrl = (value) => value, now = new Date()) {
     });
   }
   items.sort((a, b) => a.itemCode.localeCompare(b.itemCode));
-  return { items, branches: [...branchesWithPrices].sort() };
+
+  // Prices and brand logo of other laptops (rows.extraPriceItems: { item, brand } from the Flyers page's LAPTOP
+  // DATABASE) that are not in LAPTOP RAW, by matchKey; the Banner page does not list them.
+  const extraPrices = {};
+  for (const { item: itemCode, brand } of rows.extraPriceItems || []) {
+    const key = matchKey(itemCode);
+    if (!key || seen.has(key) || extraPrices[key] || !pricesByItem.has(key)) continue;
+    const byBranch = {};
+    for (const [branchKey, candidate] of branchPrices) {
+      const [branch, itemKey] = branchKey.split('|');
+      if (itemKey === key) byBranch[branch] = priceView(candidate.price);
+    }
+    extraPrices[key] = {
+      brandPicture: picture('', 'brand', brand),
+      ...priceView((regularPrices.get(key) || {}).price),
+      branchPrices: byBranch,
+      promoRows: pricesByItem.get(key).map(promoRow)
+    };
+  }
+  return { items, branches: [...branchesWithPrices].sort(), extraPrices };
 }
 
 module.exports = { BANNER_SHEETS, normalizeBannerSheets, buildBannerData, matchKey, pricesCollection };

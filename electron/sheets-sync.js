@@ -23,6 +23,7 @@ const { AGEING_BANNER_SHEET, ageingBannerCollection } = require('./ageing-banner
 const { USABILITY_SHEET, usabilityCollection } = require('./app-usability');
 const { BRANCH_DETAILS_RANGE, branchDetailsCollection } = require('./branch-details');
 const { RECO_DB_SHEET, RECO_DB_RANGE, recoDbCollection } = require('./reco-db');
+const { LAPTOP_DATABASE_SHEET, LAPTOP_DATABASE_RANGE, laptopDatabaseCollection } = require('./laptop-database');
 
 function collectionName(sheetName) {
   return sheetName.toLowerCase().trim().replace(/[\/\s]+/g, '_');
@@ -210,6 +211,19 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
       valueRenderOption: 'FORMATTED_VALUE'
     });
     result.reco_db = recoDbCollection(response.data.values || []);
+  }
+
+  // Flyers page specs (see laptop-database.js): in the pricing spreadsheet (else the main one); skipped when the
+  // tab is missing.
+  const pricingLaptopDatabase = pricingTitles.find((name) => name.trim().toUpperCase() === LAPTOP_DATABASE_SHEET);
+  const laptopDatabaseTitle = pricingLaptopDatabase || titles.find((name) => name.trim().toUpperCase() === LAPTOP_DATABASE_SHEET);
+  if (laptopDatabaseTitle) {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: pricingLaptopDatabase ? pricingSpreadsheetId : spreadsheetId,
+      range: `'${laptopDatabaseTitle.replace(/'/g, "''")}'!${LAPTOP_DATABASE_RANGE}`,
+      valueRenderOption: 'FORMATTED_VALUE'
+    });
+    result.laptop_database = laptopDatabaseCollection(response.data.values || []);
   }
 
   return result;
