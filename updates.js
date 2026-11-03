@@ -5,6 +5,16 @@
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
+      version: '1.0.23',
+      date: 'November 3, 2026',
+      changes: [
+        'Reco Table: a Customer name box (Ctrl+Shift+N). The name shows at the top of the flyer.',
+        'Flyers: with a customer name, the flyer starts with a "Prepared for" section: the customer’s segment, the three laptops from the Reco Table and their applications as logos.',
+        'Flyers: the customer name can be typed or changed on the Flyers page too (Ctrl+Shift+N).',
+        'Flyers: pick other applications for the flyer under Customer name; the segment and the Reco Table stay as they are.'
+      ]
+    },
+    {
       version: '1.0.20',
       date: 'October 29, 2026',
       changes: [
