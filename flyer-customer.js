@@ -3,6 +3,7 @@
 // the three laptops on the Reco Table result (Exceed / Meet / Budget) as cards, and the chosen applications as
 // logos; the branch's target markets follow below as before. Without a name, nothing is added.
 // The name can also be typed here (sidebar Customer name, or on the flyer itself); it goes back to the Reco Table.
+// The applications can be chosen here too (sidebar picker); that only changes the flyer, never the segment.
 (function () {
   var style = document.createElement("style");
   style.textContent = [
@@ -21,7 +22,25 @@
     ".cust-apps .app { display: flex; width: 34px; height: 34px; align-items: center; justify-content: center; }",
     ".cust-apps .app img { max-width: 100%; max-height: 100%; object-fit: contain; }",
     ".cust-apps .app.no-logo { width: auto; padding: 2px 9px; border: 1px solid var(--sec1); border-radius: 999px;",
-    "  color: var(--text-default-color, #111); font-family: var(--font-body); font-size: var(--font-size-xxs); font-weight: 700; }"
+    "  color: var(--text-default-color, #111); font-family: var(--font-body); font-size: var(--font-size-xxs); font-weight: 700; }",
+    /* Sidebar: Applications picker for the flyer */
+    "#customerApps { position: relative; }",
+    "#customerApps[hidden] { display: none; }",
+    ".capps-btn { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 8px; text-align: left; cursor: pointer; }",
+    ".capps-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }",
+    ".capps-btn b { flex: none; padding: 0 7px; border-radius: 999px; background: #e0e7ff; color: #1e3a8a; font-size: 11px; }",
+    ".capps-panel { position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px); padding: 6px;",
+    "  border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; box-shadow: 0 12px 28px rgba(15, 23, 42, .16); }",
+    ".capps-panel[hidden] { display: none; }",
+    ".capps-panel input[type=search] { width: 100%; margin-bottom: 6px; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font: inherit; font-size: 12px; }",
+    ".capps-list { max-height: 260px; overflow-y: auto; }",
+    ".capps-list label { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; font-size: 12px; cursor: pointer; }",
+    ".capps-list label:hover { background: #f1f5ff; }",
+    ".capps-list img { width: 18px; height: 18px; object-fit: contain; }",
+    ".capps-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; padding: 6px 4px 0;",
+    "  border-top: 1px solid #e2e8f0; color: #64748b; font-size: 11px; }",
+    ".capps-foot button { padding: 0; border: 0; background: none; color: #1d4ed8; font: inherit; font-weight: 700; cursor: pointer; }",
+    ".capps-foot button[hidden] { display: none; }"
   ].join("\n");
   document.head.appendChild(style);
 
@@ -38,13 +57,108 @@
   // flyer.html's redraw (whole flyer), changed (checklist) and sendName (back to the Reco Table).
   function init(next) { hooks = next; }
 
+  // Applications chosen on the Flyers tab (names), or null = the Reco Table's. They only change the flyer: the
+  // Reco Table and its segment stay as they are. New applications chosen on the Reco Table replace them.
+  var chosenApps = null;
+  var recoAppsKey = "";
+
+  function appName(app) { return typeof app === "string" ? app : app.name; }
+
+  function shownApps() {
+    if (!customer) return [];
+    if (!chosenApps) return (customer.apps || []).filter(Boolean);
+    var all = customer.allApps || customer.apps || [];
+    return chosenApps.map(function (n) {
+      return all.find(function (app) { return appName(app) === n; }) || n;
+    });
+  }
+
   // The Reco Table's customer, or null; laptops: the three cards' data, added to the flyer's laptops.
   function set(next, laptops, allLaptops) {
     customer = next || null;
     Object.keys(laptops || {}).forEach(function (k) { allLaptops[k] = laptops[k]; });
+    var key = ((customer && customer.apps) || []).map(appName).join("|");
+    if (key !== recoAppsKey) {
+      recoAppsKey = key;
+      chosenApps = null;
+    }
     var input = document.getElementById("customerInput");
     if (input && document.activeElement !== input) input.value = name();
+    drawPicker();
   }
+
+  // ---------- Sidebar: Applications picker ----------
+  var pickerOpen = false;
+  var pickerQuery = "";
+
+  function drawPicker() {
+    var box = document.getElementById("customerApps");
+    if (!box) return;
+    box.hidden = !name();
+    if (box.hidden) { pickerOpen = false; box.innerHTML = ""; return; }
+    var shown = shownApps().map(appName);
+    var all = (customer.allApps && customer.allApps.length ? customer.allApps : customer.apps || []);
+    var q = pickerQuery.trim().toLowerCase();
+    var listed = all.filter(function (app) { return !q || appName(app).toLowerCase().indexOf(q) !== -1; });
+    box.innerHTML = '<label class="field-label">Applications on the flyer</label>' +
+      '<button type="button" class="side-input capps-btn" aria-haspopup="listbox" aria-expanded="' + pickerOpen + '"' +
+      ' title="Choose the applications shown on the flyer (the segment does not change)">' +
+      "<span>" + (shown.length ? esc(shown.join(", ")) : "None") + "</span><b>" + shown.length + "</b></button>" +
+      '<div class="capps-panel"' + (pickerOpen ? "" : " hidden") + ">" +
+      '<input type="search" placeholder="Search applications" value="' + esc(pickerQuery) + '" spellcheck="false">' +
+      '<div class="capps-list" role="listbox">' + listed.map(function (app) {
+        var n = appName(app), icon = typeof app === "string" ? "" : app.icon;
+        return '<label><input type="checkbox" data-app="' + esc(n) + '"' + (shown.indexOf(n) !== -1 ? " checked" : "") + ">" +
+          (icon ? '<img data-src="' + esc(icon) + '" alt="">' : "") + "<span>" + esc(n) + "</span></label>";
+      }).join("") + (listed.length ? "" : '<div class="capps-foot">No application matches.</div>') + "</div>" +
+      '<div class="capps-foot"><span>Only changes the flyer, not the segment.</span>' +
+      '<button type="button" data-reco' + (chosenApps ? "" : " hidden") + ">Use the Reco Table's</button></div>" +
+      "</div>";
+    if (typeof fillPictures === "function") fillPictures(box);
+  }
+
+  document.addEventListener("click", function (e) {
+    var box = document.getElementById("customerApps");
+    if (!box || box.hidden) return;
+    if (e.target.closest(".capps-btn")) {
+      pickerOpen = !pickerOpen;
+      drawPicker();
+      if (pickerOpen) box.querySelector("input[type=search]").focus();
+    } else if (e.target.closest("[data-reco]")) {
+      chosenApps = null;
+      drawPicker();
+      hooks.redraw();
+    } else if (pickerOpen && !box.contains(e.target)) {
+      pickerOpen = false;
+      drawPicker();
+    }
+  });
+
+  document.addEventListener("change", function (e) {
+    var app = e.target && e.target.getAttribute && e.target.getAttribute("data-app");
+    if (app === null || app === undefined) return;
+    var names = shownApps().map(appName).filter(function (n) { return n !== app; });
+    if (e.target.checked) names.push(app);
+    chosenApps = names;
+    drawPicker();
+    hooks.redraw();
+  });
+
+  document.addEventListener("input", function (e) {
+    if (!e.target || !e.target.closest || !e.target.closest(".capps-panel") || e.target.type !== "search") return;
+    pickerQuery = e.target.value;
+    var at = e.target.selectionStart;
+    drawPicker();
+    var search = document.querySelector("#customerApps input[type=search]");
+    if (search) { search.focus(); search.setSelectionRange(at, at); }
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && pickerOpen) {
+      pickerOpen = false;
+      drawPicker();
+    }
+  });
 
   function name() {
     return (customer && String(customer.name || "").trim()) || "";
@@ -74,7 +188,7 @@
     var s = section();
     if (!s) return "";
     var cls = " s" + colourIndex(s.title);
-    var apps = (customer.apps || []).filter(Boolean);
+    var apps = shownApps();
     return '<div class="cust-box' + cls + '" id="market-cust">' +
       '<div class="cust-head"><span class="cust-label">Prepared for</span>' +
       '<span class="cust-name" contenteditable="true" spellcheck="false" title="Click to change the name">' + esc(name()) + "</span></div>" +
@@ -93,8 +207,10 @@
     if (from !== input && input) input.value = value;
     var shown = document.querySelector(".cust-head .cust-name");
     if (from !== shown && shown) shown.textContent = value;
-    if (had !== Boolean(name())) hooks.redraw();
-    else hooks.changed();
+    if (had !== Boolean(name())) {
+      hooks.redraw();
+      drawPicker();
+    } else hooks.changed();
     hooks.sendName(value);
   }
 

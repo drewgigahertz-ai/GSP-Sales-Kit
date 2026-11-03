@@ -81,11 +81,15 @@
     let hierarchy = null;
     let segment = '';
     let apps = [];
+    let allApps = [];
     try {
       hierarchy = currentHierarchy;
       segment = getSmtTargetMarket(currentHierarchy);
-      // Name and logo of each chosen application (the flyer shows the logos).
-      apps = APP_DATABASE.filter((app) => selectedAppIds.includes(app.id)).map((app) => ({ name: app.name, icon: app.icon || '' }));
+      // Name and logo of each chosen application (the flyer shows the logos), and of every application, so the
+      // Flyers tab can choose others for the flyer (that choice does not change the segment).
+      const view = (app) => ({ name: app.name, icon: app.icon || '' });
+      apps = APP_DATABASE.filter((app) => selectedAppIds.includes(app.id)).map(view);
+      allApps = APP_DATABASE.map(view);
     } catch {}
     const laptops = {};
     TIERS.forEach((tier) => {
@@ -93,7 +97,7 @@
       // A tier with nothing in stock shows a message instead of an item code.
       laptops[tier] = /^LAP[-_\s]/i.test(text) ? text : '';
     });
-    return { name: input.value.trim(), hierarchy, segment, laptops, apps };
+    return { name: input.value.trim(), hierarchy, segment, laptops, apps, allApps };
   }
 
   let timer = null;
