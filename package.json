@@ -57,6 +57,8 @@
       "flyer.html",
       "flyer-bridge.js",
       "flyer-promos.js",
+      "flyer-customer.js",
+      "reco-customer.js",
       "reco-alternatives.js",
       "banner-bridge.js",
       "banner-color.js",

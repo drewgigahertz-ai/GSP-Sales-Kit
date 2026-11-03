@@ -2,8 +2,9 @@
 // RECO TABLE rows (branch, target market, tag, laptop), each laptop's model, picture (SPECS), brand logo
 // (DB PHOTOS), specs (BANNER SPECS) and prices (NEW PRICING, regular and per branch), each branch's logo, store
 // name and address (LOGO sheet), and the Gigahertz logos. It also saves the pictures on this laptop, saves the
-// downloaded PDF / PNG pages, and passes on Refresh data, Ctrl+1–4 and ?. Like the Banner tab, the frame only
-// talks through window messages, which are only accepted from that frame.
+// downloaded PDF / PNG pages, and passes on Refresh data, Ctrl+1–4 and ?. It also passes the Reco Table's customer
+// (name, segment, three laptops, applications) for the flyer's "Prepared for" section. Like the Banner tab, the
+// frame only talks through window messages, which are only accepted from that frame.
 (function () {
   let latest = null;
   let refreshTimer = null;
@@ -26,6 +27,42 @@
   // "HP HP LAPTOP" (brand + a model that already starts with it) → "HP LAPTOP".
   const modelName = (value) => clean(value).replace(/^(\S+)\s+\1(?=\s|$)/i, '$1');
 
+  // A laptop as the flyer shows it: model, part number, picture, brand logo, specs and prices.
+  function laptopEntry(itemCode, items, specsMap) {
+    const item = items.get(key(itemCode)) || null;
+    const lower = itemCode.toLowerCase();
+    const spec = specsMap[lower] || specsMap[lower.replace(/^lap[-_\s]*/, '')] || null;
+    const guide = (item && item.specs) || {};
+    return {
+      model: modelName(item && item.brandModel) || modelName(spec && spec.title) || itemCode,
+      partNumber: clean(spec && spec.modelCode),
+      picture: (spec && spec.image) || '',
+      brandLogo: (item && item.brandPicture) || '',
+      specs: {
+        Processor: clean(guide.PROCESSOR) || clean(spec && spec.cpu),
+        Graphics: clean(guide.GRAPHICS) || clean(spec && spec.graphics),
+        Storage: clean(guide.STORAGE) || clean(spec && spec.storage),
+        Memory: clean(guide.MEMORY) || clean(spec && spec.memory),
+        Resolution: clean(guide.RESOLUTION) || clean(spec && spec.resolution),
+        OS: clean(guide.OS)
+      },
+      prices: price(item),
+      branchPrices: Object.fromEntries(Object.entries((item && item.branchPrices) || {})
+        .map(([branch, view]) => [key(branch), price(view)]).filter(([, view]) => view)),
+      // Every NEW PRICING row of the laptop, for the promo picker on its card (flyer-promos.js).
+      promoRows: ((item && item.promoRows) || []).filter((row) => row.hasPrice).map((row) => ({
+        title: row.title, branch: row.branch || '', dates: row.dates || '', cash: row.cash, twelveMonths: row.twelveMonths
+      }))
+    };
+  }
+
+  function lookups(data) {
+    return {
+      items: new Map(((data.bannerData && data.bannerData.items) || []).map((item) => [key(item.itemCode), item])),
+      specsMap: data.specsMap || {}
+    };
+  }
+
   function build(data) {
     const rows = (data.recoTableData || []).map((row) => ({
       branch: clean(row.BR || row.Branch),
@@ -34,37 +71,11 @@
       item: clean(row['ITEM DESCRIPTION'])
     })).filter((row) => row.branch && row.item);
 
-    const items = new Map(((data.bannerData && data.bannerData.items) || []).map((item) => [key(item.itemCode), item]));
-    const specsMap = data.specsMap || {};
+    const { items, specsMap } = lookups(data);
     const laptops = {};
     rows.forEach((row) => {
       const id = key(row.item);
-      if (laptops[id]) return;
-      const item = items.get(id) || null;
-      const lower = row.item.toLowerCase();
-      const spec = specsMap[lower] || specsMap[lower.replace(/^lap[-_\s]*/, '')] || null;
-      const guide = (item && item.specs) || {};
-      laptops[id] = {
-        model: modelName(item && item.brandModel) || modelName(spec && spec.title) || row.item,
-        partNumber: clean(spec && spec.modelCode),
-        picture: (spec && spec.image) || '',
-        brandLogo: (item && item.brandPicture) || '',
-        specs: {
-          Processor: clean(guide.PROCESSOR) || clean(spec && spec.cpu),
-          Graphics: clean(guide.GRAPHICS) || clean(spec && spec.graphics),
-          Storage: clean(guide.STORAGE) || clean(spec && spec.storage),
-          Memory: clean(guide.MEMORY) || clean(spec && spec.memory),
-          Resolution: clean(guide.RESOLUTION) || clean(spec && spec.resolution),
-          OS: clean(guide.OS)
-        },
-        prices: price(item),
-        branchPrices: Object.fromEntries(Object.entries((item && item.branchPrices) || {})
-          .map(([branch, view]) => [key(branch), price(view)]).filter(([, view]) => view)),
-        // Every NEW PRICING row of the laptop, for the promo picker on its card (flyer-promos.js).
-        promoRows: ((item && item.promoRows) || []).filter((row) => row.hasPrice).map((row) => ({
-          title: row.title, branch: row.branch || '', dates: row.dates || '', cash: row.cash, twelveMonths: row.twelveMonths
-        }))
-      };
+      if (!laptops[id]) laptops[id] = laptopEntry(row.item, items, specsMap);
     });
 
     return {
@@ -78,10 +89,33 @@
     };
   }
 
+  // The Reco Table's customer (reco-customer.js): { name, hierarchy, segment, laptops: { exceed, meet, budget },
+  // apps }. The flyer shows a "Prepared for" section at the top while a name is entered; the three laptops are sent
+  // with it (they may not be in RECO TABLE).
+  let lastData = null;
+  let customer = null;
+  function customerMessage() {
+    const laptops = {};
+    if (customer && lastData) {
+      const { items, specsMap } = lookups(lastData);
+      Object.values(customer.laptops || {}).filter(Boolean).forEach((itemCode) => {
+        laptops[key(itemCode)] = laptopEntry(itemCode, items, specsMap);
+      });
+    }
+    return { channel: 'saleskit-flyer-customer', customer, laptops };
+  }
+
+  window.updateFlyerCustomer = function (next) {
+    customer = next || null;
+    send(customerMessage());
+  };
+
   // Called by the page whenever SalesKit data is loaded or refreshed.
   window.updateFlyerPage = function (data) {
-    latest = build(data || {});
+    lastData = data || {};
+    latest = build(lastData);
     send(latest);
+    send(customerMessage());
     if (refreshTimer) {
       clearTimeout(refreshTimer);
       refreshTimer = null;
@@ -115,6 +149,7 @@
     const { channel } = event.data;
     if (channel === 'saleskit-flyer-ready') {
       if (latest) send(latest);
+      send(customerMessage());
     } else if (channel === 'saleskit-flyer-image') {
       const url = await savedPicture(String(event.data.url || ''));
       send({ channel: 'saleskit-flyer-image', requestId: event.data.requestId, url });

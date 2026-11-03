@@ -19,6 +19,7 @@
   <script src="./node_modules/html2canvas/dist/html2canvas.min.js"></script>
   <script src="./node_modules/jspdf/dist/jspdf.umd.min.js"></script>
   <script src="./flyer-promos.js"></script>
+  <script src="./flyer-customer.js"></script>
   <style>
   :root {
     /* Fonts (offline: the system sans-serif) */
@@ -998,7 +999,12 @@ body.is-loading { overflow: hidden; }
     } else if (!sections.length) {
       el("sections").innerHTML = '<div class="flyer-empty">No recommendations in RECO TABLE for ' + esc(branch) + ".</div>";
     } else {
-      el("sections").innerHTML = sections.map(function (section, i) {
+      // The Reco Table's customer first (flyer-customer.js), in its segment's colour; then the branch's markets.
+      var colourIndex = function (title) {
+        var i = TARGET_MARKET_ORDER.findIndex(function (m) { return norm(m) === norm(title); });
+        return i === -1 ? 0 : i;
+      };
+      el("sections").innerHTML = FlyerCustomer.html(cardHtml, colourIndex) + sections.map(function (section, i) {
         var cls = " s" + (i % 5);
         return '<div class="banner' + cls + '" id="market-' + i + '"><span>' + esc(section.title) + "</span></div>" +
           '<div class="row' + cls + '">' + section.slots.map(cardHtml).join("") + "</div>";
@@ -1033,10 +1039,14 @@ body.is-loading { overflow: hidden; }
     Array.from(document.querySelectorAll("#sections .card")).forEach(function (card) {
       if (card.querySelector(".photo img.failed")) failed[card.querySelector(".model").textContent] = true;
     });
-    sections.forEach(function (section, i) {
+    // The customer's section (Reco Table) is checked too; its market id is "cust".
+    var checked = (FlyerCustomer.section() ? [FlyerCustomer.section()] : [])
+      .concat(sections.map(function (section, i) { return { title: section.title, slots: section.slots, market: i }; }));
+    checked.forEach(function (section) {
+      var i = section.market;
       section.slots.forEach(function (model, s) {
         if (!model) {
-          checks.slots.items.push({ market: i, name: section.title + " · " + SLOT_TAGS[s] });
+          checks.slots.items.push({ market: i, name: (i === "cust" ? "Customer · " : "") + section.title + " · " + SLOT_TAGS[s] });
           return;
         }
         count++;
@@ -1158,6 +1168,12 @@ body.is-loading { overflow: hidden; }
       el("branchField").style.display = branches.length || data.homeBranch ? "" : "none";
       updateBranchButton();
       showBranchFlyer();
+    } else if (m.channel === "saleskit-flyer-customer") {
+      // The Reco Table's customer, segment, laptops and applications (flyer-customer.js): redrawn at once
+      // (pictures are already saved, so no loading screen).
+      FlyerCustomer.set(m.customer, m.laptops, data.laptops);
+      render();
+      fillPictures(el("sections"));
     } else if (m.channel === "saleskit-flyer-status") {
       el("flyerStatus").textContent = m.message || "";
       el("reload").disabled = !!m.busy;
