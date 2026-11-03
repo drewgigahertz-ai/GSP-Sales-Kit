@@ -16,6 +16,7 @@
         ['Ctrl + Shift + L', 'Location'],
         ['Ctrl + Shift + R', 'Recommendation'],
         ['Ctrl + Shift + E / M / B', 'Exceed / Meet / Budget laptop'],
+        ['Ctrl + Shift + N', 'Customer name'],
         ['Ctrl + Shift + C', 'Copy Details'],
         ['Ctrl + Shift + P', 'Present'],
         ['Ctrl + D', 'Download Result'],
@@ -55,6 +56,7 @@
         ['Ctrl + Shift + B', 'Branch'],
         ['Ctrl + Shift + C', 'Contact No.'],
         ['Ctrl + Shift + L', 'Look for'],
+        ['Ctrl + Shift + N', 'Customer name'],
         ['Ctrl + D', 'Download (PDF or PNG)'],
         ['Ctrl + P', 'Print'],
         ['Ctrl + R', 'Refresh data']

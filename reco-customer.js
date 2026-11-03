@@ -64,7 +64,7 @@
     <label class="filter-label" for="customerNameInput"><i class="bi bi-person"></i> CUSTOMER NAME</label>
     <div class="customer-name-wrap">
       <input type="text" class="form-control form-control-sm" id="customerNameInput" placeholder="e.g. Juan Dela Cruz"
-        autocomplete="off" spellcheck="false" maxlength="60" title="Shown at the top of the flyer (Flyers tab)">
+        autocomplete="off" spellcheck="false" maxlength="60" title="Shown at the top of the flyer (Flyers tab) (Ctrl+Shift+N)">
       <button type="button" class="customer-name-clear" id="customerNameClear" title="Clear the name" aria-label="Clear the name" hidden>
         <i class="bi bi-x-lg" aria-hidden="true"></i>
       </button>

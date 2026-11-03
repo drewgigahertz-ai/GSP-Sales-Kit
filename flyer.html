@@ -646,7 +646,7 @@ body.is-loading { overflow: hidden; }
   <div class="filter-step">
     <span class="search-label"><span class="step-number">2</span>Contact details</span>
     <label class="field-label" for="customerInput">Customer name</label>
-    <input id="customerInput" class="side-input" type="text" placeholder="e.g. Maria Santos" autocomplete="off" maxlength="60" title="Prepared for (same as Customer name on the Reco Table)">
+    <input id="customerInput" class="side-input" type="text" placeholder="e.g. Maria Santos" autocomplete="off" maxlength="60" title="Prepared for (same as Customer name on the Reco Table) (Ctrl+Shift+N)">
     <div id="customerApps"></div>
     <label class="field-label" for="contactInput">Contact No.</label>
     <input id="contactInput" class="side-input" type="text" placeholder="e.g. 0917 123 4567" autocomplete="off" title="Contact No. (Ctrl+Shift+C)">
@@ -1295,7 +1295,7 @@ body.is-loading { overflow: hidden; }
     if (on) el("wrap").scrollTop = 0;
   }
 
-  // ---------- Keys: Ctrl+1–4 switch SalesKit tabs; Ctrl+Shift+B / C / L branch, contact, look for; ? shows the shortcuts ----------
+  // ---------- Keys: Ctrl+1–4 switch SalesKit tabs; Ctrl+Shift+B / C / L / N branch, contact, look for, customer name; ? shows the shortcuts ----------
   function focusField(id) { var f = el(id); f.focus(); f.select(); }
   document.addEventListener("keydown", function (e) {
     var ctrl = e.ctrlKey || e.metaKey;
@@ -1312,6 +1312,7 @@ body.is-loading { overflow: hidden; }
     else if (e.shiftKey && e.code === "KeyB") { e.preventDefault(); openBranch(); }
     else if (e.shiftKey && e.code === "KeyC") { e.preventDefault(); focusField("contactInput"); }
     else if (e.shiftKey && e.code === "KeyL") { e.preventDefault(); focusField("lookInput"); }
+    else if (e.shiftKey && e.code === "KeyN") { e.preventDefault(); focusField("customerInput"); }
   });
 
   // A picture that cannot be shown is left blank (no broken-image icon on the flyer).

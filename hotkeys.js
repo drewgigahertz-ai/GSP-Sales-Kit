@@ -3,7 +3,7 @@
 //   Ctrl+Shift+A Application selection · Ctrl+Shift+R Recommendation selection · Ctrl+Shift+P Present
 //   Ctrl+D or Ctrl+Shift+D Download (Result on the Reco Table, Image on Sales Kit)
 //   Reco Table only: Ctrl+Shift+L Location selection · Ctrl+Shift+C Copy Details · Ctrl+R Refresh Data
-//     Ctrl+Shift+E / M / B the Exceed / Meet / Budget laptop list
+//     Ctrl+Shift+E / M / B the Exceed / Meet / Budget laptop list · Ctrl+Shift+N Customer name
 //   Sales Kit only: Alt+1 Applications tab · Alt+2 Features tab · Ctrl+Shift+S that tab's selector
 // In the presentation, Ctrl+1 / Ctrl+2 / Ctrl+3 switch to its Reco Table / Applications / Features tab instead,
 // and Ctrl+Shift+S opens the application / feature list; the other shortcuts are paused there (it has its own keys:
@@ -67,6 +67,14 @@
     if (typeof toggleProductMenu === 'function') toggleProductMenu(tier);
   }
 
+  // Reco Table: the Customer name box (reco-customer.js), with its text selected so a new name replaces it.
+  function focusCustomerName() {
+    const input = document.getElementById('customerNameInput');
+    if (!input) return;
+    input.focus();
+    input.select();
+  }
+
   // Download Result (Reco Table) or Download Image (Sales Kit).
   function download() {
     click(page() === 'saleskit' ? 'btnDownloadSalesKit' : 'btnDownloadReco');
@@ -93,6 +101,7 @@
     { ctrl: true, shift: true, code: 'KeyE', pages: RECO, label: 'Exceed laptop', run: () => openTier('exceed') },
     { ctrl: true, shift: true, code: 'KeyM', pages: RECO, label: 'Meet laptop', run: () => openTier('meet') },
     { ctrl: true, shift: true, code: 'KeyB', pages: RECO, label: 'Budget laptop', run: () => openTier('budget') },
+    { ctrl: true, shift: true, code: 'KeyN', pages: RECO, label: 'Customer name', run: focusCustomerName },
     { ctrl: false, alt: true, shift: false, code: 'Digit1', pages: SALESKIT, label: 'Applications tab', run: () => switchSalesKitSubTab('apps') },
     { ctrl: false, alt: true, shift: false, code: 'Digit2', pages: SALESKIT, label: 'Features tab', run: () => switchSalesKitSubTab('features') },
     { ctrl: true, shift: true, code: 'KeyS', pages: SALESKIT, label: 'Applications / Features selection', run: openSalesKitSelector }
