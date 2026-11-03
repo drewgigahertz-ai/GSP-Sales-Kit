@@ -598,7 +598,7 @@ body.is-loading { overflow: hidden; }
     #app, #main, #wrap { display: block; height: auto; overflow: visible; background: #fff; }
     #side, #bar, .no-print, .add-wrap, .banner .rm, h1, title { display: none !important; }
     .stage { padding: 0; overflow: visible; }
-    .sheet { width: auto; margin: 0; padding: 0; box-shadow: none; }
+    .sheet { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
     #loader { display: none !important; }
     .dl-overlay { display: none !important; }
   }
@@ -1227,15 +1227,21 @@ body.is-loading { overflow: hidden; }
     var usableMm = 297 - MARGIN_TOP - MARGIN_BOTTOM;
     var slicePx = Math.floor(canvas.width * usableMm / 210);
     var points = getBreakPoints(scale);
+    // The sheet is at least one A4 tall; the blank space below the footer is not content, so a short flyer
+    // (e.g. Customer section only) stays on one page instead of its footer going alone to a second one.
+    var sheet = el("sheet");
+    var footEnd = (document.querySelector(".foot").getBoundingClientRect().bottom - sheet.getBoundingClientRect().top +
+      parseFloat(getComputedStyle(sheet).paddingBottom)) * scale;
+    var end = Math.min(canvas.height, Math.ceil(footEnd));
     var cuts = [0], start = 0;
-    while (canvas.height - start > slicePx) {
+    while (end - start > slicePx) {
       var limit = start + slicePx;
       var cut = points.filter(function (p) { return p > start + 1 && p <= limit; }).pop();
       if (!cut) cut = limit;
       cuts.push(cut);
       start = cut;
     }
-    cuts.push(canvas.height);
+    cuts.push(end);
     return cuts;
   }
 
