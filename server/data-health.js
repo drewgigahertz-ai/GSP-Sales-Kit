@@ -1,7 +1,9 @@
 // Data health (Data health tab): sheet problems that silently break what SalesKit shows, checked after each sync.
-//   1. Recommended laptops (RECO TABLE, DB sheet) missing from LAPTOP RAW or BANNER SPECS: no price, logo or OS.
-//   2. The same item twice in SPECS with different prices.
-//   3. Recommended laptops with no picture (SPECS Image URL) or no OS (BANNER SPECS).
+//   1. Recommended laptops (RECO TABLE, DB sheet) missing from LAPTOP DATABASE (GST PRICING), where the Flyers
+//      take each laptop's name, part number and specs.
+//   2. Recommended laptops marked END OF LIFE / EOL in LAPTOP DATABASE.
+//   3. The same item twice in SPECS with different prices.
+//   4. Recommended laptops with no picture (SPECS Image URL) or no OS (LAPTOP DATABASE).
 // Each problem names the sheet (and row, where the sheet has one) to fix.
 const { matchKey } = require('../electron/banner-data');
 
@@ -20,13 +22,14 @@ function buildDataHealth(getRows) {
   const recoRows = getRows('reco_table');
   const dbRows = getRows('reco_db');
   const specRows = getRows('specs');
-  const laptopKeys = new Set(getRows('banner_laptops').map((row) => matchKey(row.item_code)));
-  const bannerSpecs = new Map();
-  for (const row of getRows('banner_specs')) {
-    const key = matchKey(row.item_code);
-    if (!bannerSpecs.has(key)) bannerSpecs.set(key, new Set());
-    if (text(row.value)) bannerSpecs.get(key).add(String(row.guide || '').toUpperCase());
+  // LAPTOP DATABASE by item (the first row of a laptop listed twice), with its sheet row.
+  const laptopDatabase = new Map();
+  for (const row of getRows('laptop_database')) {
+    const key = matchKey(row.item);
+    if (key && !laptopDatabase.has(key)) laptopDatabase.set(key, { row: sheetRow(row), os: text(row.os), eol: text(row.eol_status) });
   }
+  // Before the first sync that reads LAPTOP DATABASE, nothing is reported against it.
+  const laptopDatabaseSynced = laptopDatabase.size > 0;
   const priced = new Set(getRows('banner_prices')
     .filter((row) => text(row.twelve_months) || text(row.cash))
     .map((row) => matchKey(row.item_code)));
@@ -57,24 +60,25 @@ function buildDataHealth(getRows) {
     specsByItem.get(key).rows.push({ row: sheetRow(row), price: text(row.PRICE), image: text(row['Image URL']) });
   }
 
-  // 1. Missing from LAPTOP RAW or BANNER SPECS.
+  // 1. Missing from LAPTOP DATABASE. 2. End of life.
   const missing = [];
-  // 3. No picture / no OS.
+  const endOfLife = [];
+  // 4. No picture / no OS.
   const noPicture = [];
   const noOs = [];
   for (const [key, entry] of recommended) {
-    const inRaw = laptopKeys.has(key);
-    const guides = bannerSpecs.get(key);
-    if (!inRaw || !guides) {
-      missing.push({ item: entry.item, laptopRaw: inRaw, bannerSpecs: Boolean(guides), hasPrice: priced.has(key), usedIn: usedIn(entry) });
+    const listed = laptopDatabase.get(key);
+    if (laptopDatabaseSynced && !listed) missing.push({ item: entry.item, hasPrice: priced.has(key), usedIn: usedIn(entry) });
+    if (listed && /^(END OF LIFE|EOL)$/.test(listed.eol)) {
+      endOfLife.push({ item: entry.item, where: `LAPTOP DATABASE row ${listed.row}: ${listed.eol}`, usedIn: usedIn(entry) });
     }
     const specs = specsByItem.get(key);
     if (!specs) noPicture.push({ item: entry.item, where: 'Not in SPECS', usedIn: usedIn(entry) });
     else if (!specs.rows.some((row) => row.image)) {
       noPicture.push({ item: entry.item, where: `SPECS row ${specs.rows.map((row) => row.row).filter(Boolean).join(', ')}: no Image URL`, usedIn: usedIn(entry) });
     }
-    // Missing from BANNER SPECS altogether is already in group 1.
-    if (guides && !guides.has('OS')) noOs.push({ item: entry.item, where: 'BANNER SPECS: no OS row', usedIn: usedIn(entry) });
+    // Missing from LAPTOP DATABASE altogether is already in group 1.
+    if (listed && !listed.os) noOs.push({ item: entry.item, where: `LAPTOP DATABASE row ${listed.row}: no OS`, usedIn: usedIn(entry) });
   }
 
   // 2. Same item twice in SPECS with different prices.
@@ -86,15 +90,17 @@ function buildDataHealth(getRows) {
   }
 
   const byItem = (a, b) => a.item.localeCompare(b.item);
-  [missing, duplicates, noPicture, noOs].forEach((list) => list.sort(byItem));
+  [missing, endOfLife, duplicates, noPicture, noOs].forEach((list) => list.sort(byItem));
   return {
     checkedAt: new Date().toISOString(),
     recommendedCount: recommended.size,
+    laptopDatabaseSynced,
     missing,
+    endOfLife,
     duplicates,
     noPicture,
     noOs,
-    total: missing.length + duplicates.length + noPicture.length + noOs.length
+    total: missing.length + endOfLife.length + duplicates.length + noPicture.length + noOs.length
   };
 }
 

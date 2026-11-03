@@ -291,13 +291,30 @@ function renderHealth(report) {
   healthCount('healthMissingCount', report.missing.length);
   const missingRows = $('healthMissingRows');
   missingRows.replaceChildren();
-  if (!report.missing.length) healthEmpty(missingRows, 6, 'Every recommended laptop is in LAPTOP RAW and BANNER SPECS.');
+  if (!report.missing.length) {
+    healthEmpty(missingRows, 4, report.laptopDatabaseSynced
+      ? 'Every recommended laptop is in LAPTOP DATABASE.'
+      : 'LAPTOP DATABASE has not been synced yet (it is read from the pricing spreadsheet at the next sync).');
+  }
   report.missing.forEach((entry) => {
     const tr = missingRows.insertRow();
     tr.insertCell().textContent = entry.item;
-    healthFlag(tr.insertCell(), entry.laptopRaw, 'Listed', 'Missing');
-    healthFlag(tr.insertCell(), entry.bannerSpecs, 'Listed', 'Missing');
     healthFlag(tr.insertCell(), entry.hasPrice, 'Has a price', 'No price');
+    const used = tr.insertCell();
+    used.className = 'muted-small';
+    used.textContent = entry.usedIn;
+    healthCopyCell(tr, entry.item);
+  });
+
+  const endOfLife = report.endOfLife || [];
+  healthCount('healthEolCount', endOfLife.length);
+  const eolRows = $('healthEolRows');
+  eolRows.replaceChildren();
+  if (!endOfLife.length) healthEmpty(eolRows, 4, 'No recommended laptop is marked end of life.');
+  endOfLife.forEach((entry) => {
+    const tr = eolRows.insertRow();
+    tr.insertCell().textContent = entry.item;
+    tr.insertCell().textContent = entry.where;
     const used = tr.insertCell();
     used.className = 'muted-small';
     used.textContent = entry.usedIn;
