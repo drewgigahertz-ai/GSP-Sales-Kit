@@ -24,7 +24,10 @@ const { USABILITY_SHEET, USABILITY_DV_SHEET, USABILITY_DV_RANGE, usabilityCollec
 const { BRANCH_DETAILS_RANGE, branchDetailsCollection } = require('./branch-details');
 const { RECO_DB_SHEET, RECO_DB_RANGE, recoDbCollection } = require('./reco-db');
 const { readPriceMatrix } = require('./price-matrix');
-const { LAPTOP_DATABASE_SHEET, LAPTOP_DATABASE_RANGE, laptopDatabaseCollection, bannerSpecsCollection } = require('./laptop-database');
+const {
+  LAPTOP_DATABASE_SHEET, LAPTOP_DATABASE_RANGE, UKSP_ICON_SHEET, UKSP_ICON_RANGE,
+  parseLaptopDb, laptopDatabaseCollection, bannerSpecsCollection, bannerLaptopsCollection
+} = require('./laptop-database');
 
 function collectionName(sheetName) {
   return sheetName.toLowerCase().trim().replace(/[\/\s]+/g, '_');
@@ -154,9 +157,11 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
       onProgress({ phase: 'warning', message: `Pricing spreadsheet could not be read (${error.message}); using the main spreadsheet.` });
     }
   }
-  // Laptop specs (see laptop-database.js): LAPTOP DB gives the Flyers page its names and specs, and the Banner page
-  // its specs in place of BANNER SPECS (still read when LAPTOP DB is missing or empty).
-  let laptopDbValues = null;
+  // Laptops (see laptop-database.js): LAPTOP DB is the Banner page's list and specs (in place of LAPTOP RAW and
+  // BANNER SPECS, with KSP pictures from UKSP ICON), and the Flyers page's names and specs. While it is still loading
+  // none of these are synced, so the last synced laptops stay; LAPTOP RAW and BANNER SPECS are read only when there
+  // is no LAPTOP DB tab.
+  let laptopDb = null;
   const laptopDatabaseTitle = titles.find((name) => name.trim().toUpperCase() === LAPTOP_DATABASE_SHEET);
   if (laptopDatabaseTitle) {
     const response = await sheets.spreadsheets.values.get({
@@ -164,13 +169,29 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
       range: `'${laptopDatabaseTitle.replace(/'/g, "''")}'!${LAPTOP_DATABASE_RANGE}`,
       valueRenderOption: 'FORMATTED_VALUE'
     });
-    result.laptop_database = laptopDatabaseCollection(response.data.values || []);
-    if (result.laptop_database.rows.length) laptopDbValues = response.data.values;
+    try {
+      laptopDb = parseLaptopDb(response.data.values || []);
+    } catch (error) {
+      onProgress({ phase: 'warning', message: `${error.message}; the last synced laptops are kept.` });
+    }
+  }
+  if (laptopDb) {
+    const iconTitle = titles.find((name) => name.trim().toUpperCase() === UKSP_ICON_SHEET);
+    const icons = iconTitle
+      ? (await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `'${iconTitle.replace(/'/g, "''")}'!${UKSP_ICON_RANGE}`,
+        valueRenderOption: 'FORMATTED_VALUE'
+      })).data.values || []
+      : [];
+    result.laptop_database = laptopDatabaseCollection(laptopDb);
+    result.banner_laptops = bannerLaptopsCollection(laptopDb, icons);
+    result.banner_specs = bannerSpecsCollection(laptopDb);
   }
 
   const bannerValues = {};
   for (const sheetName of Object.values(BANNER_SHEETS)) {
-    if (laptopDbValues && sheetName === BANNER_SHEETS.banner_specs) continue;
+    if (laptopDatabaseTitle && (sheetName === BANNER_SHEETS.banner_laptops || sheetName === BANNER_SHEETS.banner_specs)) continue;
     // Prices: from the matrix itself; NEW PRICING (its IMPORTRANGE copy) only when the matrix cannot be read.
     if (sheetName === BANNER_SHEETS.banner_prices && priceMatrixSpreadsheetId) {
       try {
@@ -198,7 +219,6 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
     onProgress({ phase: 'sheets', completed: SHEETS.length, total: SHEETS.length, sheet: sheetName });
   }
   Object.assign(result, normalizeBannerSheets(bannerValues));
-  if (laptopDbValues) result.banner_specs = bannerSpecsCollection(laptopDbValues);
 
   // Feature banners by short name (see feature-banners.js); skipped like the Banner sheets when missing.
   const featuresBannerTitle = titles.find((name) => name.trim().toUpperCase() === FEATURES_BANNER_SHEET);

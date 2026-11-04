@@ -8,7 +8,7 @@ const { buildBannerData, matchKey } = require('./banner-data');
 const { createFeatureBannerResolver } = require('./feature-banners');
 const { createUsabilityLookup } = require('./app-usability');
 const { makeBranchDetails } = require('./branch-details');
-const { makeLaptopDatabase } = require('./laptop-database');
+const { makeLaptopDatabase, specsRowsFromLaptopDb } = require('./laptop-database');
 
 const SHEET_TABLES = new Set([
   'banner_laptops',
@@ -495,7 +495,8 @@ function getInitialData() {
   }, normalizeImageUrl);
   const priceByItem = new Map(bannerData.items.filter((item) => item.hasPrice && item.cash !== null)
     .map((item) => [matchKey(item.itemCode), item.cash]));
-  const specRows = getRows('specs');
+  // Each laptop's picture, model, part number and specs: LAPTOP DB (spec ranks, and laptops not in it, still SPECS).
+  const specRows = specsRowsFromLaptopDb(getRows('laptop_database'), getRows('specs'));
   const { specsMap, specsBySku } = makeSpecsMap(specRows, priceByItem);
   const applicationMatrix = makeApplicationMatrix(getRows('dv_transposed'));
   const criteriaSegmentData = makeCriteriaData(

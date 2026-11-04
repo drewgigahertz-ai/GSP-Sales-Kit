@@ -3,7 +3,8 @@
 //      take each laptop's name, part number and specs.
 //   2. Recommended laptops marked END OF LIFE / EOL in LAPTOP DB.
 //   3. The same item twice in SPECS with different prices.
-//   4. Recommended laptops with no picture (SPECS Image URL) or no OS (LAPTOP DB).
+//   4. Recommended laptops with no picture (LAPTOP DB, else SPECS Image URL) or no OS (LAPTOP DB), and KSP names in
+//      LAPTOP DB with no picture in UKSP ICON.
 //   5. Prices not read from the price matrix (a header renamed, access removed): NEW PRICING was used instead.
 // Each problem names the sheet (and row, where the sheet has one) to fix.
 const { matchKey } = require('../electron/banner-data');
@@ -29,7 +30,7 @@ function buildDataHealth(getRows, { priceSource = null } = {}) {
   const laptopDatabase = new Map();
   for (const row of getRows('laptop_database')) {
     const key = matchKey(row.item);
-    if (key && !laptopDatabase.has(key)) laptopDatabase.set(key, { row: sheetRow(row), os: text(row.os), eol: text(row.eol_status) });
+    if (key && !laptopDatabase.has(key)) laptopDatabase.set(key, { row: sheetRow(row), os: text(row.os), eol: text(row.eol_status), picture: text(row.picture) });
   }
   // Before the first sync that reads LAPTOP DB, nothing is reported against it.
   const laptopDatabaseSynced = laptopDatabase.size > 0;
@@ -75,14 +76,28 @@ function buildDataHealth(getRows, { priceSource = null } = {}) {
     if (listed && /^(END OF LIFE|EOL)$/.test(listed.eol)) {
       endOfLife.push({ item: entry.item, where: `LAPTOP DB row ${listed.row}: ${listed.eol}`, usedIn: usedIn(entry) });
     }
+    // The picture: LAPTOP DB (column before ITEM DESCRIPTION), else SPECS' Image URL.
     const specs = specsByItem.get(key);
-    if (!specs) noPicture.push({ item: entry.item, where: 'Not in SPECS', usedIn: usedIn(entry) });
-    else if (!specs.rows.some((row) => row.image)) {
-      noPicture.push({ item: entry.item, where: `SPECS row ${specs.rows.map((row) => row.row).filter(Boolean).join(', ')}: no Image URL`, usedIn: usedIn(entry) });
+    if (!(listed && listed.picture) && !(specs && specs.rows.some((row) => row.image))) {
+      noPicture.push({ item: entry.item, where: listed ? `LAPTOP DB row ${listed.row}: no picture` : 'Not in LAPTOP DB', usedIn: usedIn(entry) });
     }
     // Missing from LAPTOP DB altogether is already in group 1.
     if (listed && !listed.os) noOs.push({ item: entry.item, where: `LAPTOP DB row ${listed.row}: no OS`, usedIn: usedIn(entry) });
   }
+
+  // KSP names with no picture for the Banner's feature row (UKSP ICON, else DB PHOTOS' spec pictures), with how many
+  // laptops have them.
+  const specPictures = new Set(getRows('banner_photos').filter((row) => row.kind === 'spec' && text(row.link)).map((row) => matchKey(row.name)));
+  const kspsWithoutIcon = new Map();
+  for (const row of getRows('banner_laptops')) {
+    for (const n of [1, 2, 3, 4]) {
+      const name = text(row[`uksp${n}`]);
+      if (name && !text(row[`uksp${n}_pic`]) && !specPictures.has(matchKey(name))) kspsWithoutIcon.set(name, (kspsWithoutIcon.get(name) || 0) + 1);
+    }
+  }
+  const noIcon = laptopDatabaseSynced
+    ? [...kspsWithoutIcon].map(([name, count]) => ({ item: name, where: 'UKSP ICON: no picture for this name', usedIn: `KSP of ${count} laptop${count === 1 ? '' : 's'}` }))
+    : [];
 
   // 2. Same item twice in SPECS with different prices.
   const duplicates = [];
@@ -100,7 +115,7 @@ function buildDataHealth(getRows, { priceSource = null } = {}) {
   }
 
   const byItem = (a, b) => a.item.localeCompare(b.item);
-  [missing, endOfLife, duplicates, noPicture, noOs].forEach((list) => list.sort(byItem));
+  [missing, endOfLife, duplicates, noPicture, noOs, noIcon].forEach((list) => list.sort(byItem));
   return {
     checkedAt: new Date().toISOString(),
     recommendedCount: recommended.size,
@@ -110,8 +125,9 @@ function buildDataHealth(getRows, { priceSource = null } = {}) {
     duplicates,
     noPicture,
     noOs,
+    noIcon,
     priceMatrix,
-    total: priceMatrix.length + missing.length + endOfLife.length + duplicates.length + noPicture.length + noOs.length
+    total: priceMatrix.length + missing.length + endOfLife.length + duplicates.length + noPicture.length + noOs.length + noIcon.length
   };
 }
 
