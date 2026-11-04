@@ -5,7 +5,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const database = require('../electron/database');
-const { DEFAULT_SPREADSHEET_ID, DEFAULT_PRICING_SPREADSHEET_ID, fetchSpreadsheetData, fetchSheetValues } = require('../electron/sheets-sync');
+const { DEFAULT_SPREADSHEET_ID, DEFAULT_PRICING_SPREADSHEET_ID, fetchSpreadsheetData, fetchSheetValues, fetchPriceMatrixValues } = require('../electron/sheets-sync');
+const { DEFAULT_PRICE_MATRIX_SPREADSHEET_ID } = require('../electron/price-matrix');
 const { createLocalApi } = require('../electron/local-api');
 const { createDeviceRegistry, deviceKey } = require('./devices');
 const { createActivityLog } = require('./activity');
@@ -89,6 +90,9 @@ function loadSettings() {
     spreadsheetId: saved?.spreadsheetId || process.env.SALESKIT_SPREADSHEET_ID || DEFAULT_SPREADSHEET_ID,
     // NEW PRICING's own spreadsheet; blank = the NEW PRICING tab of the main spreadsheet.
     pricingSpreadsheetId: typeof saved?.pricingSpreadsheetId === 'string' ? saved.pricingSpreadsheetId : DEFAULT_PRICING_SPREADSHEET_ID,
+    // NEW PRICING MATRIX V3's spreadsheet, where prices are edited: all prices come from it (see price-matrix.js);
+    // blank = NEW PRICING above.
+    priceMatrixSpreadsheetId: typeof saved?.priceMatrixSpreadsheetId === 'string' ? saved.priceMatrixSpreadsheetId : DEFAULT_PRICE_MATRIX_SPREADSHEET_ID,
     syncIntervalMinutes: Number(saved?.syncIntervalMinutes) || 15,
     port: Number(saved?.port) || DEFAULT_PORT,
     token: saved?.token || embedded.serverToken || crypto.randomBytes(24).toString('hex'),
@@ -146,6 +150,7 @@ function getState() {
     serviceAccountPath: settings.serviceAccountPath,
     spreadsheetId: settings.spreadsheetId,
     pricingSpreadsheetId: settings.pricingSpreadsheetId,
+    priceMatrixSpreadsheetId: settings.priceMatrixSpreadsheetId,
     priceChangeCount: priceWatch ? priceWatch.count() : 0,
     syncIntervalMinutes: settings.syncIntervalMinutes,
     autoStart: settings.autoStart,
@@ -178,9 +183,24 @@ function clientReleaseSummary() {
   };
 }
 
+// Where the prices came from at the last sync and price check: the matrix, or NEW PRICING when the matrix could not
+// be read ({ source, error }); shown on the Data health tab.
+let priceSource = { sync: null, watch: null };
+
+function noticePriceSource(kind, source, error = '') {
+  const previous = priceSource[kind];
+  priceSource[kind] = { source, error };
+  if (previous && previous.source === source && previous.error === error) return;
+  if (source === 'matrix') {
+    if (previous && previous.source !== 'matrix') log('success', `Prices (${kind === 'sync' ? 'sync' : 'price check'}): reading the price matrix again`);
+  } else if (settings.priceMatrixSpreadsheetId) {
+    log('warning', `Prices (${kind === 'sync' ? 'sync' : 'price check'}): price matrix not read (${error}); using NEW PRICING`);
+  }
+}
+
 function checkDataHealth() {
   try {
-    dataHealth = buildDataHealth(database.getRows);
+    dataHealth = buildDataHealth(database.getRows, { priceSource: settings.priceMatrixSpreadsheetId ? priceSource : null });
     if (dataHealth.total) log('warning', `Data health: ${dataHealth.total} sheet problem${dataHealth.total === 1 ? '' : 's'} to fix (see the Data health tab).`);
   } catch (error) {
     log('error', `Data health check failed: ${error.message}`);
@@ -395,8 +415,13 @@ async function runSync(reason) {
     const sheets = await fetchSpreadsheetData({
       credentialsPath: settings.serviceAccountPath,
       spreadsheetId: settings.spreadsheetId,
-      pricingSpreadsheetId: settings.pricingSpreadsheetId
+      pricingSpreadsheetId: settings.pricingSpreadsheetId,
+      priceMatrixSpreadsheetId: settings.priceMatrixSpreadsheetId
     }, (progress) => {
+      if (progress.phase === 'price-source') {
+        noticePriceSource('sync', progress.source, progress.error);
+        return;
+      }
       if (progress.phase === 'warning') {
         log('warning', progress.message);
         return;
@@ -453,6 +478,16 @@ function startPriceWatch() {
     filePath: path.join(app.getPath('userData'), 'price-changes.json'),
     readValues: async () => {
       if (!settings.serviceAccountPath || !fs.existsSync(settings.serviceAccountPath)) return [];
+      // The price matrix itself (changes get the minute they were made); NEW PRICING when it cannot be read.
+      if (settings.priceMatrixSpreadsheetId) {
+        try {
+          const values = await fetchPriceMatrixValues({ credentialsPath: settings.serviceAccountPath, spreadsheetId: settings.priceMatrixSpreadsheetId });
+          noticePriceSource('watch', 'matrix');
+          return values;
+        } catch (error) {
+          noticePriceSource('watch', 'new-pricing', error.message);
+        }
+      }
       return fetchSheetValues({ credentialsPath: settings.serviceAccountPath, spreadsheetId: settings.pricingSpreadsheetId || settings.spreadsheetId }, 'NEW PRICING');
     },
     onChange: announcePriceChange,
@@ -673,6 +708,11 @@ ipcMain.handle('server:update-settings', async (_event, changes = {}) => {
     if (id && !/^[\w-]{20,}$/.test(id)) throw new Error('Enter a valid pricing spreadsheet link or ID, or leave it blank.');
     settings.pricingSpreadsheetId = id;
   }
+  if (changes.priceMatrixSpreadsheetId !== undefined) {
+    const id = spreadsheetIdFrom(changes.priceMatrixSpreadsheetId);
+    if (id && !/^[\w-]{20,}$/.test(id)) throw new Error('Enter a valid price matrix spreadsheet link or ID, or leave it blank.');
+    settings.priceMatrixSpreadsheetId = id;
+  }
   if (changes.syncIntervalMinutes !== undefined) {
     const minutes = Number(changes.syncIntervalMinutes);
     if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440) throw new Error('Sync interval must be 1–1440 minutes.');
@@ -700,6 +740,7 @@ ipcMain.handle('server:update-settings', async (_event, changes = {}) => {
   if (settings.autoStart !== previous.autoStart) applyAutoStart();
   if (settings.spreadsheetId !== previous.spreadsheetId) log('info', 'Spreadsheet ID updated.');
   if (settings.pricingSpreadsheetId !== previous.pricingSpreadsheetId) log('info', 'Pricing spreadsheet updated.');
+  if (settings.priceMatrixSpreadsheetId !== previous.priceMatrixSpreadsheetId) log('info', 'Price matrix spreadsheet updated.');
   pushState();
   return getState();
 });

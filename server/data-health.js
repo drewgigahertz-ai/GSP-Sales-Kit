@@ -4,6 +4,7 @@
 //   2. Recommended laptops marked END OF LIFE / EOL in LAPTOP DB.
 //   3. The same item twice in SPECS with different prices.
 //   4. Recommended laptops with no picture (SPECS Image URL) or no OS (LAPTOP DB).
+//   5. Prices not read from the price matrix (a header renamed, access removed): NEW PRICING was used instead.
 // Each problem names the sheet (and row, where the sheet has one) to fix.
 const { matchKey } = require('../electron/banner-data');
 
@@ -18,7 +19,9 @@ function sheetRow(row) {
   return match ? Number(match[1]) : null;
 }
 
-function buildDataHealth(getRows) {
+// options.priceSource: { sync, watch }, each { source: 'matrix' | 'new-pricing', error } or null (see server/main.js);
+// null when no price matrix is set.
+function buildDataHealth(getRows, { priceSource = null } = {}) {
   const recoRows = getRows('reco_table');
   const dbRows = getRows('reco_db');
   const specRows = getRows('specs');
@@ -89,6 +92,13 @@ function buildDataHealth(getRows) {
     if (prices.size > 1) duplicates.push({ item: entry.item, rows: entry.rows.map(({ row, price }) => ({ row, price })) });
   }
 
+  // 5. The price matrix could not be read at the last sync or price check.
+  const priceMatrix = [];
+  for (const [kind, label] of [['sync', 'Sync'], ['watch', 'Price check']]) {
+    const read = priceSource && priceSource[kind];
+    if (read && read.source !== 'matrix') priceMatrix.push({ where: label, error: read.error || 'Not read' });
+  }
+
   const byItem = (a, b) => a.item.localeCompare(b.item);
   [missing, endOfLife, duplicates, noPicture, noOs].forEach((list) => list.sort(byItem));
   return {
@@ -100,7 +110,8 @@ function buildDataHealth(getRows) {
     duplicates,
     noPicture,
     noOs,
-    total: missing.length + endOfLife.length + duplicates.length + noPicture.length + noOs.length
+    priceMatrix,
+    total: priceMatrix.length + missing.length + endOfLife.length + duplicates.length + noPicture.length + noOs.length
   };
 }
 

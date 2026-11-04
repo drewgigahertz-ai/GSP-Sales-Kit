@@ -23,6 +23,7 @@ const { AGEING_BANNER_SHEET, ageingBannerCollection } = require('./ageing-banner
 const { USABILITY_SHEET, USABILITY_DV_SHEET, USABILITY_DV_RANGE, usabilityCollection, isUsabilityHeader } = require('./app-usability');
 const { BRANCH_DETAILS_RANGE, branchDetailsCollection } = require('./branch-details');
 const { RECO_DB_SHEET, RECO_DB_RANGE, recoDbCollection } = require('./reco-db');
+const { readPriceMatrix } = require('./price-matrix');
 const { LAPTOP_DATABASE_SHEET, LAPTOP_DATABASE_RANGE, laptopDatabaseCollection, bannerSpecsCollection } = require('./laptop-database');
 
 function collectionName(sheetName) {
@@ -78,9 +79,11 @@ function normalizeSheetValues(sheetName, values = []) {
   return { collection: collectionName(sheetName), columns, rows };
 }
 
-// pricingSpreadsheetId (optional): where the NEW PRICING tab is read from; the main spreadsheet is used when it
-// is empty or has no such tab.
-async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_SPREADSHEET_ID, pricingSpreadsheetId = '' }, onProgress = () => {}) {
+// priceMatrixSpreadsheetId (optional): the spreadsheet with NEW PRICING MATRIX V3, where prices are edited; read for
+// all prices (see price-matrix.js). pricingSpreadsheetId (optional): where the NEW PRICING tab is read from when the
+// matrix is not set or cannot be read; the main spreadsheet is used when it is empty or has no such tab.
+// onProgress also gets { phase: 'price-source', source: 'matrix' | 'new-pricing', error } once per sync.
+async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_SPREADSHEET_ID, pricingSpreadsheetId = '', priceMatrixSpreadsheetId = '' }, onProgress = () => {}) {
   if (!credentialsPath) throw new Error('Set GOOGLE_APPLICATION_CREDENTIALS to a Sheets API service-account JSON file.');
   if (!spreadsheetId) throw new Error('Set SALESKIT_SPREADSHEET_ID to the source spreadsheet ID.');
 
@@ -168,6 +171,18 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
   const bannerValues = {};
   for (const sheetName of Object.values(BANNER_SHEETS)) {
     if (laptopDbValues && sheetName === BANNER_SHEETS.banner_specs) continue;
+    // Prices: from the matrix itself; NEW PRICING (its IMPORTRANGE copy) only when the matrix cannot be read.
+    if (sheetName === BANNER_SHEETS.banner_prices && priceMatrixSpreadsheetId) {
+      try {
+        const values = await readPriceMatrix(sheets, priceMatrixSpreadsheetId);
+        if (values.length < 2) throw new Error('Price matrix has no rows');
+        bannerValues[sheetName] = values;
+        onProgress({ phase: 'price-source', source: 'matrix' });
+        continue;
+      } catch (error) {
+        onProgress({ phase: 'price-source', source: 'new-pricing', error: error.message });
+      }
+    }
     const pricingTitle = sheetName === BANNER_SHEETS.banner_prices
       ? pricingTitles.find((name) => name.trim().toUpperCase() === sheetName)
       : null;
@@ -245,6 +260,13 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
   return result;
 }
 
+// The price matrix laid out like NEW PRICING (see price-matrix.js), for the every-minute price check.
+async function fetchPriceMatrixValues({ credentialsPath, spreadsheetId }) {
+  const { google } = require('googleapis');
+  const auth = new google.auth.GoogleAuth({ keyFile: credentialsPath, scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'] });
+  return readPriceMatrix(google.sheets({ version: 'v4', auth, timeout: REQUEST_TIMEOUT_MS }), spreadsheetId);
+}
+
 // One sheet's values (A:Z), for the quick price check (see server/price-watch.js).
 async function fetchSheetValues({ credentialsPath, spreadsheetId = DEFAULT_SPREADSHEET_ID }, sheetName) {
   const { google } = require('googleapis');
@@ -258,4 +280,4 @@ async function fetchSheetValues({ credentialsPath, spreadsheetId = DEFAULT_SPREA
   return response.data.values || [];
 }
 
-module.exports = { DEFAULT_SPREADSHEET_ID, DEFAULT_PRICING_SPREADSHEET_ID, SHEETS, fetchSpreadsheetData, fetchSheetValues, normalizeSheetValues };
+module.exports = { DEFAULT_SPREADSHEET_ID, DEFAULT_PRICING_SPREADSHEET_ID, SHEETS, fetchSpreadsheetData, fetchSheetValues, fetchPriceMatrixValues, normalizeSheetValues };

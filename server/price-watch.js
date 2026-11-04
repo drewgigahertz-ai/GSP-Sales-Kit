@@ -1,4 +1,4 @@
-// Price-change watch: every minute the server reads only the NEW PRICING sheet and compares each laptop's
+// Price-change watch: every minute the server reads the prices (the price matrix, else NEW PRICING) and compares each laptop's
 // CASH PRICE, SRP and 12MOS (the "with bundle" columns H, I, J) with the last check. A difference becomes a
 // price-change event { id, at, changes: [...] }, which the server pushes to SalesKit laptops at once (see
 // /api/events in local-api.js). Events are kept for 30 days so a laptop that was off catches up when it connects.
@@ -17,6 +17,9 @@ const MIN_ROWS_SHARE = 0.9;
 const REMOVE_AFTER_MS = 15 * 60 * 1000;
 // More than half the rows new (or removed) at once is the sheet being reloaded, not price changes: taken in silently.
 const BULK_SHARE = 0.5;
+// A changed or new row is announced only when this many reads in a row show it the same, so a half-loaded read
+// (a price briefly blank or old) announces nothing. A price that turns blank is taken as still loading.
+const CONFIRM_READS = 2;
 
 // NEW PRICING rows → { key: { itemCode, branch, promoTitle, cash, srp, twelveMonths } }. key: item + branch + promo
 // title, so a laptop listed for several branches or promos is followed row by row.
@@ -59,6 +62,28 @@ function diff(before, after) {
 
 function pick(row) {
   return { cash: row.cash, srp: row.srp, twelveMonths: row.twelveMonths };
+}
+
+const samePrices = (a, b) => PRICE_FIELDS.every((field) => a[field] === b[field]);
+const laptopKey = (change) => `${matchKey(change.itemCode)}|${change.branch}`;
+
+// A promo renamed on the same laptop (one row removed, one added, same item and branch) is one change: the new
+// promo title, with previousPromoTitle (older SalesKit shows it as a price change of that row).
+function pairRenames(changes) {
+  const removed = changes.filter((change) => change.kind === 'removed');
+  const paired = new Map();
+  for (const change of changes) {
+    if (change.kind !== 'added') continue;
+    const match = removed.find((old) => !paired.has(old) && laptopKey(old) === laptopKey(change));
+    if (match) paired.set(match, change);
+  }
+  const renamedTo = new Map([...paired].map(([old, added]) => [added, old]));
+  return changes.filter((change) => !paired.has(change)).map((change) => {
+    const old = renamedTo.get(change);
+    return old
+      ? { kind: 'changed', itemCode: change.itemCode, branch: change.branch, promoTitle: change.promoTitle, previousPromoTitle: old.promoTitle, before: old.before, after: change.after }
+      : change;
+  });
 }
 
 // readValues(): the NEW PRICING values; onChange(event): called after a change is recorded; log(level, message).
@@ -106,18 +131,44 @@ function createPriceWatch({ filePath, readValues, onChange = () => {}, log = () 
         save();
         return null;
       }
+      // A price that turned blank is still loading: the row keeps its last prices.
+      const next = { ...snapshot };
+      for (const [key, row] of Object.entries(next)) {
+        const old = state.snapshot[key];
+        if (old && PRICE_FIELDS.some((field) => old[field] !== null && row[field] === null)) next[key] = old;
+      }
+      // A changed or new row waits until CONFIRM_READS reads in a row show the same prices.
+      const pending = {};
+      for (const [key, row] of Object.entries(next)) {
+        const old = state.snapshot[key];
+        if (old && samePrices(old, row)) continue;
+        const seen = state.pending && state.pending[key];
+        const count = seen && samePrices(seen, row) ? seen.count + 1 : 1;
+        if (count >= CONFIRM_READS) continue;
+        pending[key] = { ...pick(row), count };
+        if (old) next[key] = old;
+        else delete next[key];
+      }
+      state.pending = pending;
+      // A confirmed new row next to a missing row of the same laptop is a renamed promo: the old row goes now.
+      const renamed = new Set();
+      for (const [key, row] of Object.entries(next)) {
+        if (state.snapshot[key]) continue;
+        const oldKey = Object.keys(state.snapshot).find((candidate) => !snapshot[candidate] && !renamed.has(candidate)
+          && laptopKey(state.snapshot[candidate]) === laptopKey(row));
+        if (oldKey) renamed.add(oldKey);
+      }
       // Rows missing from this read stay known (with their last prices) until they have been gone for 15 minutes.
       const missing = {};
-      const next = { ...snapshot };
       for (const [key, row] of Object.entries(state.snapshot)) {
-        if (snapshot[key]) continue;
+        if (snapshot[key] || renamed.has(key)) continue;
         const since = (state.missing && state.missing[key]) || now;
         if (now - since < REMOVE_AFTER_MS) {
           next[key] = row;
           missing[key] = since;
         }
       }
-      const changes = diff(state.snapshot, next);
+      const changes = pairRenames(diff(state.snapshot, next));
       state.snapshot = next;
       state.missing = missing;
       const added = changes.filter((change) => change.kind === 'added').length;

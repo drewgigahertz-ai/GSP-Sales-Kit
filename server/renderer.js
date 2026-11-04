@@ -151,6 +151,7 @@ function renderSettings() {
   if (settingsDirty) return;
   $('spreadsheetId').value = state.spreadsheetId;
   $('pricingSpreadsheetId').value = state.pricingSpreadsheetId || '';
+  $('priceMatrixSpreadsheetId').value = state.priceMatrixSpreadsheetId || '';
   const interval = $('syncInterval');
   if (![...interval.options].some((option) => Number(option.value) === state.syncIntervalMinutes)) {
     interval.add(new Option(`${state.syncIntervalMinutes} minutes`, state.syncIntervalMinutes));
@@ -287,6 +288,16 @@ function renderHealth(report) {
     ? `${report.total} problem${report.total === 1 ? '' : 's'} to fix in the sheets`
     : 'No problems found';
   $('healthDetail').textContent = `${report.recommendedCount} recommended laptops checked · ${formatTime(report.checkedAt, true)} (${timeAgo(report.checkedAt)})`;
+
+  const priceMatrix = report.priceMatrix || [];
+  $('healthPricePanel').hidden = !priceMatrix.length;
+  $('healthPriceCount').textContent = priceMatrix.length;
+  $('healthPriceRows').replaceChildren(...priceMatrix.map((entry) => {
+    const tr = document.createElement('tr');
+    tr.insertCell().textContent = entry.where;
+    healthFlag(tr.insertCell(), false, '', entry.error);
+    return tr;
+  }));
 
   healthCount('healthMissingCount', report.missing.length);
   const missingRows = $('healthMissingRows');
@@ -1050,9 +1061,11 @@ function renderPriceRows() {
     item.className = 'price-item';
     item.textContent = change.itemCode;
     const details = document.createElement('small');
-    details.textContent = [change.promoTitle, change.branch ? `${change.branch} only` : ''].filter(Boolean).join(' · ');
+    // A renamed promo (server/price-watch.js pairRenames): old → new title.
+    const promo = change.previousPromoTitle ? `${change.previousPromoTitle} → ${change.promoTitle}` : change.promoTitle;
+    details.textContent = [promo, change.branch ? `${change.branch} only` : ''].filter(Boolean).join(' · ');
     item.appendChild(details);
-    tr.insertCell().textContent = KIND[change.kind] || change.kind;
+    tr.insertCell().textContent = change.previousPromoTitle ? 'Promo changed' : (KIND[change.kind] || change.kind);
     ['cash', 'srp', 'twelveMonths'].forEach((field) => tr.appendChild(priceCell(change, field)));
   });
   const total = priceEvents.reduce((count, event) => count + event.changes.length, 0);
@@ -1155,6 +1168,7 @@ $('settingsForm').addEventListener('submit', async (event) => {
   const next = await run(button, () => api.updateSettings({
     spreadsheetId: $('spreadsheetId').value,
     pricingSpreadsheetId: $('pricingSpreadsheetId').value,
+    priceMatrixSpreadsheetId: $('priceMatrixSpreadsheetId').value,
     syncIntervalMinutes: Number($('syncInterval').value),
     port: Number($('port').value),
     autoStart: $('autoStart').checked,

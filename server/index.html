@@ -1133,6 +1133,18 @@
           <div class="sync-detail" id="healthDetail"></div>
         </div>
       </section>
+      <section class="panel mt-3" id="healthPricePanel" hidden>
+        <div class="panel-head">
+          <h2 class="panel-title"><i class="bi bi-currency-exchange"></i> Prices not read from the price matrix <span class="health-count is-alert" id="healthPriceCount"></span></h2>
+        </div>
+        <p class="muted-small px-3 mb-2">NEW PRICING (GST PRICING) was used instead, so prices may be older and price changes may show a later time. Check that NEW PRICING MATRIX V3 is still shared with the server and its headers are as before, then Sync now.</p>
+        <div class="table-responsive">
+          <table class="list-table">
+            <thead><tr><th>Where</th><th>Problem</th></tr></thead>
+            <tbody id="healthPriceRows"></tbody>
+          </table>
+        </div>
+      </section>
       <section class="panel mt-3">
         <div class="panel-head">
           <h2 class="panel-title"><i class="bi bi-exclamation-triangle"></i> Recommended laptops missing from LAPTOP DB <span class="health-count" id="healthMissingCount"></span></h2>
@@ -1284,7 +1296,11 @@
               <input class="form-control form-control-sm" id="spreadsheetId" spellcheck="false" required>
             </div>
             <div class="col-12">
-              <label class="label" for="pricingSpreadsheetId">Pricing spreadsheet (NEW PRICING)</label>
+              <label class="label" for="priceMatrixSpreadsheetId">Price matrix (NEW PRICING MATRIX V3)</label>
+              <input class="form-control form-control-sm" id="priceMatrixSpreadsheetId" spellcheck="false" placeholder="Link or ID · blank = prices from NEW PRICING below">
+            </div>
+            <div class="col-12">
+              <label class="label" for="pricingSpreadsheetId">Pricing spreadsheet (NEW PRICING, used when the price matrix cannot be read)</label>
               <input class="form-control form-control-sm" id="pricingSpreadsheetId" spellcheck="false" placeholder="Link or ID · blank = the NEW PRICING tab of the spreadsheet above">
             </div>
             <div class="col-6">
