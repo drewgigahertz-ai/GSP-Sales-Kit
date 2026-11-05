@@ -131,6 +131,15 @@
       margin-right: 5px;
     }
 
+    .reco-alts-menu .alts-part {
+      display: block;
+      margin-top: 1px;
+      color: #0f172a;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: .3px;
+    }
+
     .reco-alts-menu .alts-shown {
       margin-left: 6px;
       color: #15803d;
@@ -328,9 +337,13 @@
         shown.textContent = '✓ On card';
         title.appendChild(shown);
       }
+      // The part number under the brand and model, as on the card (LAPTOP DB MTM; none when the sheet has none).
+      const part = document.createElement('span');
+      part.className = 'alts-part';
+      part.textContent = typeof laptopPartNumber === 'function' ? laptopPartNumber(choice.prod) : (choice.prod.modelCode || '');
       const sku = document.createElement('small');
       sku.textContent = choice.prod.sku || '';
-      name.append(title, sku);
+      name.append(title, ...(part.textContent ? [part] : []), sku);
       const stock = document.createElement('span');
       stock.className = 'alts-stock';
       stock.textContent = choice.stock > 0 ? `${choice.stock} in stock` : 'No stock';

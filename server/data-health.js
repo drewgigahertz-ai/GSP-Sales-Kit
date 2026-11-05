@@ -4,7 +4,7 @@
 //   2. Recommended laptops marked END OF LIFE / EOL in LAPTOP DB.
 //   3. The same item twice in SPECS with different prices.
 //   4. Recommended laptops with no picture (LAPTOP DB, else SPECS Image URL) or no OS (LAPTOP DB), and KSP names in
-//      LAPTOP DB with no picture in UKSP ICON.
+//      LAPTOP DB with no picture in UKSP ICON, and every LAPTOP DB laptop with no MTM (its part number).
 //   5. Prices not read from the price matrix (a header renamed, access removed): NEW PRICING was used instead.
 // Each problem names the sheet (and row, where the sheet has one) to fix.
 const { matchKey } = require('../electron/banner-data');
@@ -85,6 +85,16 @@ function buildDataHealth(getRows, { priceSource = null } = {}) {
     if (listed && !listed.os) noOs.push({ item: entry.item, where: `LAPTOP DB row ${listed.row}: no OS`, usedIn: usedIn(entry) });
   }
 
+  // Every laptop in LAPTOP DB without an MTM: its brand and model would show no part number under them.
+  const noMtm = [];
+  const seenMtm = new Set();
+  for (const row of getRows('laptop_database')) {
+    const key = matchKey(row.item);
+    if (!key || seenMtm.has(key)) continue;
+    seenMtm.add(key);
+    if (!text(row.mtm)) noMtm.push({ item: text(row.item), where: `LAPTOP DB row ${sheetRow(row)}: no MTM`, usedIn: recommended.has(key) ? usedIn(recommended.get(key)) : 'Not recommended' });
+  }
+
   // KSP names with no picture for the Banner's feature row (UKSP ICON, else DB PHOTOS' spec pictures), with how many
   // laptops have them.
   const specPictures = new Set(getRows('banner_photos').filter((row) => row.kind === 'spec' && text(row.link)).map((row) => matchKey(row.name)));
@@ -115,7 +125,7 @@ function buildDataHealth(getRows, { priceSource = null } = {}) {
   }
 
   const byItem = (a, b) => a.item.localeCompare(b.item);
-  [missing, endOfLife, duplicates, noPicture, noOs, noIcon].forEach((list) => list.sort(byItem));
+  [missing, endOfLife, duplicates, noPicture, noOs, noIcon, noMtm].forEach((list) => list.sort(byItem));
   return {
     checkedAt: new Date().toISOString(),
     recommendedCount: recommended.size,
@@ -126,8 +136,9 @@ function buildDataHealth(getRows, { priceSource = null } = {}) {
     noPicture,
     noOs,
     noIcon,
+    noMtm,
     priceMatrix,
-    total: priceMatrix.length + missing.length + endOfLife.length + duplicates.length + noPicture.length + noOs.length + noIcon.length
+    total: priceMatrix.length + missing.length + endOfLife.length + duplicates.length + noPicture.length + noOs.length + noIcon.length + noMtm.length
   };
 }
 

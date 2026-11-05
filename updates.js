@@ -6,6 +6,13 @@
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
+      version: '1.0.25',
+      date: 'November 5, 2026',
+      changes: [
+        'Reco Table: the list of recommended and alternative laptops shows each laptop’s part number under its name.'
+      ]
+    },
+    {
       version: '1.0.24',
       date: 'November 3, 2026',
       changes: [
