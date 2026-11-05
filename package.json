@@ -62,6 +62,7 @@
       "flyer-customer.js",
       "reco-customer.js",
       "reco-alternatives.js",
+      "reco-refresh-guard.js",
       "banner-bridge.js",
       "banner-color.js",
       "banner-hotkeys.js",

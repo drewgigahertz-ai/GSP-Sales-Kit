@@ -8930,6 +8930,8 @@
       if (!data) return;
       if (fromSaved && window._desktopCurrentDataApplied) return;
       if (!fromSaved) window._desktopCurrentDataApplied = true;
+      // The laptops on the Exceed / Meet / Budget cards stay when the lists are rebuilt below (reco-refresh-guard.js).
+      const keptLaptops = window.RecoRefreshGuard ? RecoRefreshGuard.remember() : null;
       if (typeof window.updateBannerPage === 'function') window.updateBannerPage(data.bannerData, data.homeBranch, data.specsMap);
       if (typeof window.updateFlyerPage === 'function') window.updateFlyerPage(data);
       window.SERVER_INITIAL_DATA = data;
@@ -8967,6 +8969,7 @@
       }
       applyBranchLock(data.lockedBranch);
       if (typeof window.applyBranchHome === 'function') window.applyBranchHome(data.homeBranch);
+      if (window.RecoRefreshGuard) RecoRefreshGuard.restore(keptLaptops);
     }
 
     function updateRefreshButtons(label, isBusy) {
@@ -8992,6 +8995,8 @@
 
     function refreshAllData(options = {}) {
       const { silent = false, automatic = false, startup = false } = options;
+      // A background refresh waits while the presentation is open (reco-refresh-guard.js).
+      if (automatic && !startup && window.RecoRefreshGuard && RecoRefreshGuard.deferWhilePresenting(() => refreshAllData(options))) return;
       const refreshBtn = document.getElementById('btnRefreshData');
       updateRefreshButtons(startup ? 'Loading latest data...' : 'Connecting...', true);
 
@@ -9298,5 +9303,6 @@
   </script>
   <!-- Reco Table: Customer name, passed to the Flyers tab with the segment, laptops and applications. -->
   <script src="./reco-customer.js"></script>
+  <script src="./reco-refresh-guard.js"></script>
 </body>
 </html>
