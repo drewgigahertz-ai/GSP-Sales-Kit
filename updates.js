@@ -11,7 +11,8 @@
       changes: [
         'Reco Table: the list of recommended and alternative laptops shows each laptop’s part number under its name.',
         'Reco Table: the laptops you put on the Exceed / Meet / Budget cards stay when the data refreshes (they only change if they are no longer in stock).',
-        'Presentation: the data no longer refreshes while you are presenting; it refreshes when you close the presentation.'
+        'Presentation: the data no longer refreshes while you are presenting; it refreshes when you close the presentation.',
+        'Reco Table: "Clear all" (or Ctrl+Shift+X, pressed twice) clears the customer name, applications and recommendation, and puts the default laptops back for the next customer.'
       ]
     },
     {

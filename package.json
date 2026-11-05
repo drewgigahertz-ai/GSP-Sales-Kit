@@ -63,6 +63,7 @@
       "reco-customer.js",
       "reco-alternatives.js",
       "reco-refresh-guard.js",
+      "reco-clear.js",
       "banner-bridge.js",
       "banner-color.js",
       "banner-hotkeys.js",

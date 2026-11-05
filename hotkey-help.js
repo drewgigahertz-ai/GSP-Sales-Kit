@@ -17,6 +17,7 @@
         ['Ctrl + Shift + R', 'Recommendation'],
         ['Ctrl + Shift + E / M / B', 'Exceed / Meet / Budget laptop'],
         ['Ctrl + Shift + N', 'Customer name'],
+        ['Ctrl + Shift + X', 'Clear all (press twice)'],
         ['Ctrl + Shift + C', 'Copy Details'],
         ['Ctrl + Shift + P', 'Present'],
         ['Ctrl + D', 'Download Result'],
