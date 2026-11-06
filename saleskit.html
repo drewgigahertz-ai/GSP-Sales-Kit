@@ -2711,7 +2711,7 @@
               <div class="filter-label"><i class="bi bi-star"></i> LOCATION</div>
               <div class="filter-select-wrapper" id="locationDropdownWrapper">
                 <div class="filter-select-input" id="locationDisplayInput" onclick="toggleLocationMenu()">
-                  <span id="locationDisplayText">IF APPLICABLE</span>
+                  <span id="locationDisplayText">ALL BRANCHES</span>
                 </div>
                 <i class="bi bi-chevron-down filter-select-chevron"></i>
 
@@ -5291,6 +5291,11 @@
     ];
     let selectedLocation = 'IF APPLICABLE';
 
+    // "IF APPLICABLE" (no single branch: stock of all branches) is shown as ALL BRANCHES; the value stays the same.
+    function locationLabel(value) {
+      return String(value || '').trim().toUpperCase() === 'IF APPLICABLE' ? 'ALL BRANCHES' : value;
+    }
+
     function buildLocationDropdown(locationsList) {
       if (locationsList && Array.isArray(locationsList) && locationsList.length > 0) {
         const cleanList = locationsList.map(l => String(l).trim()).filter(l => l !== '');
@@ -5306,7 +5311,8 @@
         const item = document.createElement('div');
         const isActive = (loc.toUpperCase() === selectedLocation.toUpperCase());
         item.className = `custom-dropdown-item ${isActive ? 'active' : ''}`;
-        item.textContent = loc;
+        item.textContent = locationLabel(loc);
+        item.dataset.value = loc;
         item.onclick = function() { selectLocation(loc); };
         container.appendChild(item);
       });
@@ -5360,14 +5366,14 @@
     function selectLocation(val) {
       selectedLocation = val;
       const displayEl = document.getElementById('locationDisplayText');
-      if (displayEl) displayEl.textContent = val;
+      if (displayEl) displayEl.textContent = locationLabel(val);
       updateTierSelectionHeading();
 
       const container = document.getElementById('locationItemsList');
       if (container) {
         const items = container.querySelectorAll('.custom-dropdown-item');
         items.forEach(it => {
-          if (it.textContent.trim().toUpperCase() === val.trim().toUpperCase()) {
+          if ((it.dataset.value || it.textContent).trim().toUpperCase() === val.trim().toUpperCase()) {
             it.classList.add('active');
           } else {
             it.classList.remove('active');
@@ -6491,7 +6497,7 @@
       out += '=================================\n';
       out += 'Recommendation for: ' + segment + '\n';
       out += 'Applications: ' + apps + '\n';
-      out += 'Location / Branch: ' + (location || 'IF APPLICABLE') + '\n\n';
+      out += 'Location / Branch: ' + (location || 'ALL BRANCHES') + '\n\n';
 
       tiers.forEach(t => {
         out += t.label + '\n';

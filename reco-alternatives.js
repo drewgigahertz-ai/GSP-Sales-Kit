@@ -207,10 +207,32 @@
     return { ...laptop, stocksByLocation: { [selectedLocation]: stock }, totalStock: stock };
   }
 
+  // ALL BRANCHES (no single branch): every laptop with stock at some branch is listed in each tier, below the ones
+  // already there (the card keeps starting on its default laptop), by total stock.
+  function addEveryLaptopInStock(catalog) {
+    Object.keys(TIERS).forEach((tier) => {
+      const list = catalog[tier] || (catalog[tier] = []);
+      // A laptop listed under several segments in the criteria sheet is added once.
+      const listed = new Set(list.map((prod) => normalizeSmtSku(prod.sku || prod.cleanSku)));
+      CRITERIA_LAPTOPS_DATA
+        .filter((laptop) => getLaptopStock(laptop, selectedLocation) > 0)
+        .sort((a, b) => getLaptopStock(b, selectedLocation) - getLaptopStock(a, selectedLocation))
+        .forEach((laptop) => {
+          const sku = normalizeSmtSku(laptop.sku || laptop.cleanSku);
+          if (listed.has(sku)) return;
+          listed.add(sku);
+          list.push(laptop);
+        });
+    });
+  }
+
   // Called after the tier lists are made: OSD lists every laptop in stock, DB's laptops are added when missing,
   // and DB's recommended laptop (if in stock) becomes the one each tier starts on.
   function applyToCatalog(catalog, hierarchy) {
-    if (!branchCode()) return;
+    if (!branchCode()) {
+      addEveryLaptopInStock(catalog);
+      return;
+    }
     const isSmt = selectedRecommendationMode === 'SMT';
     Object.keys(TIERS).forEach((tier) => {
       const list = catalog[tier] || (catalog[tier] = []);
