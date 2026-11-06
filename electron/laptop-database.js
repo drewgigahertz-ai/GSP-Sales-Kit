@@ -6,11 +6,13 @@
 // Columns are found by their headers (ITEM DESCRIPTION, BRAND, EOL STATUS, MTM, MODEL, PROCESSOR … OS, KSP 1–4),
 // so inserted or moved columns do not matter. The laptop picture is the column headed IMAGE / PICTURE / PHOTO, or
 // else the column just before ITEM DESCRIPTION (headerless today: column A).
+// Inventory: each column after the last of those headed with a branch code (ALB, ALSA, … HO, … VMLC) is that
+// branch's stock of the laptop; new branch columns are picked up by themselves.
 // The laptops come from an IMPORTRANGE, which repeats its own header rows; those are skipped wherever they are.
 // While the IMPORTRANGE is still loading ("Loading…", #REF!) nothing is taken, so the last synced laptops stay.
 
 const LAPTOP_DATABASE_SHEET = 'LAPTOP DB';
-const LAPTOP_DATABASE_RANGE = 'A:AZ';
+const LAPTOP_DATABASE_RANGE = 'A:CZ';
 const UKSP_ICON_SHEET = 'UKSP ICON';
 const UKSP_ICON_RANGE = 'A:B';
 // Header rows are looked for in the first rows of the sheet.
@@ -66,8 +68,20 @@ function locateColumns(values) {
     if (picture !== -1) break;
   }
   found.picture = picture !== -1 ? picture : found.item - 1;
+  // Branch stock columns: right of the last field found, headed (row 1) with a branch code.
+  const last = Math.max(...FIELDS.map(([field]) => (found[field] === undefined ? -1 : found[field])));
+  found.stock = [];
+  ((top[0]) || []).forEach((cell, index) => {
+    const code = text(cell).toUpperCase();
+    if (index > last && /^[A-Z0-9][A-Z0-9 -]{0,19}$/.test(code)) found.stock.push([index, code]);
+  });
   return found;
 }
+
+const stockNumber = (value) => {
+  const number = Number(String(value ?? '').replace(/,/g, '').trim());
+  return Number.isFinite(number) && number > 0 ? Math.floor(number) : 0;
+};
 
 // A header row of the imported block: "LAPTOP" / "ITEM DESCRIPTION" / a link in the item column.
 function isHeaderItem(value) {
@@ -90,6 +104,8 @@ function parseLaptopDb(values = []) {
       if (field !== 'item') laptop[field] = columns[field] === undefined ? '' : text(row[columns[field]]);
     }
     laptop.eol = laptop.eol.toUpperCase();
+    // { BRANCH: units } of the branches with stock.
+    laptop.stock = Object.fromEntries(columns.stock.map(([index, code]) => [code, stockNumber(row[index])]).filter(([, units]) => units > 0));
     return [laptop];
   });
   if (!laptops.length) throw new Error('LAPTOP DB has no laptops');
@@ -101,11 +117,11 @@ const rowId = (laptop) => `item_${String(laptop.row).padStart(4, '0')}`;
 // → collection laptop_database (Flyers page, Data health, the SPECS replacement). Ids keep the sheet row.
 function laptopDatabaseCollection(laptops) {
   const columns = ['item', 'picture', 'brand', 'eol_status', 'mtm', 'model', 'processor', 'graphics', 'storage', 'memory',
-    'resolution', 'os', 'ksp1', 'ksp2', 'ksp3', 'ksp4'];
+    'resolution', 'os', 'ksp1', 'ksp2', 'ksp3', 'ksp4', 'stock'];
   return {
     collection: 'laptop_database',
     columns,
-    rows: laptops.map((laptop) => ({ id: rowId(laptop), data: { ...laptop, eol_status: laptop.eol } }))
+    rows: laptops.map((laptop) => ({ id: rowId(laptop), data: { ...laptop, eol_status: laptop.eol, stock: JSON.stringify(laptop.stock || {}) } }))
   };
 }
 
@@ -215,7 +231,16 @@ function specsRowsFromLaptopDb(laptopRows = [], specRows = []) {
   return rows;
 }
 
-// Database rows → what the Flyers page needs, one entry per laptop (the first row of a laptop listed twice).
+function parseStock(value) {
+  try {
+    const stock = JSON.parse(value || '{}');
+    return stock && typeof stock === 'object' ? stock : {};
+  } catch {
+    return {};
+  }
+}
+
+// Database rows → what the Flyers page and the Reco Table need, one entry per laptop (the first row of a laptop listed twice).
 function makeLaptopDatabase(rows = []) {
   const seen = new Set();
   return rows.flatMap((row) => {
@@ -228,6 +253,8 @@ function makeLaptopDatabase(rows = []) {
       model: text(row.model),
       partNumber: text(row.mtm),
       endOfLife: /^(END OF LIFE|EOL)$/.test(text(row.eol_status)),
+      // { BRANCH: units } from LAPTOP DB's inventory columns (the Reco Table's ALL BRANCHES lists).
+      stock: parseStock(row.stock),
       specs: {
         Processor: text(row.processor),
         Graphics: text(row.graphics),

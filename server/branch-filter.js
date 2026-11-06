@@ -33,6 +33,11 @@ function filterDataForBranch(data, branch) {
     .map((row) => ({ ...row, 'HO STOCK': '', 'OA STOCK': '' }));
   // DB sheet recommendations: only this branch's rows.
   const recoDbData = (data.recoDbData || []).filter((row) => sameBranch(row.branch, code));
+  // LAPTOP DB inventory: only this branch's stock.
+  const laptopDatabase = (data.laptopDatabase || []).map((laptop) => {
+    const units = stockAt(laptop.stock, code);
+    return { ...laptop, stock: units ? { [code]: units } : {} };
+  });
 
   return {
     ...data,
@@ -40,7 +45,8 @@ function filterDataForBranch(data, branch) {
     locationsList: [code],
     criteriaSegmentData: { ...criteria, laptops, locations: [code] },
     recoTableData,
-    recoDbData
+    recoDbData,
+    laptopDatabase
   };
 }
 

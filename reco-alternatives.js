@@ -209,13 +209,50 @@
 
   // ALL BRANCHES (no single branch): every laptop with stock at some branch is listed in each tier, below the ones
   // already there (the card keeps starting on its default laptop), by total stock.
+  // A LAPTOP DB laptop as a list entry: the criteria sheet's laptop when there is one, else built from its specs
+  // (SPECS_MAP: LAPTOP DB name, part number, picture, specs and price); with LAPTOP DB's inventory as its stock.
+  function laptopDbProduct(laptop) {
+    const stocksByLocation = laptop.stock || {};
+    const totalStock = Object.values(stocksByLocation).reduce((sum, units) => sum + (Number(units) || 0), 0);
+    const known = CRITERIA_LAPTOPS_DATA.find((item) => same(item.sku || item.cleanSku, laptop.item));
+    if (known) return { ...known, stocksByLocation, totalStock };
+    const specsMap = window.SPECS_MAP || {};
+    const lower = String(laptop.item || '').toLowerCase();
+    const spec = specsMap[lower] || specsMap[lower.replace(/^lap[-_\s]*/, '')] || {};
+    return {
+      sku: laptop.item,
+      cleanSku: laptop.item.replace(/^LAP[-_\s]*/i, ''),
+      modelCode: spec.modelCode || laptop.partNumber || '',
+      title: spec.title || [laptop.brand, laptop.model].filter(Boolean).join(' ') || laptop.item,
+      brand: spec.brand || laptop.brand || '',
+      price: spec.price || '',
+      image: spec.image || '',
+      specs: spec.specs || [],
+      specRanks: spec.specRanks || {},
+      rawSpecs: spec,
+      stocksByLocation,
+      totalStock
+    };
+  }
+
+  // The laptops to list for ALL BRANCHES: LAPTOP DB's, by its inventory (end-of-life ones too); with an older
+  // server (no inventory sent), the criteria sheet's laptops in stock.
+  function laptopsInStock() {
+    const laptopDb = ((window.sheetData && window.sheetData.laptopDatabase) || []).filter((laptop) => laptop.stock);
+    if (laptopDb.some((laptop) => Object.keys(laptop.stock).length)) {
+      return laptopDb.map(laptopDbProduct).filter((prod) => prod.totalStock > 0);
+    }
+    return CRITERIA_LAPTOPS_DATA.filter((laptop) => getLaptopStock(laptop, selectedLocation) > 0);
+  }
+
   function addEveryLaptopInStock(catalog) {
+    const inStock = laptopsInStock();
     Object.keys(TIERS).forEach((tier) => {
       const list = catalog[tier] || (catalog[tier] = []);
-      // A laptop listed under several segments in the criteria sheet is added once.
+      // A laptop listed twice (several segments in the criteria sheet, or two LAPTOP DB rows) is added once.
       const listed = new Set(list.map((prod) => normalizeSmtSku(prod.sku || prod.cleanSku)));
-      CRITERIA_LAPTOPS_DATA
-        .filter((laptop) => getLaptopStock(laptop, selectedLocation) > 0)
+      inStock
+        .slice()
         .sort((a, b) => getLaptopStock(b, selectedLocation) - getLaptopStock(a, selectedLocation))
         .forEach((laptop) => {
           const sku = normalizeSmtSku(laptop.sku || laptop.cleanSku);
