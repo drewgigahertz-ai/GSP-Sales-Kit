@@ -2309,11 +2309,28 @@
     }
 
     .saleskit-presentation-banner-tab-select {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
       max-width: 220px;
       overflow: hidden;
-      text-overflow: ellipsis;
       white-space: nowrap;
       font: inherit;
+      line-height: 1.15;
+    }
+
+    .saleskit-presentation-banner-tab-select > span {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .saleskit-presentation-banner-tab-select .banner-tab-part {
+      margin-top: 2px;
+      font-size: 0.72em;
+      font-weight: 700;
+      letter-spacing: .3px;
+      opacity: .8;
     }
 
     .saleskit-presentation-banner-tab-close {
@@ -7404,6 +7421,7 @@
                   return {
                     id: `${tier}:${normalizeSmtSku(laptop.sku)}`,
                     model: laptop.title || laptop.sku || 'Selected laptop',
+                    partNumber: laptopPartNumber(laptop),
                     sku: laptop.sku,
                     url: getUkspBannerUrl(laptop.sku, rowTitle),
                     banners: getUkspBanners(laptop.sku, rowTitle)
@@ -7544,8 +7562,18 @@
           selectButton.className = 'saleskit-presentation-banner-tab-select';
           selectButton.setAttribute('role', 'tab');
           selectButton.setAttribute('aria-selected', String(tab.id === slide.activeBannerTabId));
-          selectButton.textContent = tab.model;
-          selectButton.title = `${tab.model} - ${slide.title}`;
+          // The model, with its part number under it.
+          const tabModel = document.createElement('span');
+          tabModel.className = 'banner-tab-model';
+          tabModel.textContent = tab.model;
+          selectButton.appendChild(tabModel);
+          if (tab.partNumber) {
+            const tabPart = document.createElement('span');
+            tabPart.className = 'banner-tab-part';
+            tabPart.textContent = tab.partNumber;
+            selectButton.appendChild(tabPart);
+          }
+          selectButton.title = `${[tab.model, tab.partNumber].filter(Boolean).join(' ')} - ${slide.title}`;
           selectButton.addEventListener('click', () => {
             slide.activeBannerTabId = tab.id;
             slide.bannerOpen = true;
