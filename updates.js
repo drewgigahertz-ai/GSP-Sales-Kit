@@ -6,6 +6,13 @@
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
+      version: '1.0.26',
+      date: 'November 6, 2026',
+      changes: [
+        'Zoom: Ctrl+Plus / Ctrl+Minus (or Ctrl + mouse wheel, or − 100% + in the header) make everything bigger or smaller; Ctrl+0 goes back to 100%. SalesKit remembers it.'
+      ]
+    },
+    {
       version: '1.0.25',
       date: 'November 5, 2026',
       changes: [
@@ -14,7 +21,6 @@
         'Presentation: the data no longer refreshes while you are presenting; it refreshes when you close the presentation.',
         'Presentation: each feature banner tab shows the laptop’s part number under its name.',
         'Reco Table: the Location "IF APPLICABLE" is now called ALL BRANCHES, and with it the Exceed / Meet / Budget lists show every laptop in stock at any branch, with its total stock.',
-        'Zoom: Ctrl+Plus / Ctrl+Minus (or Ctrl + mouse wheel, or − 100% + in the header) make everything bigger or smaller; Ctrl+0 goes back to 100%. SalesKit remembers it.',
         'Reco Table: "Clear all" (or Ctrl+Shift+X, pressed twice) clears the customer name, applications and recommendation, and puts the default laptops back for the next customer.'
       ]
     },
