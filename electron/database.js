@@ -26,6 +26,7 @@ const SHEET_TABLES = new Set([
   'uksp_banner',
   'reco_table',
   'reco_db',
+  'promo_icons',
   'laptop_database',
   'logo'
 ]);
@@ -489,6 +490,7 @@ function getInitialData() {
     photos: getRows('banner_photos'),
     prices: getRows('banner_prices'),
     ageing: getRows('ageing_banner'),
+    promoIcons: getRows('promo_icons'),
     reco: recoTableData,
     // Laptops on the Flyers page that are not in LAPTOP RAW still get their NEW PRICING prices (extraPrices).
     extraPriceItems: getRows('laptop_database').map(({ item, brand }) => ({ item, brand }))

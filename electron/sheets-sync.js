@@ -24,6 +24,7 @@ const { USABILITY_SHEET, USABILITY_DV_SHEET, USABILITY_DV_RANGE, usabilityCollec
 const { BRANCH_DETAILS_RANGE, branchDetailsCollection } = require('./branch-details');
 const { RECO_DB_SHEET, RECO_DB_RANGE, recoDbCollection } = require('./reco-db');
 const { readPriceMatrix } = require('./price-matrix');
+const { PROMO_IMAGES_SHEET, PROMO_IMAGES_RANGE, promoIconsCollection } = require('./promo-icons');
 const {
   LAPTOP_DATABASE_SHEET, LAPTOP_DATABASE_RANGE, UKSP_ICON_SHEET, UKSP_ICON_RANGE,
   parseLaptopDb, laptopDatabaseCollection, bannerSpecsCollection, bannerLaptopsCollection
@@ -264,6 +265,21 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
       valueRenderOption: 'FORMATTED_VALUE'
     });
     result.usability = usabilityCollection(response.data.values || []);
+  }
+
+  // Promo pictures for the Banner page (see promo-icons.js); while PROMO IMAGES is loading the last ones stay.
+  const promoImagesTitle = titles.find((name) => name.trim().toUpperCase() === PROMO_IMAGES_SHEET);
+  if (promoImagesTitle) {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `'${promoImagesTitle.replace(/'/g, "''")}'!${PROMO_IMAGES_RANGE}`,
+      valueRenderOption: 'FORMATTED_VALUE'
+    });
+    try {
+      result.promo_icons = promoIconsCollection(response.data.values || []);
+    } catch (error) {
+      onProgress({ phase: 'warning', message: `${error.message}; the last synced promo pictures are kept.` });
+    }
   }
 
   // Reco Table recommendations and alternatives per branch (see reco-db.js); skipped when the tab is missing.

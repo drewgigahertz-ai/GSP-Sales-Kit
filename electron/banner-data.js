@@ -36,6 +36,8 @@ const PRICE_COLUMNS = {
   promo: 'R'
 };
 
+const { promoKey } = require('./promo-icons');
+
 // 'A' → 0, 'CG' → 84.
 function columnIndex(letters) {
   return [...letters].reduce((index, letter) => index * 26 + letter.charCodeAt(0) - 64, 0) - 1;
@@ -299,8 +301,14 @@ function buildBannerData(rows, imageUrl = (value) => value, now = new Date()) {
     for (const branch of branches) choose(branchPrices, `${branch}|${key}`, candidate);
   }
 
-  // Promo picture: by the TOTAL PROMO column (R) of NEW PRICING. A blank promo means "NO PROMO", which has
-  // its own picture in DB PHOTOS; a promo without a picture there also shows the NO PROMO picture.
+  // Promo picture: by TOTAL PROMO (promo title + freebies): PROMO IMAGES first (rows.promoIcons, see
+  // promo-icons.js), else DB PHOTOS. A blank promo means "NO PROMO", which has its own picture in DB PHOTOS; a promo
+  // without a picture in either also shows the NO PROMO picture.
+  const promoIcons = new Map();
+  for (const row of rows.promoIcons || []) {
+    const iconKey = promoKey(row.name);
+    if (iconKey && text(row.link) && !promoIcons.has(iconKey)) promoIcons.set(iconKey, row);
+  }
   // An AGEING promo (e.g. "ACER - AGEING PROMO") is sold with its clearance banner only (AGEING BANNER).
   const priceView = (price) => {
     if (!price) {
@@ -309,7 +317,8 @@ function buildBannerData(rows, imageUrl = (value) => value, now = new Date()) {
         priceDetails: PRICE_DETAILS.map(([title, , isPrice]) => ({ title, value: isPrice ? null : '', isPrice }))
       };
     }
-    const match = [text(price.promo) || 'NO PROMO', 'NO PROMO'].map((name) => photo('promo', name)).find((row) => row && row.link);
+    const icon = text(price.promo) ? promoIcons.get(promoKey(price.promo)) : null;
+    const match = icon || [text(price.promo) || 'NO PROMO', 'NO PROMO'].map((name) => photo('promo', name)).find((row) => row && row.link);
     const ageingPromo = /\bag(e)?ing\b/i.test(text(price.promo));
     return {
       cash: number(price.cash),

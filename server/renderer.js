@@ -349,12 +349,13 @@ function renderHealth(report) {
     ...report.noPicture.map((entry) => ({ ...entry, missing: 'Picture' })),
     ...report.noOs.map((entry) => ({ ...entry, missing: 'OS' })),
     ...(report.noIcon || []).map((entry) => ({ ...entry, missing: 'KSP picture' })),
-    ...(report.noMtm || []).map((entry) => ({ ...entry, missing: 'Part number (MTM)' }))
+    ...(report.noMtm || []).map((entry) => ({ ...entry, missing: 'Part number (MTM)' })),
+    ...(report.noPromoIcon || []).map((entry) => ({ ...entry, missing: 'Promo picture' }))
   ].sort((a, b) => a.item.localeCompare(b.item));
   healthCount('healthMediaCount', media.length);
   const mediaRows = $('healthMediaRows');
   mediaRows.replaceChildren();
-  if (!media.length) healthEmpty(mediaRows, 5, 'Every laptop has a picture, an OS and a part number, and every KSP has a picture.');
+  if (!media.length) healthEmpty(mediaRows, 5, 'Every laptop has a picture, an OS and a part number, and every KSP and promo has a picture.');
   media.forEach((entry) => {
     const tr = mediaRows.insertRow();
     tr.insertCell().textContent = entry.item;

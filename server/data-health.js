@@ -4,10 +4,12 @@
 //   2. Recommended laptops marked END OF LIFE / EOL in LAPTOP DB.
 //   3. The same item twice in SPECS with different prices.
 //   4. Recommended laptops with no picture (LAPTOP DB, else SPECS Image URL) or no OS (LAPTOP DB), and KSP names in
-//      LAPTOP DB with no picture in UKSP ICON, and every LAPTOP DB laptop with no MTM (its part number).
+//      LAPTOP DB with no picture in UKSP ICON, every LAPTOP DB laptop with no MTM (its part number), and promos
+//      (title + freebies) with no picture in PROMO IMAGES.
 //   5. Prices not read from the price matrix (a header renamed, access removed): NEW PRICING was used instead.
 // Each problem names the sheet (and row, where the sheet has one) to fix.
 const { matchKey } = require('../electron/banner-data');
+const { promoKey } = require('../electron/promo-icons');
 
 function text(value) {
   const result = value === null || value === undefined ? '' : String(value).trim();
@@ -95,6 +97,24 @@ function buildDataHealth(getRows, { priceSource = null } = {}) {
     if (!text(row.mtm)) noMtm.push({ item: text(row.item), where: `LAPTOP DB row ${sheetRow(row)}: no MTM`, usedIn: recommended.has(key) ? usedIn(recommended.get(key)) : 'Not recommended' });
   }
 
+  // Promos (title + freebies) with no Icon Link in PROMO IMAGES; ageing promos show their clearance banner instead.
+  const promoIcons = new Map(getRows('promo_icons').map((row) => [promoKey(row.name), text(row.link)]));
+  const promoLaptops = new Map();
+  for (const row of getRows('banner_prices')) {
+    const promo = text(row.promo);
+    if (!promo || /\bag(e)?ing\b/i.test(promo)) continue;
+    const entry = promoLaptops.get(promoKey(promo)) || { name: [text(row.promo_title), promo.slice(text(row.promo_title).length)].filter(Boolean).join(' + '), items: new Set() };
+    entry.items.add(matchKey(row.item_code));
+    promoLaptops.set(promoKey(promo), entry);
+  }
+  const noPromoIcon = promoIcons.size
+    ? [...promoLaptops].filter(([key]) => !promoIcons.get(key)).map(([key, entry]) => ({
+      item: entry.name,
+      where: promoIcons.has(key) ? 'PROMO IMAGES: no Icon Link' : 'PROMO IMAGES: not listed',
+      usedIn: `Promo of ${entry.items.size} laptop${entry.items.size === 1 ? '' : 's'}`
+    }))
+    : [];
+
   // KSP names with no picture for the Banner's feature row (UKSP ICON, else DB PHOTOS' spec pictures), with how many
   // laptops have them.
   const specPictures = new Set(getRows('banner_photos').filter((row) => row.kind === 'spec' && text(row.link)).map((row) => matchKey(row.name)));
@@ -125,7 +145,7 @@ function buildDataHealth(getRows, { priceSource = null } = {}) {
   }
 
   const byItem = (a, b) => a.item.localeCompare(b.item);
-  [missing, endOfLife, duplicates, noPicture, noOs, noIcon, noMtm].forEach((list) => list.sort(byItem));
+  [missing, endOfLife, duplicates, noPicture, noOs, noIcon, noMtm, noPromoIcon].forEach((list) => list.sort(byItem));
   return {
     checkedAt: new Date().toISOString(),
     recommendedCount: recommended.size,
@@ -137,8 +157,9 @@ function buildDataHealth(getRows, { priceSource = null } = {}) {
     noOs,
     noIcon,
     noMtm,
+    noPromoIcon,
     priceMatrix,
-    total: priceMatrix.length + missing.length + endOfLife.length + duplicates.length + noPicture.length + noOs.length + noIcon.length + noMtm.length
+    total: priceMatrix.length + missing.length + endOfLife.length + duplicates.length + noPicture.length + noOs.length + noIcon.length + noMtm.length + noPromoIcon.length
   };
 }
 

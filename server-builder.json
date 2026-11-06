@@ -3,7 +3,7 @@
   "productName": "GigaHertz SalesKit Server",
   "extraMetadata": {
     "name": "saleskit-server",
-    "version": "1.0.26",
+    "version": "1.0.27",
     "main": "server/main.js"
   },
   "directories": {
@@ -22,6 +22,7 @@
     "electron/reco-db.js",
     "electron/laptop-database.js",
     "electron/price-matrix.js",
+    "electron/promo-icons.js",
     "electron/embedded-config.json",
     "package.json",
     "!node_modules/html2canvas{,/**/*}",
