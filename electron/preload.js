@@ -20,6 +20,13 @@ contextBridge.exposeInMainWorld('saleskit', {
   login: (username, password, remember) => ipcRenderer.invoke('auth:login', username, password, remember),
   autoLogin: () => ipcRenderer.invoke('auth:auto-login'),
   setOpenAtStartup: (on) => ipcRenderer.invoke('auth:open-at-startup', on),
+  getZoom: () => ipcRenderer.invoke('zoom:get'),
+  changeZoom: (how) => ipcRenderer.invoke('zoom:change', how),
+  onZoomChanged: (callback) => {
+    const listener = (_event, factor) => callback(factor);
+    ipcRenderer.on('zoom:changed', listener);
+    return () => ipcRenderer.removeListener('zoom:changed', listener);
+  },
   continueOffline: () => ipcRenderer.invoke('auth:offline'),
   getCurrentUser: () => ipcRenderer.invoke('auth:user'),
   logout: () => ipcRenderer.invoke('auth:logout'),

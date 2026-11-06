@@ -13,6 +13,7 @@ const { createActivityReporter } = require('./activity');
 const { getDeviceInfo } = require('./device-info');
 const { createPriceStream } = require('./price-stream');
 const { createRememberLogin } = require('./remember-login');
+const { createZoom } = require('./zoom');
 
 // SalesKit is a client: it loads its data from the SalesKit Server, which does the Google Sheets sync.
 
@@ -29,6 +30,7 @@ let updateResume;
 let logoCache;
 let activityReporter;
 let rememberLogin;
+let zoom;
 
 function reportSyncProgress(progress) {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -358,6 +360,10 @@ ipcMain.handle('auth:auto-login', async () => {
   };
 });
 
+// Zoom (zoom.js): the header's − 100% + buttons.
+ipcMain.handle('zoom:get', () => zoom.get());
+ipcMain.handle('zoom:change', (_event, how) => zoom.change(how));
+
 ipcMain.handle('auth:open-at-startup', (_event, on) => {
   rememberLogin.setOpensAtStartup(Boolean(on));
   return rememberLogin.opensAtStartup();
@@ -488,6 +494,7 @@ function createWindow() {
   });
 
   mainWindow.once('ready-to-show', () => mainWindow.show());
+  zoom.attach(mainWindow);
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   mainWindow.webContents.on('will-navigate', (event, url) => {
     if (!url.startsWith('file://')) event.preventDefault();
@@ -524,6 +531,7 @@ app.whenReady().then(() => {
   // Logo addresses come from the small meta file, so the large saved data is not read for them.
   logoCache = createLogoCache({ userDataDir: app.getPath('userData'), imageCache, snapshotCache: { load: () => dataLoader.loadMeta() } });
   updateResume = createUpdateResume(path.join(app.getPath('userData'), 'update-resume.bin'));
+  zoom = createZoom({ filePath: path.join(app.getPath('userData'), 'zoom.json'), getWindow: () => mainWindow });
   rememberLogin = createRememberLogin({
     credentialsPath: path.join(app.getPath('userData'), 'remember-login.bin'),
     settingsPath: path.join(app.getPath('userData'), 'startup-settings.json')

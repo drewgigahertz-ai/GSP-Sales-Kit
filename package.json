@@ -79,6 +79,7 @@
       "price-notify.js",
       "updates.js",
       "hotkey-help.js",
+      "zoom-control.js",
       "package.json"
     ],
     "publish": {

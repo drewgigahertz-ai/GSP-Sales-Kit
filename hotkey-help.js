@@ -6,6 +6,7 @@
     ['Ctrl + 1 / 2 / 3 / 4', 'Reco Table / Sales Kit / Banner / Flyers'],
     ['↑ ↓ then Enter', 'Choose an option in any open list'],
     ['Esc', 'Close the open list or window'],
+    ['Ctrl + Plus / Minus', 'Zoom in / out (Ctrl + 0: 100%)'],
     ['?', 'Show these shortcuts']
   ];
   const PAGES = {
