@@ -6,6 +6,14 @@
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
+      version: '1.0.27',
+      date: 'November 7, 2026',
+      changes: [
+        'Reco Table: with a branch chosen, the Exceed / Meet / Budget lists also show every laptop with stock at that branch, even if it is not in the Reco Table yet.',
+        'Sales Kit: shows the laptops you picked on the Reco Table, even when the Sales Kit has no data for them yet.'
+      ]
+    },
+    {
       version: '1.0.26',
       date: 'November 6, 2026',
       changes: [

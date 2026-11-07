@@ -245,6 +245,22 @@
     return CRITERIA_LAPTOPS_DATA.filter((laptop) => getLaptopStock(laptop, selectedLocation) > 0);
   }
 
+  // LAPTOP DB laptops with inventory at one branch, most units first (an older server sends no inventory: none).
+  function laptopsAtBranch(branch) {
+    const laptopDb = (window.sheetData && window.sheetData.laptopDatabase) || [];
+    const seen = new Set();
+    return laptopDb
+      .filter((laptop) => laptop.stock && Number(laptop.stock[branch]) > 0)
+      .map(laptopDbProduct)
+      .filter((prod) => {
+        const sku = normalizeSmtSku(prod.sku);
+        if (seen.has(sku)) return false;
+        seen.add(sku);
+        return true;
+      })
+      .sort((a, b) => getLaptopStock(b, branch) - getLaptopStock(a, branch));
+  }
+
   function addEveryLaptopInStock(catalog) {
     const inStock = laptopsInStock();
     Object.keys(TIERS).forEach((tier) => {
@@ -279,6 +295,11 @@
           if (!has(laptop.sku || laptop.cleanSku) && getLaptopStock(laptop, selectedLocation) > 0) list.push(laptop);
         });
       }
+      // Every LAPTOP DB laptop with inventory at this branch (end-of-life ones too), by its stock there.
+      laptopsAtBranch(branchCode())
+        .forEach((prod) => {
+          if (!has(prod.sku)) list.push(prod);
+        });
       const rows = dbRows(tier, hierarchy);
       rows.forEach((row) => {
         if (has(row.item)) return;

@@ -7987,6 +7987,12 @@
       if (sku) {
         found = allLaptops.find(l => l.sku === sku || (l.cleanSku && l.cleanSku === sku));
       }
+      // A laptop only in LAPTOP DB (picked from the Reco Table's lists, e.g. by its branch inventory) is not in the
+      // criteria sheet: it is found in the lists themselves, so the Sales Kit shows it too, even without Sales Kit data.
+      if (!found && sku && typeof productCatalog !== 'undefined') {
+        found = ['exceed', 'meet', 'budget'].flatMap(name => productCatalog[name] || [])
+          .find(l => l.sku === sku || (l.cleanSku && l.cleanSku === sku)) || null;
+      }
       if (!found && titleEl && titleEl.textContent && titleEl.textContent.trim()) {
         found = allLaptops.find(l => l.title === titleEl.textContent.trim());
       }
