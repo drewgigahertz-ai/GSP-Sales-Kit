@@ -10,7 +10,8 @@
       date: 'November 9, 2026',
       changes: [
         'Banner: when a promo and its freebie have separate pictures, both are shown side by side.',
-        'Banner: promo pictures are no longer cut off when Layout 2 or Layout 3 is downloaded.'
+        'Banner: promo pictures are no longer cut off when Layout 2 or Layout 3 is downloaded.',
+        'Banner: branch accounts now choose between All branches and their own branch.'
       ]
     },
     {

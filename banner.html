@@ -1488,17 +1488,16 @@
       if (currentItemCode) selectItem(currentItemCode);
     });
 
-    // Branches with promos today. A branch account starts on its own branch (when it has promos) and
-    // can switch to any other; HO and ALL accounts start on the regular price.
-    // Every branch (stock, from the server) and the branches with their own prices in NEW PRICING.
+    // A branch account starts on its own branch and can only switch to All branches. HO and ALL accounts start on
+    // All branches and can pick any branch: every branch (stock, from the server) and those with their own prices.
     function loadBranches(priceBranches, homeBranch, stockBranches = []) {
-      const branches = [...new Set([...stockBranches, ...priceBranches])].sort();
+      const home = String(homeBranch || '').trim().toUpperCase();
+      const branches = home ? [home] : [...new Set([...stockBranches, ...priceBranches])].sort();
       bannerBranches = branches;
       const select = $('branchSelect');
       select.replaceChildren(select.options[0]);
       branches.forEach((branch) => select.add(new Option(branch, branch)));
-      const home = String(homeBranch || '').trim().toUpperCase();
-      if (!branchChosen) setBranch(branches.includes(home) ? home : '');
+      if (!branchChosen) setBranch(home);
       else if (!branches.includes(selectedBranch)) setBranch('');
       select.value = selectedBranch;
     }
