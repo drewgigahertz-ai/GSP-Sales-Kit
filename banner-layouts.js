@@ -63,6 +63,8 @@
     /* A thin dark blue outline that follows the picture's own shape, so its white lettering reads on the white box. */
     .alt-promo img { width: auto; object-fit: contain;
       filter: drop-shadow(0 0 1px #0f2a8a) drop-shadow(0 0 1px #0f2a8a) drop-shadow(0 0 1.5px #0f2a8a); }
+    .alt-promo-row { display: flex; max-width: 100%; min-width: 0; align-items: center; justify-content: center; gap: 10px; }
+    .alt-promo-row img { min-width: 0; flex: 0 1 auto; }
     .alt-promo-sub { color: #1d3fb8; font-size: 18px; font-weight: 800; letter-spacing: 5px; }
     .alt-promo-title { color: #1a2cf0; font-weight: 900; line-height: 1; padding: 0 20px; }
 
@@ -192,7 +194,7 @@
         .filter((f) => f.name && f.name !== 'N/A'),
       brandPicture: shownImage($('brandLogo')),
       brandName: text('brandName'),
-      promoPicture: shownImage(document.querySelector('#promoPictures img')),
+      promoPictures: [...document.querySelectorAll('#promoPictures img')].map(shownImage).filter(Boolean),
       promoName,
       branch: (typeof selectedBranch === 'string' && selectedBranch) || '',
       codes: [...document.querySelectorAll('#priceDetails .price-detail')].map((cell) => cell.textContent.replace(/\s+/g, ' ').trim()),
@@ -209,10 +211,12 @@
   function brandHtml(d) {
     return `<div class="alt-brand">${d.brandPicture ? `<img src="${esc(d.brandPicture)}" alt="${esc(d.brandName)}">` : esc(d.brandName)}</div>`;
   }
-  // The promo picture (DB PHOTOS); without one, the promo title (and the branch, when one is picked).
+  // The promo pictures (side by side when there are several); without one, the promo title (and the branch, when one is picked).
   function promoHtml(d, className, titleSize) {
     let inner = '';
-    if (d.promoPicture) inner = `<img src="${esc(d.promoPicture)}" alt="${esc(d.promoName)}">`;
+    const images = d.promoPictures.map((picture) => `<img src="${esc(picture)}" alt="${esc(d.promoName)}">`).join('');
+    if (d.promoPictures.length > 1) inner = `<div class="alt-promo-row">${images}</div>`;
+    else if (images) inner = images;
     else if (d.promoName) {
       inner = (d.branch ? `<div class="alt-promo-sub">${esc(d.branch)}</div>` : '')
         + `<div class="alt-promo-title" style="font-size:${d.promoName.length > 18 ? Math.round(titleSize * .6) : titleSize}px">${esc(d.promoName)}</div>`;

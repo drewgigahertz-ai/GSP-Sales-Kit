@@ -6,6 +6,13 @@
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
+      version: '1.0.28',
+      date: 'November 9, 2026',
+      changes: [
+        'Banner: when a promo and its freebie have separate pictures, both are shown side by side.'
+      ]
+    },
+    {
       version: '1.0.27',
       date: 'November 7, 2026',
       changes: [

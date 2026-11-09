@@ -1438,14 +1438,20 @@
 
     async function renderPromoPictures(promo) {
       const version = ++promoRenderVersion;
-      const image = document.createElement('img');
-      image.className = 'picture-slot';
-      await setPicture(image, promo && promo.picture, promoLabel(promo && promo.name));
+      // Side by side when the promo and its freebies each have their own picture.
+      const pictures = promo && promo.pictures && promo.pictures.length ? promo.pictures : [promo || {}];
+      const images = await Promise.all(pictures.map(async (picture) => {
+        const image = document.createElement('img');
+        image.className = 'picture-slot';
+        await setPicture(image, picture.picture, promoLabel(picture.name));
+        return image;
+      }));
       if (version !== promoRenderVersion) return;
       const box = $('promoPictures');
-      box.style.gridTemplateColumns = 'minmax(0, 1fr)';
+      const shown = images.filter((image) => !image.hidden);
+      box.style.gridTemplateColumns = `repeat(${Math.max(1, shown.length)}, minmax(0, 1fr))`;
       box.style.gridTemplateRows = 'minmax(0, 1fr)';
-      box.replaceChildren(...(image.hidden ? [] : [image]));
+      box.replaceChildren(...shown);
     }
 
     function promoLabel(name) {

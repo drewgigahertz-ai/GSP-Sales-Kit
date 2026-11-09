@@ -33,7 +33,8 @@ const PRICE_COLUMNS = {
   cash: 'H',
   srp: 'I',
   twelveMonths: 'J',
-  promo: 'R'
+  promo: 'R',
+  freebies: ['O', 'P', 'Q']
 };
 
 const { promoKey } = require('./promo-icons');
@@ -191,6 +192,7 @@ function pricesCollection(values) {
       branch: branchList(at(row, PRICE_COLUMNS.branch)).join(', '),
       promo_title: text(at(row, PRICE_COLUMNS.promoTitle)).replace(/\s+/g, ' '),
       promo: text(at(row, PRICE_COLUMNS.promo)),
+      freebies: JSON.stringify(PRICE_COLUMNS.freebies.map((letters) => text(at(row, letters))).filter(Boolean)),
       // NEW PRICING has no promo dates; the columns stay so dated rows keep working if they are added.
       start: '',
       end: '',
@@ -200,7 +202,7 @@ function pricesCollection(values) {
       ...Object.fromEntries(PRICE_DETAILS.map(([title, letters]) => [detailColumn(title), text(at(row, letters))]))
     });
   }
-  return collection('banner_prices', ['item_code', 'branch', 'promo_title', 'promo', 'start', 'end', 'cash', 'srp', 'twelve_months',
+  return collection('banner_prices', ['item_code', 'branch', 'promo_title', 'promo', 'freebies', 'start', 'end', 'cash', 'srp', 'twelve_months',
     ...PRICE_DETAILS.map(([title]) => detailColumn(title))], rows);
 }
 
@@ -301,14 +303,43 @@ function buildBannerData(rows, imageUrl = (value) => value, now = new Date()) {
     for (const branch of branches) choose(branchPrices, `${branch}|${key}`, candidate);
   }
 
-  // Promo picture: by TOTAL PROMO (promo title + freebies): PROMO IMAGES first (rows.promoIcons, see
-  // promo-icons.js), else DB PHOTOS. A blank promo means "NO PROMO", which has its own picture in DB PHOTOS; a promo
-  // without a picture in either also shows the NO PROMO picture.
+  // Promo pictures: by TOTAL PROMO (promo title + freebies): PROMO IMAGES first (rows.promoIcons, see
+  // promo-icons.js), else DB PHOTOS. Without a picture for the whole combination, the promo title's and each freebie's
+  // own pictures are shown side by side. A blank promo means "NO PROMO", which has its own picture in DB PHOTOS; a
+  // promo with none of these also shows the NO PROMO picture.
   const promoIcons = new Map();
   for (const row of rows.promoIcons || []) {
     const iconKey = promoKey(row.name);
     if (iconKey && text(row.link) && !promoIcons.has(iconKey)) promoIcons.set(iconKey, row);
   }
+  const promoPicture = (name) => {
+    if (!text(name)) return null;
+    const row = photo('promo', name);
+    return promoIcons.get(promoKey(name)) || (row && row.link ? row : null);
+  };
+  const freebiesOf = (price) => {
+    try {
+      const list = JSON.parse(price.freebies || '[]');
+      return Array.isArray(list) ? list : [];
+    } catch {
+      return [];
+    }
+  };
+  // The pictures for a price row, in the order they are shown; the same picture is shown once.
+  const promoPictures = (price) => {
+    const whole = promoPicture(price.promo);
+    if (whole) return [whole];
+    const title = promoKey(price.promo_title) === 'NOPROMO' ? '' : price.promo_title;
+    const links = new Set();
+    const parts = [title, ...freebiesOf(price)].map(promoPicture).filter((row) => {
+      if (!row || links.has(row.link)) return false;
+      links.add(row.link);
+      return true;
+    });
+    if (parts.length) return parts;
+    const none = promoPicture('NO PROMO');
+    return none ? [none] : [];
+  };
   // An AGEING promo (e.g. "ACER - AGEING PROMO") is sold with its clearance banner only (AGEING BANNER).
   const priceView = (price) => {
     if (!price) {
@@ -317,8 +348,8 @@ function buildBannerData(rows, imageUrl = (value) => value, now = new Date()) {
         priceDetails: PRICE_DETAILS.map(([title, , isPrice]) => ({ title, value: isPrice ? null : '', isPrice }))
       };
     }
-    const icon = text(price.promo) ? promoIcons.get(promoKey(price.promo)) : null;
-    const match = icon || [text(price.promo) || 'NO PROMO', 'NO PROMO'].map((name) => photo('promo', name)).find((row) => row && row.link);
+    const pictures = promoPictures(price);
+    const [match] = pictures;
     const ageingPromo = /\bag(e)?ing\b/i.test(text(price.promo));
     return {
       cash: number(price.cash),
@@ -326,8 +357,13 @@ function buildBannerData(rows, imageUrl = (value) => value, now = new Date()) {
       twelveMonths: number(price.twelve_months),
       hasPrice: true,
       promo: match
-        ? { name: match.name, picture: imageUrl(match.link), trigger: match.trigger || '' }
-        : { name: text(price.promo) || 'NO PROMO', picture: '', trigger: '' },
+        ? {
+          name: match.name,
+          picture: imageUrl(match.link),
+          trigger: match.trigger || '',
+          pictures: pictures.map((row) => ({ name: row.name, picture: imageUrl(row.link) }))
+        }
+        : { name: text(price.promo) || 'NO PROMO', picture: '', trigger: '', pictures: [] },
       ageingPromo,
       // Clearance banner only (no generated banner, no switch).
       ageingOnly: ageingPromo,
