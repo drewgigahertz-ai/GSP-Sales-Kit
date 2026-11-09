@@ -302,10 +302,10 @@ function makeCriteriaData(rows, specsBySku, appHierarchyMap) {
   return { laptops, appHierarchyMap, locations };
 }
 
-// Banner page branch filter: each laptop's stock per branch (Criteria Segment-Application; RECO TABLE's
-// BR STOCK for laptops not in it). item.stock lists only branches with stock; bannerData.stockBranches lists
-// every branch.
-function attachBranchStock(bannerData, criteriaSegmentData, recoRows) {
+// Banner page branch filter: each laptop's stock per branch: LAPTOP DB's inventory columns; for a laptop not in
+// LAPTOP DB (or while it has no inventory at all), Criteria Segment-Application, then RECO TABLE's BR STOCK.
+// item.stock lists only branches with stock; bannerData.stockBranches lists every branch.
+function attachBranchStock(bannerData, criteriaSegmentData, recoRows, laptopDatabase = []) {
   const stockByItem = new Map();
   for (const laptop of criteriaSegmentData.laptops) {
     const stock = {};
@@ -324,9 +324,12 @@ function attachBranchStock(bannerData, criteriaSegmentData, recoRows) {
     fromReco.get(key)[branch] = quantity;
   }
   for (const [key, stock] of fromReco) stockByItem.set(key, stock);
+  const hasInventory = laptopDatabase.some((laptop) => Object.keys(laptop.stock).length);
+  if (hasInventory) for (const laptop of laptopDatabase) stockByItem.set(canonicalSku(laptop.item), laptop.stock);
   for (const item of bannerData.items) item.stock = stockByItem.get(canonicalSku(item.itemCode)) || {};
   const branches = new Set(criteriaSegmentData.locations.map((location) => location.trim().toUpperCase()).filter(Boolean));
   for (const row of recoRows) if (text(row.BR)) branches.add(text(row.BR).toUpperCase());
+  if (hasInventory) for (const laptop of laptopDatabase) Object.keys(laptop.stock).forEach((branch) => branches.add(branch));
   bannerData.stockBranches = [...branches].sort();
 }
 
@@ -506,7 +509,8 @@ function getInitialData() {
     specsBySku,
     Object.fromEntries(applicationMatrix.applications.map(({ name, hierarchy }) => [name.toLowerCase(), hierarchy]))
   );
-  attachBranchStock(bannerData, criteriaSegmentData, recoTableData);
+  const laptopDatabase = makeLaptopDatabase(getRows('laptop_database'));
+  attachBranchStock(bannerData, criteriaSegmentData, recoTableData, laptopDatabase);
   const ukspBannerData = makeUkspBannerData(getRows('uksp_banner'), getRows('features_banner'));
   const modelBySku = Object.fromEntries(Object.entries(specsBySku).map(([sku, spec]) => [sku, spec.title]));
   ukspBannerData.skus.forEach(({ sku, model }) => {
@@ -547,7 +551,7 @@ function getInitialData() {
     // Flyers page: each branch's logo, store name and address (LOGO sheet E–I).
     branchDetails: makeBranchDetails(getRows('branch_details'), normalizeImageUrl),
     // Flyers page: each laptop's name, part number and specs (LAPTOP DB sheet).
-    laptopDatabase: makeLaptopDatabase(getRows('laptop_database')),
+    laptopDatabase,
     ukspPerSkuData,
     ukspBannerData,
     appUkspData: applicationMatrix,
