@@ -32,6 +32,7 @@
   <script src="./feature-banner-status.js"></script>
   <script src="./reco-promos.js"></script>
   <script src="./reco-alternatives.js"></script>
+  <script src="./reco-all-laptops.js"></script>
   <script src="./presentation-picker.js" defer></script>
   <script src="./price-notify.js" defer></script>
   <script src="./updates.js" defer></script>
@@ -4369,6 +4370,8 @@
         buildSmtProductCatalog(targetHierarchy);
         // DB sheet: each tier starts on its recommended laptop (reco-alternatives.js).
         if (window.RecoAlternatives) RecoAlternatives.applyToCatalog(productCatalog, targetHierarchy);
+        // Every other LAPTOP DB laptop, with no stock, at the end of each list (reco-all-laptops.js).
+        if (window.RecoAllLaptops) RecoAllLaptops.addLaptopsWithoutStock(productCatalog);
         buildProductDropdowns();
         ['exceed', 'meet', 'budget'].forEach(tier => {
           selectProduct(tier, productCatalog[tier].find(product => product.smtDefault) || null);
@@ -4413,12 +4416,16 @@
       productCatalog.budget = processTierLaptops(1);
       // DB sheet: every laptop in stock is listed, and each tier starts on its recommended laptop (reco-alternatives.js).
       if (window.RecoAlternatives) RecoAlternatives.applyToCatalog(productCatalog, targetHierarchy);
+      // Every other LAPTOP DB laptop, with no stock, at the end of each list (reco-all-laptops.js); the cards still
+      // start on the first laptop of the list as it was before.
+      if (window.RecoAllLaptops) RecoAllLaptops.addLaptopsWithoutStock(productCatalog);
 
       buildProductDropdowns();
 
-      selectProduct('exceed', productCatalog.exceed.length > 0 ? productCatalog.exceed[0] : null);
-      selectProduct('meet', productCatalog.meet.length > 0 ? productCatalog.meet[0] : null);
-      selectProduct('budget', productCatalog.budget.length > 0 ? productCatalog.budget[0] : null);
+      const startingLaptop = (list) => (window.RecoAllLaptops ? RecoAllLaptops.startingLaptop(list) : (list[0] || null));
+      selectProduct('exceed', startingLaptop(productCatalog.exceed));
+      selectProduct('meet', startingLaptop(productCatalog.meet));
+      selectProduct('budget', startingLaptop(productCatalog.budget));
 
       updateRecoBanner();
     }
@@ -6142,28 +6149,32 @@
         if (!listEl) return;
         listEl.innerHTML = '';
 
-        let items = productCatalog[tier] || [];
+        const catalogItems = productCatalog[tier] || [];
+        // The laptops in stock first; then, under a "No stock" heading, the others (reco-all-laptops.js).
+        const split = window.RecoAllLaptops
+          ? RecoAllLaptops.splitByStock(catalogItems)
+          : { inStock: catalogItems.filter(prod => !isBranch || getLaptopStock(prod, selectedLocation) > 0), noStock: [] };
+        const items = [...split.inStock, ...split.noStock];
+        const startingProd = window.RecoAllLaptops ? RecoAllLaptops.startingLaptop(catalogItems) : catalogItems[0];
 
-        if (isBranch) {
-          items = items.filter(prod => getLaptopStock(prod, selectedLocation) > 0);
-        }
-
-        if (items.length === 0) {
+        if (split.inStock.length === 0) {
           const emptyDiv = document.createElement('div');
           emptyDiv.className = 'p-3 text-center text-muted small';
           emptyDiv.innerHTML = `<i class="bi bi-info-circle me-1"></i> No ${tier.toUpperCase()} laptops currently in stock at <strong>${selectedLocation}</strong>`;
           listEl.appendChild(emptyDiv);
-          return;
+          if (items.length === 0) return;
         }
 
         const meta = tierMeta[tier];
 
         items.forEach((prod, index) => {
+          if (index === split.inStock.length) listEl.appendChild(RecoAllLaptops.noStockHeader(split.noStock.length));
           const div = document.createElement('div');
           const isSmt = selectedRecommendationMode === 'SMT';
           // In SMT the list is by stock only; the starting laptop is marked as selected, with no tag labels.
-          const isTop = isSmt ? Boolean(prod.smtDefault) : (index === 0);
-          div.className = `custom-dropdown-item ${isTop ? 'active' : ''}`;
+          const isTop = isSmt ? Boolean(prod.smtDefault) : (prod === startingProd);
+          const hasNoStock = index >= split.inStock.length;
+          div.className = `custom-dropdown-item ${isTop ? 'active' : ''} ${hasNoStock ? 'is-no-stock' : ''}`;
           div.style.display = 'flex';
           div.style.flexDirection = 'column';
           div.style.alignItems = 'stretch';
@@ -6399,6 +6410,10 @@
       standardItems.forEach(it => {
         const matches = !query || it.textContent.toLowerCase().includes(query);
         setSearchMatch(it, matches);
+      });
+      // The "No stock" heading shows while a laptop under it is shown.
+      listEl.querySelectorAll('.no-stock-header').forEach(header => {
+        header.hidden = Boolean(query) && !listEl.querySelector('.is-no-stock:not(.search-no-match)');
       });
 
       const existingExtras = listEl.querySelectorAll('.sheet-extra-item, .sheet-extra-header');

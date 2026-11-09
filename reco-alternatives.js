@@ -459,5 +459,5 @@
   window.addEventListener('resize', closeMenu);
   document.addEventListener('scroll', (event) => { if (event.target !== menu) closeMenu(); }, true);
 
-  window.RecoAlternatives = { applyToCatalog, isRecommended, show, toggle };
+  window.RecoAlternatives = { applyToCatalog, isRecommended, show, toggle, laptopDbProduct };
 })();

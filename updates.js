@@ -6,6 +6,13 @@
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
+      version: '1.0.29',
+      date: 'November 9, 2026',
+      changes: [
+        'Reco Table: the Exceed / Meet / Budget lists now show every laptop, including laptops with no stock. Laptops in stock come first, and the rest are listed under "No stock". You can still pick them.'
+      ]
+    },
+    {
       version: '1.0.28',
       date: 'November 9, 2026',
       changes: [
