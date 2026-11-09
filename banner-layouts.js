@@ -90,7 +90,8 @@
     .alt-specs .l2-monthly { width: 380px; padding: 14px 0; background: #fff; color: #1d3fb8; font-size: 44px; font-weight: 900; text-align: center; }
     .alt-specs .l2-monthly i { font-size: 20px; font-weight: 700; }
     /* Centred in the space left of the brand logo (x 602 to 1298). */
-    .alt-specs .l2-promo { top: 45px; left: 950px; min-width: 320px; max-width: 696px; height: 236px; transform: translateX(-50%);
+    /* Centred with auto margins: the download's picture library misplaces pictures in a box moved with transform. */
+    .alt-specs .l2-promo { top: 45px; left: 602px; right: 302px; margin-inline: auto; min-width: 320px; max-width: 696px; height: 236px;
       border: 4px solid #1a2cf0; }
     .alt-specs .l2-promo img { height: 216px; max-width: 668px; }
     .alt-specs .alt-brand { top: 64px; right: 40px; }
@@ -137,7 +138,7 @@
       font-size: 12px; line-height: 1.6; word-spacing: 2px; }
     .alt-quick .alt-brand { top: 40px; right: 46px; }
     /* Centred over the Quick Specs card (520 px wide, from x 1020). */
-    .alt-quick .l3-promo { top: 142px; left: 1280px; min-width: 280px; max-width: 520px; height: 168px; transform: translateX(-50%);
+    .alt-quick .l3-promo { top: 142px; left: 1020px; right: 60px; margin-inline: auto; min-width: 280px; max-width: 520px; height: 168px;
       border-left: 8px solid #e0262f; border-radius: 22px; box-shadow: 0 12px 30px rgba(20, 40, 120, .12); }
     .alt-quick .l3-promo img { height: 156px; max-width: 494px; }
     .alt-quick .l3-promo .alt-promo-sub { color: #334155; font-size: 15px; letter-spacing: 6px; }
