@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>App Tests</title>
+<meta name="robots" content="noindex">
+<style>
+:root{--navy:#0012b3;--navy2:#003ecb;--blue:#1d3ae0;--soft:#e4e9fb;--bg:#f2f3f8;--ink:#181a2e;--muted:#6a6f8e;--line:#e1e4f0}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",system-ui,sans-serif;font-size:14px}
+header{background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;padding:22px 40px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+h1{margin:0;font-size:1.5rem}header p{margin:2px 0 0;opacity:.85}
+main{max-width:1180px;margin:0 auto;padding:24px 40px 60px}h2{color:var(--navy);font-size:1.1rem;margin:28px 0 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.card{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(20,25,80,.08);margin-bottom:22px;overflow:hidden}
+.card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;background:var(--soft);flex-wrap:wrap}
+.name{font-weight:700;color:var(--navy);font-size:1.05rem;display:flex;align-items:center;gap:10px;flex-wrap:wrap}.sub{font-size:.8rem;color:var(--muted);margin-top:2px}
+.dot{width:12px;height:12px;border-radius:50%;background:#aab0cc;display:inline-block}.dot.on{background:#16a34a}.dot.busy{background:var(--blue);animation:p 1s infinite}@keyframes p{50%{opacity:.35}}
+button{font:inherit;font-weight:600;border-radius:8px;padding:9px 16px;cursor:pointer;border:1px solid var(--blue);background:var(--blue);color:#fff}
+button:disabled{background:#b8c1ef;border-color:#b8c1ef;cursor:not-allowed}button.line{background:#fff;color:#c42424;border-color:#f0bcbc}button.ghost{background:#fff;color:var(--blue)}
+header button{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.5)}
+.btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+table{width:100%;border-collapse:collapse}th{text-align:left;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:11px 20px;border-bottom:2px solid var(--line)}
+td{padding:11px 20px;border-bottom:1px solid var(--line);vertical-align:top}tr:last-child td{border-bottom:0}.d{color:var(--muted);font-size:.78rem;margin-top:2px;word-break:break-word}
+.status{display:inline-block;padding:3px 11px;border-radius:999px;font-size:.74rem;font-weight:700;background:#eceef5;color:var(--muted)}
+.s-ok,.s-PASS{background:#e2f5e9;color:#14783a}.s-exited,.s-stopped{background:#fdf0d8;color:#a4510a}.s-crashed,.s-failed,.s-missing,.s-not_installed,.s-CHECK{background:#fde6e6;color:#c42424}.s-testing{background:var(--soft);color:var(--blue)}
+.k{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.empty{padding:36px;text-align:center;color:var(--muted)}
+input,select{font:inherit;border:1px solid var(--line);border-radius:7px;padding:7px 9px;background:#fff;color:var(--ink);width:100%}
+.targets td{padding:8px 10px}.targets th{padding:10px}.targets td:first-child,.targets th:first-child{padding-left:20px}
+.foot{display:flex;align-items:flex-end;gap:16px;padding:14px 20px;border-top:1px solid var(--line);flex-wrap:wrap}.foot>div{flex:1 1 220px;min-width:0}
+.msg{font-size:.85rem;font-weight:600}.msg.bad{color:#c42424}.msg.good{color:#14783a}
+.filter{display:flex;align-items:center;gap:8px;font-size:.85rem;font-weight:600;color:var(--muted)}.filter select{width:auto;min-width:160px}
+.tag{display:inline-block;padding:2px 8px;border-radius:6px;background:#fff;color:var(--navy);font-size:.72rem;font-weight:700;border:1px solid #c9d2f5}
+.login{max-width:380px;margin:60px auto;padding:28px}.login h2{margin-top:0}.login label{display:block;margin:14px 0 6px;font-weight:600;font-size:.85rem}.login button{width:100%;margin-top:18px}
+.scroll{overflow-x:auto}
+@media (max-width:700px){header,main{padding-left:16px;padding-right:16px}td,th{padding-left:12px;padding-right:12px}}
+</style></head><body>
+<header><div><h1>App Tests</h1><p>Check that the apps on the Gigahertz Sales Tools branch laptops open properly</p></div>
+<div class="btns" id="who" hidden><span id="me"></span><button id="logout">Sign out</button></div></header>
+
+<main id="signin" hidden>
+  <form class="card login" id="loginForm">
+    <h2>Sign in</h2>
+    <div class="sub">Use a SalesKit account of a head office branch (HO or ALL).</div>
+    <label for="username">Username</label><input id="username" autocomplete="username" required>
+    <label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required>
+    <button type="submit">Sign in</button>
+    <div class="msg bad" id="loginMsg" style="margin-top:12px"></div>
+  </form>
+</main>
+
+<main id="app" hidden>
+<h2><span>Branch laptops</span><span class="btns"><label class="filter">Branch <select id="branch"><option value="">All branches</option></select></label><button id="runAll">Run test on all online</button></span></h2>
+<div id="laptops"></div>
+
+<h2>Apps to test</h2>
+<div class="card">
+  <div class="scroll"><table class="targets"><thead><tr><th style="width:20%">App</th><th style="width:20%">Find app by name containing</th><th style="width:19%">Test</th><th style="width:17%">Demo file types</th><th style="width:11%">Wait (s)</th><th></th></tr></thead><tbody id="targets"></tbody></table></div>
+  <div class="foot">
+    <div><div class="k">Demo folder on the laptops</div><input id="demoFolder" placeholder="Desktop\APPLICATION DEMO (leave empty for this)"></div>
+    <div class="btns" style="flex:none"><button class="ghost" id="addTarget">Add app</button><button id="saveTargets">Save</button></div>
+  </div>
+  <div class="sub" style="padding:0 20px 14px">Separate alternatives with | (for example <code>assassin|mirage</code>). "Open a demo file" opens a file of that type from the demo folder and checks its name shows in the app's window. Changes apply to the next test. <span class="msg" id="tmsg"></span></div>
+</div>
+
+<h2><span>Test history</span><button class="line" id="clearBtn">Clear test history</button></h2>
+<div class="card scroll"><table><thead><tr><th>Time</th><th>Laptop</th><th>Branch</th><th>Results</th><th>Overall</th></tr></thead><tbody id="hist"></tbody></table><div class="empty" id="hempty">No finished tests yet.</div></div>
+<div class="sub" id="dir" style="word-break:break-all"></div>
+</main>
+<script>
+const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const LABEL={not_installed:'not installed',exited:'closed early'};
+const badge=(s,title)=>`<span class="status s-${esc(s)}"${title?` title="${esc(title)}"`:''}>${esc(LABEL[s]||s)}</span>`;
+const ago=t=>{if(!t)return'never';const s=Math.round((Date.now()-t)/1000);return s<60?s+'s ago':s<3600?Math.round(s/60)+' min ago':s<86400?Math.round(s/3600)+' h ago':new Date(t).toLocaleString()};
+let key='';try{key=sessionStorage.getItem('appCheckSession')||''}catch{}
+const setKey=k=>{key=k;try{k?sessionStorage.setItem('appCheckSession',k):sessionStorage.removeItem('appCheckSession')}catch{}};
+async function api(path,body){
+  const r=await fetch('/app-check/api/'+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json','X-SalesKit-Session':key},body:body===undefined?undefined:JSON.stringify(body)});
+  const j=await r.json().catch(()=>({}));
+  if(r.status===401&&path!=='login'){showSignin('Please sign in again.');throw new Error('signed out')}
+  return{ok:r.ok,status:r.status,...j};
+}
+let state={laptops:[],history:[]},targets=null,timer=null;
+function showSignin(msg){setKey('');clearInterval(timer);timer=null;targets=null;$('app').hidden=true;$('who').hidden=true;$('signin').hidden=false;$('loginMsg').textContent=msg||'';$('username').focus()}
+function showApp(){$('signin').hidden=true;$('app').hidden=false;$('who').hidden=false;load();clearInterval(timer);timer=setInterval(load,2000)}
+$('loginForm').addEventListener('submit',async e=>{
+  e.preventDefault();$('loginMsg').textContent='';
+  const r=await api('login',{username:$('username').value,password:$('password').value}).catch(()=>({ok:false,error:'The server did not answer.'}));
+  if(!r.ok){$('loginMsg').textContent=r.error||'Could not sign in.';return}
+  $('password').value='';setKey(r.sessionKey);showApp();
+});
+$('logout').addEventListener('click',async()=>{await api('logout',{}).catch(()=>{});showSignin()});
+
+function shown(){const b=$('branch').value;return state.laptops.filter(l=>!b||l.branch===b)}
+const isRunning=l=>l.current&&!l.current.finished;
+function render(){
+  $('me').textContent=state.me||'';
+  const branches=[...new Set(state.laptops.map(l=>l.branch).filter(Boolean))].sort();
+  const sel=$('branch'),cur=sel.value;
+  if(sel.options.length-1!==branches.length||branches.some((b,i)=>sel.options[i+1].value!==b)){
+    sel.innerHTML='<option value="">All branches</option>'+branches.map(b=>`<option>${esc(b)}</option>`).join('');sel.value=branches.includes(cur)?cur:'';
+  }
+  const list=shown();
+  $('runAll').disabled=!list.some(l=>l.online&&!isRunning(l)&&!l.waiting);
+  $('laptops').innerHTML=list.length?list.map(l=>{
+    const run=isRunning(l);
+    const st=run?'Testing now':l.waiting?'Starting the test (within 5 seconds)...':l.online?'Online, ready':'Offline, last seen '+ago(l.lastSeen);
+    const who=[l.user?'Signed in: '+l.user:(l.online?'Nobody signed in':''),l.version&&'Sales Tools '+l.version].filter(Boolean).join(' · ');
+    const rows=l.current?Object.entries(l.current.targets).map(([n,t])=>`<tr><td><strong>${esc(n)}</strong></td><td>${badge(t.status)}</td><td class="d">${esc(t.detail)}</td></tr>`).join(''):'<tr><td colspan="3" class="empty">No test since the server started.</td></tr>';
+    const btn=l.waiting?`<button class="ghost" data-act="cancel" data-n="${esc(l.name)}">Cancel</button>`
+      :!l.online&&!run?`<button class="line" data-act="forget" data-n="${esc(l.name)}">Remove from list</button>`
+      :`<button data-act="run" data-n="${esc(l.name)}" ${run?'disabled':''}>Run test</button>`;
+    return`<div class="card"><div class="card-h"><div><div class="name"><span class="dot ${run?'busy':l.online?'on':''}"></span>${esc(l.name)} ${l.branch?`<span class="tag">${esc(l.branch)}</span>`:''}</div><div class="sub">${esc(st)}${who?' · '+esc(who):''}</div></div>${btn}</div>
+    <div class="scroll"><table><thead><tr><th style="width:24%">App</th><th style="width:16%">Status</th><th>What is happening</th></tr></thead><tbody>${rows}</tbody></table></div></div>`}).join('')
+  :`<div class="card"><div class="empty"><strong>${state.laptops.length?'No laptop in this branch.':'No laptop has connected yet.'}</strong><br>Laptops appear here when Gigahertz Sales Tools 1.0.30 or later is open on them.</div></div>`;
+  const b=$('branch').value,hist=state.history.filter(h=>!b||h.branch===b);
+  $('hist').innerHTML=hist.map(h=>{const ok=h.results.length&&h.results.every(r=>r.status==='ok');return`<tr><td>${esc(new Date(h.time).toLocaleString())}</td><td>${esc(h.laptop)}${h.user?`<div class="d">${esc(h.user)}</div>`:''}</td><td>${esc(h.branch||'')}</td>
+    <td>${h.results.map(r=>esc(r.target)+' '+badge(r.status,r.detail)).join(' &nbsp; ')}${h.stoppedOnLaptop?'<div class="d">Stopped on the laptop</div>':''}</td><td>${badge(ok?'PASS':'CHECK')}</td></tr>`}).join('');
+  $('hempty').style.display=hist.length?'none':'block';
+  $('dir').textContent='Results are also saved on the server in '+state.dataDir+' (results.csv opens in Excel).';
+}
+async function load(){
+  let r;try{r=await api('state')}catch{return}
+  if(!r.ok){$('laptops').innerHTML='<div class="card"><div class="empty">The server did not answer. Retrying...</div></div>';return}
+  state=r;
+  if(!targets){targets=state.targets.map(t=>({...t}));$('demoFolder').value=state.demoFolder||'';renderTargets()}
+  render();
+}
+$('laptops').addEventListener('click',async e=>{
+  const b=e.target.closest('button[data-act]');if(!b)return;
+  const n=b.dataset.n;
+  if(b.dataset.act==='forget'&&!confirm(`Remove ${n} from the list? It comes back when Gigahertz Sales Tools is opened on it again.`))return;
+  b.disabled=true;
+  if(b.dataset.act==='run')await api('run',{laptops:[n]}).catch(()=>{});
+  if(b.dataset.act==='cancel')await api('cancel',{laptop:n}).catch(()=>{});
+  if(b.dataset.act==='forget')await api('forget',{laptop:n}).catch(()=>{});
+  load();
+});
+$('runAll').addEventListener('click',async()=>{
+  const names=shown().filter(l=>l.online&&!isRunning(l)&&!l.waiting).map(l=>l.name);
+  if(!names.length||!confirm(`Start the app test on ${names.length} laptop${names.length>1?'s':''}? The apps will open on them while it runs.`))return;
+  await api('run',{laptops:names}).catch(()=>{});load();
+});
+$('branch').addEventListener('change',render);
+$('clearBtn').addEventListener('click',async()=>{if(confirm('Delete the whole test history (also results.csv on the server)?')){await api('clear',{}).catch(()=>{});load()}});
+
+// ---- apps to test ----
+const unsaved=()=>{$('tmsg').textContent='Not saved yet.';$('tmsg').className='msg'};
+function renderTargets(){
+  $('targets').innerHTML=targets.map((t,i)=>`<tr>
+    <td><input data-i="${i}" data-k="name" value="${esc(t.name)}" aria-label="App name"></td>
+    <td><input data-i="${i}" data-k="keyword" value="${esc(t.keyword)}" aria-label="Keyword for ${esc(t.name)}"></td>
+    <td><select data-i="${i}" data-k="mode" aria-label="How to test ${esc(t.name)}"><option value="file"${t.mode==='file'?' selected':''}>Open a demo file</option><option value="launch"${t.mode!=='file'?' selected':''}>Just open the app</option></select></td>
+    <td><input data-i="${i}" data-k="exts" value="${esc((t.exts||[]).join(', '))}" placeholder=".dwg" ${t.mode==='file'?'':'disabled'} aria-label="File types for ${esc(t.name)}"></td>
+    <td><input data-i="${i}" data-k="wait" type="number" min="2" max="600" value="${esc(t.wait)}" aria-label="Wait seconds for ${esc(t.name)}"></td>
+    <td><button class="line" data-del="${i}" title="Remove" aria-label="Remove ${esc(t.name)}">✕</button></td></tr>`).join('');
+}
+$('targets').addEventListener('input',e=>{
+  const el=e.target,t=targets[el.dataset.i];if(!t)return;
+  t[el.dataset.k]=el.dataset.k==='exts'?el.value.split(/[,\s]+/).filter(Boolean):el.value;
+  if(el.dataset.k==='mode')renderTargets();
+  unsaved();
+});
+$('targets').addEventListener('click',e=>{const i=e.target.dataset.del;if(i===undefined)return;targets.splice(+i,1);renderTargets();unsaved()});
+$('addTarget').addEventListener('click',()=>{targets.push({name:'',keyword:'',mode:'launch',exts:[],wait:90});renderTargets();$('targets').querySelector('tr:last-child input').focus();unsaved()});
+$('saveTargets').addEventListener('click',async()=>{
+  const r=await api('targets',{targets,demoFolder:$('demoFolder').value}).catch(()=>null);if(!r)return;
+  if(r.ok){targets=r.targets.map(t=>({...t}));$('demoFolder').value=r.demoFolder||'';renderTargets();$('tmsg').textContent='Saved. The next test uses this list.';$('tmsg').className='msg good'}
+  else{$('tmsg').textContent=r.error||'Could not save.';$('tmsg').className='msg bad'}
+});
+$('demoFolder').addEventListener('input',unsaved);
+
+if(key)showApp();else showSignin();
+</script></body></html>

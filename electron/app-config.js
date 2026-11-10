@@ -21,28 +21,8 @@ function getConfig() {
   return {
     serverUrls,
     serverUrl: serverUrls[0] || '',
-    serverToken: setting('SALESKIT_SERVER_TOKEN', embedded.serverToken),
-    ...appCheckConfig(serverUrls)
+    serverToken: setting('SALESKIT_SERVER_TOKEN', embedded.serverToken)
   };
-}
-
-// App Check Server (app tests from the admin page, see app-check.js): its own address(es) in appCheckUrl, or else
-// the SalesKit Server's computer on port 3100. No token in the config turns App Check off on this laptop.
-const APP_CHECK_PORT = 3100;
-function appCheckConfig(serverUrls) {
-  const appCheckToken = setting('SALESKIT_APPCHECK_TOKEN', embedded.appCheckToken);
-  const given = setting('SALESKIT_APPCHECK_URL', embedded.appCheckUrl).split(',').map(cleanUrl).filter(Boolean);
-  const derived = serverUrls.map((url) => {
-    try {
-      const address = new URL(url);
-      address.port = String(APP_CHECK_PORT);
-      return cleanUrl(address.origin);
-    } catch {
-      return '';
-    }
-  }).filter(Boolean);
-  const appCheckUrls = appCheckToken ? [...new Set(given.length ? given : derived)] : [];
-  return { appCheckUrls, appCheckToken };
 }
 
 module.exports = { getConfig };

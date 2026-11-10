@@ -560,7 +560,7 @@ app.whenReady().then(() => {
     isSignedIn: () => Boolean(session) && !onLoginPage
   });
   appCheck = createAppCheck({
-    getConfig,
+    request: (route, body, timeoutMs) => requestServer(`/api/app-check/${route}`, { method: 'POST', body, timeoutMs }),
     getUser: () => (session ? session.user : null),
     getWindow: () => mainWindow,
     readShortcutLink: (file) => shell.readShortcutLink(file),

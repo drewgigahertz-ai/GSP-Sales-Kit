@@ -60,12 +60,22 @@ function readJsonBody(request, limit = 10 * 1024) {
 // priceChanges (optional): { latestId(), since(id), subscribe(listener) → unsubscribe } (server/price-watch.js).
 //   GET /api/price-changes?since=<id> lists the changes a laptop missed; GET /api/events stays open and sends
 //   each new price change the moment it happens (Server-Sent Events).
-function createLocalApi({ database, token = '', onRequest = null, getDataVersion = () => null, getLatestClientVersion = () => null, getInitialPayload = null, onActivity = null, accounts = null, priceChanges = null }) {
+// appCheck (optional): server/app-check.js. Its web page (/app-check) has its own sign-in instead of the app token;
+//   laptops send POST /api/app-check/<route> with the app token, also from the sign-in page (no user needed).
+function createLocalApi({ database, token = '', onRequest = null, getDataVersion = () => null, getLatestClientVersion = () => null, getInitialPayload = null, onActivity = null, accounts = null, priceChanges = null, appCheck = null }) {
   return http.createServer(async (request, response) => {
     const url = new URL(request.url, 'http://localhost');
     const address = request.socket.remoteAddress || '';
     let user = null;
     let denied = null; // 'token' (wrong app key) or 'login' (not signed in)
+    if (appCheck && (url.pathname === '/app-check' || url.pathname.startsWith('/app-check/'))) {
+      try {
+        await appCheck.handleAdmin(request, response, url, address);
+      } catch (error) {
+        if (!response.headersSent) sendJson(response, 500, { error: error.message || 'Server request failed.' });
+      }
+      return;
+    }
     if (onRequest) {
       response.on('finish', () => onRequest({
         method: request.method,
@@ -105,6 +115,13 @@ function createLocalApi({ database, token = '', onRequest = null, getDataVersion
       if (accounts && request.method === 'POST' && url.pathname === '/api/logout') {
         accounts.logout(request.headers['x-saleskit-session']);
         sendJson(response, 200, { ok: true });
+        return;
+      }
+
+      if (appCheck && request.method === 'POST' && url.pathname.startsWith('/api/app-check/')) {
+        user = accounts ? accounts.userForSession(request.headers['x-saleskit-session']) : null;
+        const result = appCheck.handleLaptop(url.pathname.slice('/api/app-check/'.length), await readJsonBody(request, 64 * 1024), user);
+        sendJson(response, result.status, result.body);
         return;
       }
 

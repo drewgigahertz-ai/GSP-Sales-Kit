@@ -18,6 +18,7 @@ const { createCompressedData } = require('./compressed-data');
 const { createPriceWatch } = require('./price-watch');
 const { createServerUpdater } = require('./updater');
 const { buildDataHealth } = require('./data-health');
+const { createAppCheck } = require('./app-check');
 const { version: APP_VERSION } = require('../package.json');
 
 const APP_NAME = 'GigaHertz SalesKit Server';
@@ -57,6 +58,8 @@ let serverUpdater;
 let dataHealth = null;
 let activity;
 let priceWatch;
+// App tests on the branch laptops, run from the /app-check web page (server/app-check.js).
+let appCheck = null;
 // Laptops listening on /api/events for price changes.
 const priceListeners = new Set();
 const logs = [];
@@ -317,6 +320,7 @@ async function startApi() {
       if (activity && activity.record(deviceKey(address, client), user, report)) pushDevices();
     },
     getLatestClientVersion: () => clientRelease.get().version,
+    appCheck,
     priceChanges: {
       latestId: () => (priceWatch ? priceWatch.latestId() : 0),
       since: (id) => (priceWatch ? priceWatch.since(id) : []),
@@ -348,6 +352,8 @@ async function startApi() {
         else if (status === 429) log('warning', `Login locked for 15 minutes on ${client.name || ip} (too many wrong passwords)`);
         else if (denied !== 'token') log('warning', `Failed login on ${client.name || ip}`);
       }
+      // Laptops check in for app tests every 5 seconds; app-check.js logs the tests themselves.
+      if (pathname.startsWith('/api/app-check/') && !denied) return;
       if (denied === 'token') log('warning', `Rejected ${who}: wrong or missing token`);
       else if (denied === 'login') {
         if (pathname !== '/api/version') log('warning', `${who} needs to log in (older SalesKit or signed out)`);
@@ -902,6 +908,12 @@ if (!app.requestSingleInstanceLock()) {
           decrypt: (stored) => safeStorage.decryptString(Buffer.from(stored, 'base64'))
         }
       });
+      appCheck = createAppCheck({
+        dataDir: path.join(app.getPath('userData'), 'app-check'),
+        accounts: users,
+        canAdmin: (user) => Boolean(user) && !user.disabled && hasFullAccess(user.branch),
+        log
+      });
       backups = createBackupStore(path.join(app.getPath('userData'), 'backups'), database);
       startApi();
       loadLogos();
@@ -924,6 +936,7 @@ if (!app.requestSingleInstanceLock()) {
     if (clientRelease) clientRelease.stop();
     if (serverUpdater) serverUpdater.stop();
     if (activity) activity.close();
+    if (appCheck) appCheck.stop();
     stopApi();
     database.closeDatabase();
   });

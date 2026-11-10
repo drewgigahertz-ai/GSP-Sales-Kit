@@ -1,8 +1,9 @@
-// App Check: lets the admin test this laptop's apps (AutoCAD, Blender, Premiere...) from the App Check Server's
-// admin page. Every 5 seconds SalesKit tells the App Check Server it is here; when the admin presses "Run test",
-// the reply carries the list of apps to test. SalesKit then runs them one by one (app-check-tests.js), sends each
-// step live, and sends the results at the end. Results the server did not receive are kept on this laptop and sent
-// on a later check-in. While a test runs the window shows a notice with a Stop button (app-check-notice.js).
+// App Check: lets the admin test this laptop's apps (AutoCAD, Blender, Premiere...) from the App Tests web page on
+// the SalesKit Server (server/app-check.js). Every 5 seconds SalesKit tells the server it is here
+// (POST /api/app-check/poll); when the admin pressed "Run test", the reply carries the list of apps to test. SalesKit
+// then runs them one by one (app-check-tests.js), sends each step live, and sends the results at the end. Results
+// the server did not receive are kept on this laptop and sent on a later check-in. While a test runs the window
+// shows a notice with a Stop button (app-check-notice.js). Older SalesKit Servers answer 404; nothing happens then.
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -10,10 +11,11 @@ const { listApps, testTarget } = require('./app-check-tests');
 
 const POLL_MS = 5000;
 
-function createAppCheck({ getConfig, getUser, getWindow, readShortcutLink, userDataDir, desktopDir, version }) {
+// request(route, body, timeoutMs): POSTs to /api/app-check/<route> on the SalesKit Server (same addresses, token
+// and sign-in as the rest of SalesKit) and resolves to the reply, or rejects.
+function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDataDir, desktopDir, version }) {
   const pendingPath = path.join(userDataDir, 'app-check-pending.json');
   const laptop = os.hostname();
-  let workingUrl = '';
   let state = { running: false };
   let stopRequested = false;
 
@@ -33,31 +35,20 @@ function createAppCheck({ getConfig, getUser, getWindow, readShortcutLink, userD
     if (win && !win.isDestroyed()) win.webContents.send('appcheck:state', state);
   }
 
-  // Tries the address that answered last first. Returns the reply, or null when no address answered.
+  // The server's reply, or null when it could not be reached or refused.
   async function post(route, payload, timeoutMs = 10000) {
-    const { appCheckUrls, appCheckToken } = getConfig();
-    const urls = workingUrl && appCheckUrls.includes(workingUrl) ? [workingUrl, ...appCheckUrls.filter((u) => u !== workingUrl)] : appCheckUrls;
-    for (const url of urls) {
-      try {
-        const response = await fetch(url + route, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-token': appCheckToken },
-          body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(timeoutMs)
-        });
-        workingUrl = url;
-        if (!response.ok) return null;
-        return await response.json().catch(() => ({}));
-      } catch { /* not reachable at this address; try the next one */ }
+    try {
+      return (await request(route, payload, timeoutMs)) || {};
+    } catch {
+      return null;
     }
-    return null;
   }
 
   async function sendPending() {
     const pending = readPending();
     if (!pending.length) return;
     const left = [];
-    for (const payload of pending) if (left.length || !(await post('/results', payload))) left.push(payload);
+    for (const payload of pending) if (left.length || !(await post('results', payload))) left.push(payload);
     writePending(left);
   }
 
@@ -73,11 +64,11 @@ function createAppCheck({ getConfig, getUser, getWindow, readShortcutLink, userD
     const step = (target, status, detail) => {
       steps[target] = { status, detail };
       show();
-      post('/event', { laptop, type: 'step', runId, target, status, detail }, 5000);
+      post('event', { laptop, type: 'step', runId, target, status, detail }, 5000);
     };
 
     show();
-    await post('/event', { laptop, type: 'start', runId, targets: list.map((t) => t.name) }, 5000);
+    await post('event', { laptop, type: 'start', runId, targets: list.map((t) => t.name) }, 5000);
     const desktops = [desktopDir, path.join(process.env.PUBLIC || 'C:\\Users\\Public', 'Desktop')];
     const apps = listApps(readShortcutLink, desktops);
     const results = [];
@@ -102,25 +93,17 @@ function createAppCheck({ getConfig, getUser, getWindow, readShortcutLink, userD
         stoppedOnLaptop: stopRequested,
         results
       };
-      if (!(await post('/results', payload))) writePending([...readPending(), payload]);
+      if (!(await post('results', payload))) writePending([...readPending(), payload]);
     } finally {
-      await post('/event', { laptop, type: 'finish', runId }, 5000);
+      await post('event', { laptop, type: 'finish', runId }, 5000);
       setState({ running: false });
     }
   }
 
   async function poll() {
-    const { appCheckUrls } = getConfig();
-    if (!appCheckUrls.length) return;
-    const user = getUser();
-    // Keeps checking in during a test, so the admin page shows the laptop online; commands wait until it ends.
-    const reply = await post('/agent/poll', {
-      laptop,
-      branch: user ? user.branch || '' : '',
-      user: user ? user.username || '' : '',
-      version,
-      busy: state.running
-    }, 5000);
+    // Keeps checking in during a test, so the web page shows the laptop online; commands wait until it ends.
+    // (The server knows the signed-in user and branch from the session.)
+    const reply = await post('poll', { laptop, version, busy: state.running }, 5000);
     if (!reply || state.running) return;
     await sendPending();
     // Not awaited: the check-ins carry on while the test runs.
