@@ -6,6 +6,13 @@
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
+      version: '1.0.32',
+      date: 'November 10, 2026',
+      changes: [
+        'App test: the laptop now finds the demo files by itself, for example in an APPLICATION DEMO folder on any drive, so they no longer have to be on the desktop.'
+      ]
+    },
+    {
       version: '1.0.30',
       date: 'November 10, 2026',
       changes: [

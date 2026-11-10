@@ -7,13 +7,14 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { listApps, testTarget } = require('./app-check-tests');
+const { listApps, testTarget, collectSampleFiles } = require('./app-check-tests');
 
 const POLL_MS = 5000;
 
 // request(route, body, timeoutMs): POSTs to /api/app-check/<route> on the SalesKit Server (same addresses, token
 // and sign-in as the rest of SalesKit) and resolves to the reply, or rejects.
-function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDataDir, desktopDir, version }) {
+// places: this laptop's { desktop, documents, downloads } folders (app.getPath).
+function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDataDir, places, version }) {
   const pendingPath = path.join(userDataDir, 'app-check-pending.json');
   const laptop = os.hostname();
   let state = { running: false };
@@ -57,7 +58,9 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
     const runId = Date.now();
     const list = (Array.isArray(targets) ? targets : []).filter((t) => t && t.name);
     const user = getUser();
-    const demoRoot = String(demoFolder || '').trim().replace(/^["']+|["']+$/g, '') || path.join(desktopDir, 'APPLICATION DEMO');
+    // The folder the admin chose for the sample files, or '' to look for them anywhere on this laptop.
+    const demoRoot = String(demoFolder || '').trim().replace(/^["']+|["']+$/g, '');
+    let sampleFiles = null;
     const isStopped = () => stopRequested;
     const steps = Object.fromEntries(list.map((t) => [t.name, { status: 'waiting', detail: '' }]));
     const show = () => setState({ running: true, stopping: stopRequested, targets: list.map((t) => ({ name: t.name, ...steps[t.name] })) });
@@ -69,7 +72,7 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
 
     show();
     await post('event', { laptop, type: 'start', runId, targets: list.map((t) => t.name) }, 5000);
-    const desktops = [desktopDir, path.join(process.env.PUBLIC || 'C:\\Users\\Public', 'Desktop')];
+    const desktops = [places.desktop, path.join(process.env.PUBLIC || 'C:\\Users\\Public', 'Desktop')];
     const apps = listApps(readShortcutLink, desktops);
     const results = [];
     try {
@@ -80,7 +83,13 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
           continue;
         }
         step(target.name, 'testing', 'Looking for the app...');
-        const result = await testTarget(target, { apps, demoRoot, isStopped, onStep: (detail) => step(target.name, 'testing', detail) });
+        // One search of the laptop for every file type in the list, the first time an app needs a sample file.
+        if (!demoRoot && target.mode === 'file' && !sampleFiles) {
+          step(target.name, 'testing', 'Looking for sample files on this laptop...');
+          const exts = [...new Set(list.filter((t) => t.mode === 'file').flatMap((t) => t.exts || []))];
+          sampleFiles = await collectSampleFiles(exts, places);
+        }
+        const result = await testTarget(target, { apps, demoRoot, sampleFiles: sampleFiles || [], isStopped, onStep: (detail) => step(target.name, 'testing', detail) });
         results.push({ target: target.name, app: result.app, status: result.status, detail: result.detail });
         step(target.name, result.status, result.detail);
       }

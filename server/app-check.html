@@ -168,10 +168,10 @@ code{background:var(--ghz-soft);padding:1px 5px;border-radius:5px;font-size:.85e
     <div class="panel">
       <div class="scroll"><table class="targets"><thead><tr><th style="width:20%">App</th><th style="width:20%">Find app by name containing</th><th style="width:19%">Test</th><th style="width:17%">Demo file types</th><th style="width:11%">Wait (s)</th><th></th></tr></thead><tbody id="targets"></tbody></table></div>
       <div class="foot">
-        <div><div class="k">Demo folder on the laptops</div><input id="demoFolder" placeholder="Desktop\APPLICATION DEMO (leave empty for this)"></div>
+        <div><div class="k">Only look for demo files in this folder (optional)</div><input id="demoFolder" placeholder="Leave empty: each laptop finds a file by itself"></div>
         <div class="toolbar-right" style="flex:none"><button class="btn light" id="addTarget">Add app</button><button class="btn" id="saveTargets">Save</button></div>
       </div>
-      <div class="hint">Separate alternatives with | (for example <code>assassin|mirage</code>). "Open a demo file" opens a file of that type from the demo folder and checks its name shows in the app's window. <span class="msg" id="tmsg"></span></div>
+      <div class="hint">Separate alternatives with | (for example <code>assassin|mirage</code>). "Open a demo file" opens a file of that type and checks its name shows in the app's window. Each laptop looks on its desktop, Documents, Downloads, OneDrive and its drives, and prefers files or folders named after the app or with "demo" or "sample" in the name (like <code>APPLICATION DEMO</code>). The result says which file was opened. <span class="msg" id="tmsg"></span></div>
     </div>
   </section>
 

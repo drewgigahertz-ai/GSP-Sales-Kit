@@ -83,6 +83,97 @@ function findDemoFile(demoRoot, keyword, exts) {
   return { error: `No ${exts.join(' / ')} file found for "${keyword}" inside ${demoRoot}` };
 }
 
+// ---------- Finding sample files anywhere on the laptop (when the admin set no demo folder) ----------
+
+// Folders never worth searching: Windows, programs, app data, recycle bin, code and game libraries.
+const SKIP_DIR = /^(windows|program files( \(x86\))?|programdata|appdata|\$recycle\.bin|system volume information|recovery|perflogs|msocache|\$windows\.~\w+|intel|amd|nvidia|drivers|node_modules|\.git|steamapps|epic games|xboxgames|windowsapps)$/i;
+const SEARCH_LIMITS = { entries: 80000, ms: 20000 };
+
+// The laptop's own fixed drives other than C: (D:, E:...). Network, USB and CD drives are left out.
+function otherFixedDrives() {
+  return new Promise((resolve) => {
+    if (!IS_WIN) return resolve([]);
+    const cmd = "Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | ForEach-Object { $_.DeviceID }";
+    execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], { timeout: 10000, windowsHide: true }, (_error, out) => {
+      resolve(String(out || '').split(/\r?\n/).map((d) => d.trim()).filter((d) => /^[D-Z]:$/i.test(d)).map((d) => `${d}\\`));
+    });
+  });
+}
+
+// Lists every file with one of `exts` under the usual places on this laptop, without blocking SalesKit (async)
+// and within a time and size limit. places: { desktop, documents, downloads, home }.
+async function collectSampleFiles(exts, places) {
+  const wanted = new Set(exts.map((e) => e.toLowerCase()));
+  const found = [];
+  const seen = new Set();
+  const started = Date.now();
+  let visited = 0;
+  const overLimit = () => visited > SEARCH_LIMITS.entries || Date.now() - started > SEARCH_LIMITS.ms;
+
+  async function search(dir, depth) {
+    if (depth < 0 || overLimit()) return;
+    const key = dir.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    let entries;
+    try { entries = await fs.promises.readdir(dir, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      visited += 1;
+      if (overLimit()) return;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (!SKIP_DIR.test(entry.name) && !entry.name.startsWith('.')) await search(full, depth - 1);
+      } else if (entry.isFile() && wanted.has(path.extname(entry.name).toLowerCase()) && !IGNORED_FILE.test(entry.name)) {
+        found.push(full);
+      }
+    }
+  }
+
+  const publicDir = process.env.PUBLIC || 'C:\\Users\\Public';
+  const userPlaces = [
+    places.desktop, path.join(publicDir, 'Desktop'), places.documents, places.downloads,
+    process.env.OneDrive, path.join(publicDir, 'Documents')
+  ].filter(Boolean);
+  for (const dir of userPlaces) await search(dir, 6);
+  // Folders made straight on C: (like C:\Projects) and the other drives; C:\Users is covered above.
+  for (const drive of ['C:\\', ...(await otherFixedDrives())]) {
+    let entries = [];
+    try { entries = await fs.promises.readdir(drive, { withFileTypes: true }); } catch { continue; }
+    for (const entry of entries) {
+      if (!entry.isDirectory() || SKIP_DIR.test(entry.name) || /^users$/i.test(entry.name)) continue;
+      await search(path.join(drive, entry.name), 4);
+    }
+  }
+
+  const files = await Promise.all(found.map(async (file) => {
+    try { return { file, mtime: (await fs.promises.stat(file)).mtimeMs }; } catch { return null; }
+  }));
+  return files.filter(Boolean);
+}
+
+// The best of the collected files for one app: first anything in an APPLICATION DEMO folder (the stores' own demo
+// files), then files whose name or folder has the app's keyword, then "demo" / "sample" names, then the newest.
+// (So D:\APPLICATION DEMO\AUTOCAD 3D House\house.dwg wins over AutoCAD's own D:\AutoCAD 2027\Sample\Tower.dwg.)
+function pickSampleFile(files, keyword, exts) {
+  const okExt = new Set(exts.map((e) => e.toLowerCase()));
+  const score = ({ file }) => (/application demo/i.test(file) ? 4 : 0) + (matches(file, keyword) ? 2 : 0) + (/demo|sample/i.test(file) ? 1 : 0);
+  const best = files.filter((f) => okExt.has(path.extname(f.file).toLowerCase()))
+    .sort((a, b) => score(b) - score(a) || b.mtime - a.mtime)[0];
+  return best ? { file: best.file } : { error: `No ${exts.join(' / ')} file on this laptop to open.` };
+}
+
+// AutoCAD leaves lock files next to a drawing when it is closed by force. Returns a function that deletes the
+// ones that were not there before the test.
+function lockFileCleanup(file) {
+  const base = file.slice(0, -path.extname(file).length);
+  const locks = path.extname(file).toLowerCase() === '.dwg' ? [`${base}.dwl`, `${base}.dwl2`] : [];
+  const before = new Set(locks.filter((f) => fs.existsSync(f)));
+  return async () => {
+    await sleep(2000);
+    for (const lock of locks) if (!before.has(lock)) fs.rm(lock, { force: true }, () => {});
+  };
+}
+
 // Windows with a title, and whether each one is responding.
 function windowList() {
   return new Promise((resolve) => {
@@ -136,6 +227,7 @@ async function launchTest(exe, waitSeconds, isStopped) {
 // Open the sample file in the app. OK = the file name shows up in the app's window and the window keeps responding.
 async function openFileTest(exe, file, waitSeconds, onStep, isStopped) {
   const base = path.parse(file).name.toLowerCase();
+  const cleanUpLocks = lockFileCleanup(file);
   let spawnError = null;
   const child = spawn(exe, [file], { stdio: 'ignore', cwd: path.dirname(exe) });
   child.on('error', (error) => { spawnError = error.message; });
@@ -150,29 +242,32 @@ async function openFileTest(exe, file, waitSeconds, onStep, isStopped) {
       win = (await windowList()).find((w) => String(w.MainWindowTitle).toLowerCase().includes(base));
       if (!win) onStep(`Waiting for "${path.basename(file)}" to appear in the app window (${Math.max(0, Math.round((end - Date.now()) / 1000))}s left)`);
     }
-    if (!win) return { status: 'failed', detail: `The app did not show "${base}" within ${waitSeconds}s. A pop-up may be blocking it, or it is still loading.` };
+    if (!win) return { status: 'failed', detail: `The app did not show "${base}" within ${waitSeconds}s. A pop-up may be blocking it, or it is still loading. File: ${file}` };
     pid = win.Id;
     onStep('File opened. Checking the app keeps responding...');
     if (await waitUnlessStopped(8000, isStopped)) return STOPPED;
     const again = (await windowList()).find((w) => w.Id === pid);
-    if (!again) return { status: 'crashed', detail: 'The app closed by itself after opening the file.' };
-    if (again.Responding === false) return { status: 'failed', detail: 'The app opened the file but stopped responding.' };
-    return { status: 'ok', detail: `Opened ${path.basename(file)} and it kept responding. The app was closed again.` };
+    if (!again) return { status: 'crashed', detail: `The app closed by itself after opening ${file}.` };
+    if (again.Responding === false) return { status: 'failed', detail: `The app opened ${file} but stopped responding.` };
+    return { status: 'ok', detail: `Opened ${file} and it kept responding. The app was closed again.` };
   } finally {
     kill(pid);
     kill(child.pid);
+    cleanUpLocks();
   }
 }
 
 // One app from the admin's list: { name, keyword, mode: 'file' | 'launch', exts, wait }.
-async function testTarget(target, { apps, demoRoot, onStep, isStopped }) {
+// demoRoot: the folder the admin chose, or '' to pick from sampleFiles (collectSampleFiles: the whole laptop).
+async function testTarget(target, { apps, demoRoot, sampleFiles = [], onStep, isStopped }) {
   if (!IS_WIN) return { app: '', status: 'failed', detail: 'App tests only run on Windows.' };
   const found = apps.find((a) => matches(a.name, target.keyword));
   if (!found) return { app: '', status: 'not_installed', detail: `No app matching "${target.keyword}" was found on this laptop` };
   const wait = Math.min(600, Math.max(2, Number(target.wait) || 90));
   let result;
   if (target.mode === 'file') {
-    const demo = findDemoFile(demoRoot, target.keyword, (target.exts || []).map((e) => String(e).toLowerCase()));
+    const exts = (target.exts || []).map((e) => String(e).toLowerCase());
+    const demo = demoRoot ? findDemoFile(demoRoot, target.keyword, exts) : pickSampleFile(sampleFiles, target.keyword, exts);
     result = demo.error ? { status: 'missing', detail: demo.error } : await openFileTest(found.exe, demo.file, wait, onStep, isStopped);
   } else {
     onStep(`Launching, waiting ${wait}s...`);
@@ -181,4 +276,4 @@ async function testTarget(target, { apps, demoRoot, onStep, isStopped }) {
   return { app: found.name, ...result };
 }
 
-module.exports = { listApps, testTarget };
+module.exports = { listApps, testTarget, collectSampleFiles, pickSampleFile, lockFileCleanup };

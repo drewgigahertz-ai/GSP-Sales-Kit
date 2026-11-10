@@ -565,7 +565,7 @@ app.whenReady().then(() => {
     getWindow: () => mainWindow,
     readShortcutLink: (file) => shell.readShortcutLink(file),
     userDataDir: app.getPath('userData'),
-    desktopDir: app.getPath('desktop'),
+    places: { desktop: app.getPath('desktop'), documents: app.getPath('documents'), downloads: app.getPath('downloads') },
     version: app.getVersion()
   });
   app.on('activate', () => {
