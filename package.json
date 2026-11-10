@@ -1,6 +1,6 @@
 {
   "name": "saleskit-desktop",
-  "version": "1.0.29",
+  "version": "1.0.30",
   "private": true,
   "description": "Gigahertz Sales Tools desktop application",
   "main": "electron/main.js",
@@ -80,6 +80,7 @@
       "updates.js",
       "hotkey-help.js",
       "zoom-control.js",
+      "app-check-notice.js",
       "package.json"
     ],
     "publish": {

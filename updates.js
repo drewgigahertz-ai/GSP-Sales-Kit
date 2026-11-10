@@ -6,6 +6,13 @@
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
+      version: '1.0.30',
+      date: 'November 10, 2026',
+      changes: [
+        'App test: the admin can now check that this laptop’s apps (like AutoCAD, Blender and Premiere Pro) open properly. While a test runs, a card in the corner says so and the apps open and close by themselves. Press Stop test if you need the laptop right away.'
+      ]
+    },
+    {
       version: '1.0.29',
       date: 'November 9, 2026',
       changes: [

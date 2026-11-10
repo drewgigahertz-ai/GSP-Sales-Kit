@@ -45,6 +45,14 @@ contextBridge.exposeInMainWorld('saleskit', {
     ipcRenderer.on('prices:changed', listener);
     return () => ipcRenderer.removeListener('prices:changed', listener);
   },
+  // App test from the App Check Server's admin page: { running, stopping, targets: [{ name, status, detail }] }.
+  getAppCheckState: () => ipcRenderer.invoke('appcheck:state'),
+  stopAppCheck: () => ipcRenderer.invoke('appcheck:stop'),
+  onAppCheckState: (callback) => {
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on('appcheck:state', listener);
+    return () => ipcRenderer.removeListener('appcheck:state', listener);
+  },
   onDataChanged: (callback) => {
     const listener = () => callback();
     ipcRenderer.on('data:changed', listener);

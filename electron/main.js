@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Notification, dialog, ipcMain, nativeImage, net, protocol } = require('electron');
+const { app, BrowserWindow, Menu, Notification, dialog, ipcMain, nativeImage, net, protocol, shell } = require('electron');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -14,6 +14,7 @@ const { getDeviceInfo } = require('./device-info');
 const { createPriceStream } = require('./price-stream');
 const { createRememberLogin } = require('./remember-login');
 const { createZoom } = require('./zoom');
+const { createAppCheck } = require('./app-check');
 
 // SalesKit is a client: it loads its data from the SalesKit Server, which does the Google Sheets sync.
 
@@ -31,6 +32,7 @@ let logoCache;
 let activityReporter;
 let rememberLogin;
 let zoom;
+let appCheck;
 
 function reportSyncProgress(progress) {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -434,6 +436,9 @@ ipcMain.handle('images:cache', async (_event, url) => {
   await imageCache.sync([url]);
   return imageCache.resolve(url);
 });
+// App tests started from the App Check Server's admin page (see app-check.js).
+ipcMain.handle('appcheck:state', () => (appCheck ? appCheck.getState() : { running: false }));
+ipcMain.handle('appcheck:stop', () => { if (appCheck) appCheck.stop(); return true; });
 ipcMain.handle('app:version', () => app.getVersion());
 ipcMain.handle('update:status', () => getUpdateStatus());
 ipcMain.handle('update:install', () => installUpdateNow());
@@ -553,6 +558,15 @@ app.whenReady().then(() => {
     send: (report) => requestServer('/api/activity', { method: 'POST', body: report, timeoutMs: 5000 }),
     getWindow: () => mainWindow,
     isSignedIn: () => Boolean(session) && !onLoginPage
+  });
+  appCheck = createAppCheck({
+    getConfig,
+    getUser: () => (session ? session.user : null),
+    getWindow: () => mainWindow,
+    readShortcutLink: (file) => shell.readShortcutLink(file),
+    userDataDir: app.getPath('userData'),
+    desktopDir: app.getPath('desktop'),
+    version: app.getVersion()
   });
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

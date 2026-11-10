@@ -4,5 +4,7 @@
     "http://SERVER-IP:3000",
     "http://SERVER-COMPUTER-NAME:3000"
   ],
-  "serverToken": "paste the token from SalesKit Server (Copy client config)"
+  "serverToken": "paste the token from SalesKit Server (Copy client config)",
+  "appCheckToken": "paste the token from App Check Server (Connect a laptop box); leave out to turn App Check off",
+  "appCheckUrl": ""
 }
