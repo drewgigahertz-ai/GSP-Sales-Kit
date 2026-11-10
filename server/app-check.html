@@ -3,72 +3,206 @@
 <title>App Tests</title>
 <meta name="robots" content="noindex">
 <style>
-:root{--navy:#0012b3;--navy2:#003ecb;--blue:#1d3ae0;--soft:#e4e9fb;--bg:#f2f3f8;--ink:#181a2e;--muted:#6a6f8e;--line:#e1e4f0}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",system-ui,sans-serif;font-size:14px}
-header{background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;padding:22px 40px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
-h1{margin:0;font-size:1.5rem}header p{margin:2px 0 0;opacity:.85}
-main{max-width:1180px;margin:0 auto;padding:24px 40px 60px}h2{color:var(--navy);font-size:1.1rem;margin:28px 0 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.card{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(20,25,80,.08);margin-bottom:22px;overflow:hidden}
-.card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;background:var(--soft);flex-wrap:wrap}
-.name{font-weight:700;color:var(--navy);font-size:1.05rem;display:flex;align-items:center;gap:10px;flex-wrap:wrap}.sub{font-size:.8rem;color:var(--muted);margin-top:2px}
-.dot{width:12px;height:12px;border-radius:50%;background:#aab0cc;display:inline-block}.dot.on{background:#16a34a}.dot.busy{background:var(--blue);animation:p 1s infinite}@keyframes p{50%{opacity:.35}}
-button{font:inherit;font-weight:600;border-radius:8px;padding:9px 16px;cursor:pointer;border:1px solid var(--blue);background:var(--blue);color:#fff}
-button:disabled{background:#b8c1ef;border-color:#b8c1ef;cursor:not-allowed}button.line{background:#fff;color:#c42424;border-color:#f0bcbc}button.ghost{background:#fff;color:var(--blue)}
-header button{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.5)}
-.btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-table{width:100%;border-collapse:collapse}th{text-align:left;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:11px 20px;border-bottom:2px solid var(--line)}
-td{padding:11px 20px;border-bottom:1px solid var(--line);vertical-align:top}tr:last-child td{border-bottom:0}.d{color:var(--muted);font-size:.78rem;margin-top:2px;word-break:break-word}
-.status{display:inline-block;padding:3px 11px;border-radius:999px;font-size:.74rem;font-weight:700;background:#eceef5;color:var(--muted)}
-.s-ok,.s-PASS{background:#e2f5e9;color:#14783a}.s-exited,.s-stopped{background:#fdf0d8;color:#a4510a}.s-crashed,.s-failed,.s-missing,.s-not_installed,.s-CHECK{background:#fde6e6;color:#c42424}.s-testing{background:var(--soft);color:var(--blue)}
-.k{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
-.empty{padding:36px;text-align:center;color:var(--muted)}
-input,select{font:inherit;border:1px solid var(--line);border-radius:7px;padding:7px 9px;background:#fff;color:var(--ink);width:100%}
-.targets td{padding:8px 10px}.targets th{padding:10px}.targets td:first-child,.targets th:first-child{padding-left:20px}
-.foot{display:flex;align-items:flex-end;gap:16px;padding:14px 20px;border-top:1px solid var(--line);flex-wrap:wrap}.foot>div{flex:1 1 220px;min-width:0}
-.msg{font-size:.85rem;font-weight:600}.msg.bad{color:#c42424}.msg.good{color:#14783a}
-.filter{display:flex;align-items:center;gap:8px;font-size:.85rem;font-weight:600;color:var(--muted)}.filter select{width:auto;min-width:160px}
-.tag{display:inline-block;padding:2px 8px;border-radius:6px;background:#fff;color:var(--navy);font-size:.72rem;font-weight:700;border:1px solid #c9d2f5}
-.login{max-width:380px;margin:60px auto;padding:28px}.login h2{margin-top:0}.login label{display:block;margin:14px 0 6px;font-weight:600;font-size:.85rem}.login button{width:100%;margin-top:18px}
-.scroll{overflow-x:auto}
-@media (max-width:700px){header,main{padding-left:16px;padding-right:16px}td,th{padding-left:12px;padding-right:12px}}
-</style></head><body>
-<header><div><h1>App Tests</h1><p>Check that the apps on the Gigahertz Sales Tools branch laptops open properly</p></div>
-<div class="btns" id="who" hidden><span id="me"></span><button id="logout">Sign out</button></div></header>
+:root{
+  --ghz-blue:#0012b3;--ghz-dark:#000c7a;--ghz-btn:#003ecb;--ghz-border:#dbe4f3;--ghz-soft:#edf3fa;
+  --bg:#f0f4f9;--ink:#1e293b;--ink-strong:#0f172a;--muted:#64748b;--line:#e6ecf5;
+  --ok-bg:#e2f5e9;--ok:#14783a;--warn-bg:#fdf0d8;--warn:#a4510a;--bad-bg:#fde6e6;--bad:#c42424;
+}
+*{box-sizing:border-box}
+html{scrollbar-color:#9fb0c9 transparent}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Plus Jakarta Sans","Segoe UI",system-ui,-apple-system,sans-serif;font-size:14px}
+button,input,select{font:inherit}
+[hidden]{display:none!important}
 
-<main id="signin" hidden>
-  <form class="card login" id="loginForm">
+/* ---- Top bar (as on Gigahertz Sales Tools) ---- */
+.header-bar{background:linear-gradient(135deg,#001bb5 0%,#000c7a 100%);color:#fff;padding:16px 32px 0;box-shadow:0 4px 15px rgba(0,18,179,.15)}
+.header-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-bottom:16px}
+.brand{display:flex;align-items:center;gap:16px;min-width:0}
+.brand-logo{height:40px;display:flex;align-items:center;flex-shrink:0}
+.brand-logo img{max-height:40px;max-width:220px;width:auto;height:auto;object-fit:contain}
+.brand-divider{width:1px;height:34px;background:rgba(255,255,255,.3)}
+.dashboard-title{font-size:1.35rem;font-weight:800;letter-spacing:-.2px;line-height:1.2}
+.dashboard-subtitle{font-size:.75rem;color:rgba(255,255,255,.72);letter-spacing:.2px}
+.header-actions{display:flex;align-items:center;gap:10px}
+.btn-header{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.45);border-radius:10px;padding:8px 16px;font-weight:700;cursor:pointer}
+.btn-header:hover{background:rgba(255,255,255,.2)}
+.nav-tabs-dashboard{display:flex;align-items:flex-end;gap:6px;overflow-x:auto;padding-top:2px}
+.nav-tab-ghz{padding:9px 22px;font-size:.8rem;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--ink);background:rgba(255,255,255,.9);border:1px solid rgba(255,255,255,.3);border-bottom:0;border-radius:10px 10px 0 0;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:8px;transition:transform .15s ease,background .15s ease}
+.nav-tab-ghz:hover:not(.active){background:#fff;transform:translateY(-1px)}
+.nav-tab-ghz.active{background:var(--bg);color:var(--ink-strong);font-weight:900;border-radius:12px 12px 0 0;box-shadow:0 -2px 10px rgba(0,0,0,.08)}
+.tab-count{min-width:20px;padding:1px 7px;border-radius:999px;background:var(--ghz-blue);color:#fff;font-size:.7rem;font-weight:800;letter-spacing:0}
+.tab-count.alert{background:var(--bad)}
+
+/* ---- Page ---- */
+.main-content{max-width:1280px;margin:0 auto;padding:24px 32px 48px}
+.panel{background:#fff;border:1px solid var(--ghz-border);border-radius:14px;box-shadow:0 1px 3px rgba(15,23,42,.04)}
+.section-title{font-size:1.05rem;font-weight:800;color:var(--ink-strong);margin:0}
+.section-sub{font-size:.8rem;color:var(--muted);margin-top:2px}
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.toolbar-left,.toolbar-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.field{display:flex;align-items:center;gap:8px;font-size:.8rem;font-weight:700;color:var(--muted)}
+input,select{border:1px solid var(--ghz-border);border-radius:9px;padding:8px 10px;background:#fff;color:var(--ink);width:100%}
+input:focus,select:focus{outline:2px solid rgba(0,62,203,.25);border-color:var(--ghz-btn)}
+.field select{width:auto;min-width:150px}.search{width:220px}
+.btn{border:1px solid var(--ghz-btn);background:var(--ghz-btn);color:#fff;border-radius:10px;padding:8px 16px;font-weight:700;cursor:pointer;white-space:nowrap}
+.btn:hover:not(:disabled){background:#0030a8}
+.btn:disabled{background:#b8c4ea;border-color:#b8c4ea;cursor:not-allowed}
+.btn.light{background:#fff;color:var(--ghz-btn);border-color:var(--ghz-border)}.btn.light:hover:not(:disabled){background:var(--ghz-soft)}
+.btn.danger{background:#fff;color:var(--bad);border-color:#f0c4c4}.btn.danger:hover:not(:disabled){background:var(--bad-bg)}
+.btn.sm{padding:6px 12px;font-size:.8rem;border-radius:8px}
+
+/* Summary tiles */
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:20px}
+.stat{padding:16px 18px;display:flex;flex-direction:column;gap:4px}
+.stat .k{font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.stat .v{font-size:1.8rem;font-weight:800;color:var(--ink-strong);line-height:1.1}
+.stat.ok .v{color:var(--ok)}.stat.busy .v{color:var(--ghz-btn)}.stat.bad .v{color:var(--bad)}
+
+/* Laptop cards */
+.laptops{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px;align-items:start}
+.laptop{overflow:hidden;display:flex;flex-direction:column}
+.laptop.running{border-color:#9db1f0;box-shadow:0 0 0 3px rgba(0,62,203,.08)}
+.laptop-head{display:flex;gap:12px;align-items:flex-start;padding:16px 18px}
+.dot{width:11px;height:11px;border-radius:50%;background:#b7c0d4;flex:none;margin-top:6px}.dot.on{background:#16a34a}.dot.busy{background:var(--ghz-btn);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.laptop-info{flex:1;min-width:0}
+.laptop-name{font-weight:800;color:var(--ghz-blue);font-size:1rem;line-height:1.3;word-break:break-word}
+.laptop-meta{font-size:.78rem;color:var(--muted);margin-top:3px;word-break:break-word}
+.laptop-state{font-size:.78rem;font-weight:700;margin-top:6px;color:var(--ink)}
+.laptop-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 18px;border-top:1px solid var(--line);background:#fafcff;margin-top:auto}
+.last{font-size:.78rem;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.link{background:none;border:0;color:var(--ghz-btn);font-weight:700;font-size:.78rem;cursor:pointer;padding:0}
+.steps{border-top:1px solid var(--line)}
+.steps table td{padding:8px 18px}
+
+/* Tables and badges */
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:11px 18px;border-bottom:2px solid var(--line);background:#fafcff;white-space:nowrap}
+td{padding:11px 18px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+.d{color:var(--muted);font-size:.76rem;margin-top:2px;word-break:break-word}
+.status{display:inline-block;padding:3px 10px;border-radius:999px;font-size:.72rem;font-weight:800;background:#eef1f6;color:var(--muted);white-space:nowrap}
+.s-ok,.s-PASS{background:var(--ok-bg);color:var(--ok)}.s-exited,.s-stopped{background:var(--warn-bg);color:var(--warn)}
+.s-crashed,.s-failed,.s-missing,.s-not_installed,.s-CHECK{background:var(--bad-bg);color:var(--bad)}.s-testing{background:#e4e9fb;color:var(--ghz-btn)}
+.results{display:flex;flex-wrap:wrap;gap:6px 14px}.results span.app{white-space:nowrap}
+.scroll{overflow-x:auto}
+.empty{padding:40px 20px;text-align:center;color:var(--muted)}
+.empty strong{display:block;color:var(--ink);margin-bottom:4px}
+
+/* Apps to test */
+.targets td{padding:8px 10px}.targets th{padding:10px}.targets td:first-child,.targets th:first-child{padding-left:18px}
+.foot{display:flex;align-items:flex-end;gap:16px;padding:14px 18px;border-top:1px solid var(--line);flex-wrap:wrap}.foot>div{flex:1 1 220px;min-width:0}
+.k{font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.hint{font-size:.8rem;color:var(--muted);padding:0 18px 16px;line-height:1.5}
+.msg{font-size:.82rem;font-weight:700}.msg.bad{color:var(--bad)}.msg.good{color:var(--ok)}
+code{background:var(--ghz-soft);padding:1px 5px;border-radius:5px;font-size:.85em}
+.path{font-size:.78rem;color:var(--muted);margin-top:14px;word-break:break-all}
+
+/* Sign in */
+.login{max-width:400px;margin:56px auto;padding:30px}
+.login h2{margin:0 0 4px;font-size:1.25rem;color:var(--ink-strong)}
+.login label{display:block;margin:16px 0 6px;font-weight:700;font-size:.82rem}
+.login .btn{width:100%;margin-top:20px;padding:10px}
+
+@media (max-width:820px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:700px){
+  .header-bar{padding:14px 16px 0}.main-content{padding:18px 16px 40px}
+  .brand-divider{display:none}.brand{gap:12px}.brand-logo img{max-width:130px}
+  .laptops{grid-template-columns:1fr}.search{width:100%}.toolbar-left,.toolbar-right{width:100%}
+  th,td{padding-left:12px;padding-right:12px}.nav-tab-ghz{padding:8px 14px}
+}
+</style></head><body>
+
+<div class="header-bar">
+  <div class="header-row">
+    <div class="brand">
+      <div class="brand-logo"><img src="/app-check/logo.png" alt="GigaHertz" id="logo"></div>
+      <div class="brand-divider" id="logoDivider"></div>
+      <div>
+        <div class="dashboard-title">App Tests</div>
+        <div class="dashboard-subtitle">Gigahertz Sales Tools<span id="me"></span></div>
+      </div>
+    </div>
+    <div class="header-actions" id="who" hidden><button class="btn-header" id="logout">Sign out</button></div>
+  </div>
+  <nav class="nav-tabs-dashboard" role="tablist" id="tabs" hidden>
+    <button class="nav-tab-ghz active" role="tab" data-tab="laptops">Laptops <span class="tab-count" id="countOnline" hidden></span></button>
+    <button class="nav-tab-ghz" role="tab" data-tab="apps">Apps to test</button>
+    <button class="nav-tab-ghz" role="tab" data-tab="history">History <span class="tab-count alert" id="countCheck" hidden></span></button>
+  </nav>
+</div>
+
+<main class="main-content" id="signin" hidden>
+  <form class="panel login" id="loginForm">
     <h2>Sign in</h2>
-    <div class="sub">Use a SalesKit account of a head office branch (HO or ALL).</div>
+    <div class="section-sub">Use a SalesKit account of a head office branch (HO or ALL).</div>
     <label for="username">Username</label><input id="username" autocomplete="username" required>
     <label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required>
-    <button type="submit">Sign in</button>
+    <button class="btn" type="submit">Sign in</button>
     <div class="msg bad" id="loginMsg" style="margin-top:12px"></div>
   </form>
 </main>
 
-<main id="app" hidden>
-<h2><span>Branch laptops</span><span class="btns"><label class="filter">Branch <select id="branch"><option value="">All branches</option></select></label><button id="runAll">Run test on all online</button></span></h2>
-<div id="laptops"></div>
+<main class="main-content" id="app" hidden>
+  <!-- LAPTOPS -->
+  <section data-view="laptops">
+    <div class="stats">
+      <div class="panel stat ok"><span class="k">Online</span><span class="v" id="stOnline">0</span></div>
+      <div class="panel stat busy"><span class="k">Testing now</span><span class="v" id="stTesting">0</span></div>
+      <div class="panel stat bad"><span class="k">Last test: check</span><span class="v" id="stCheck">0</span></div>
+      <div class="panel stat"><span class="k">Laptops</span><span class="v" id="stTotal">0</span></div>
+    </div>
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <label class="field">Branch <select class="branch-filter" id="branch"><option value="">All branches</option></select></label>
+        <input class="search" id="search" type="search" placeholder="Search laptop, model or user" aria-label="Search laptops">
+      </div>
+      <div class="toolbar-right"><button class="btn" id="runAll">Run test on all online</button></div>
+    </div>
+    <div class="laptops" id="laptops"></div>
+  </section>
 
-<h2>Apps to test</h2>
-<div class="card">
-  <div class="scroll"><table class="targets"><thead><tr><th style="width:20%">App</th><th style="width:20%">Find app by name containing</th><th style="width:19%">Test</th><th style="width:17%">Demo file types</th><th style="width:11%">Wait (s)</th><th></th></tr></thead><tbody id="targets"></tbody></table></div>
-  <div class="foot">
-    <div><div class="k">Demo folder on the laptops</div><input id="demoFolder" placeholder="Desktop\APPLICATION DEMO (leave empty for this)"></div>
-    <div class="btns" style="flex:none"><button class="ghost" id="addTarget">Add app</button><button id="saveTargets">Save</button></div>
-  </div>
-  <div class="sub" style="padding:0 20px 14px">Separate alternatives with | (for example <code>assassin|mirage</code>). "Open a demo file" opens a file of that type from the demo folder and checks its name shows in the app's window. Changes apply to the next test. <span class="msg" id="tmsg"></span></div>
-</div>
+  <!-- APPS TO TEST -->
+  <section data-view="apps" hidden>
+    <div class="toolbar"><div><h2 class="section-title">Apps to test</h2><div class="section-sub">Sent to the laptops with every test. Changes apply to the next test.</div></div></div>
+    <div class="panel">
+      <div class="scroll"><table class="targets"><thead><tr><th style="width:20%">App</th><th style="width:20%">Find app by name containing</th><th style="width:19%">Test</th><th style="width:17%">Demo file types</th><th style="width:11%">Wait (s)</th><th></th></tr></thead><tbody id="targets"></tbody></table></div>
+      <div class="foot">
+        <div><div class="k">Demo folder on the laptops</div><input id="demoFolder" placeholder="Desktop\APPLICATION DEMO (leave empty for this)"></div>
+        <div class="toolbar-right" style="flex:none"><button class="btn light" id="addTarget">Add app</button><button class="btn" id="saveTargets">Save</button></div>
+      </div>
+      <div class="hint">Separate alternatives with | (for example <code>assassin|mirage</code>). "Open a demo file" opens a file of that type from the demo folder and checks its name shows in the app's window. <span class="msg" id="tmsg"></span></div>
+    </div>
+  </section>
 
-<h2><span>Test history</span><button class="line" id="clearBtn">Clear test history</button></h2>
-<div class="card scroll"><table><thead><tr><th>Time</th><th>Laptop</th><th>Branch</th><th>Results</th><th>Overall</th></tr></thead><tbody id="hist"></tbody></table><div class="empty" id="hempty">No finished tests yet.</div></div>
-<div class="sub" id="dir" style="word-break:break-all"></div>
+  <!-- HISTORY -->
+  <section data-view="history" hidden>
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <label class="field">Branch <select class="branch-filter" id="hBranch"><option value="">All branches</option></select></label>
+        <label class="field">Result <select id="hResult"><option value="">All</option><option value="PASS">PASS</option><option value="CHECK">CHECK</option></select></label>
+      </div>
+      <div class="toolbar-right"><button class="btn light" id="download">Download results (CSV)</button><button class="btn danger" id="clearBtn">Clear history</button></div>
+    </div>
+    <div class="panel scroll"><table><thead><tr><th>Time</th><th>Branch</th><th>Laptop</th><th>Results</th><th>Test</th></tr></thead><tbody id="hist"></tbody></table><div class="empty" id="hempty">No finished tests yet.</div></div>
+    <div class="path" id="dir"></div>
+  </section>
 </main>
+
 <script>
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LABEL={not_installed:'not installed',exited:'closed early'};
 const badge=(s,title)=>`<span class="status s-${esc(s)}"${title?` title="${esc(title)}"`:''}>${esc(LABEL[s]||s)}</span>`;
-const ago=t=>{if(!t)return'never';const s=Math.round((Date.now()-t)/1000);return s<60?s+'s ago':s<3600?Math.round(s/60)+' min ago':s<86400?Math.round(s/3600)+' h ago':new Date(t).toLocaleString()};
+const ago=t=>{if(!t)return'never';const ms=typeof t==='number'?t:Date.parse(t);const s=Math.round((Date.now()-ms)/1000);return s<60?'just now':s<3600?Math.round(s/60)+' min ago':s<86400?Math.round(s/3600)+' h ago':new Date(ms).toLocaleDateString()};
+const device=x=>[x.make,x.model].filter(Boolean).join(' ');
+// "HO - Lenovo IdeaPad 5 14ALC05"; the computer name is shown under it.
+const title=l=>`${l.branch||'No branch'} - ${device(l)||l.name}`;
+const isRunning=l=>l.current&&!l.current.finished;
+const pass=h=>h.results.length&&h.results.every(r=>r.status==='ok');
+
+// The logo comes from the server's LOGO sheet; without one the bar shows only the title.
+$('logo').addEventListener('error',()=>{$('logo').parentElement.hidden=true;$('logoDivider').hidden=true});
+
 let key='';try{key=sessionStorage.getItem('appCheckSession')||''}catch{}
 const setKey=k=>{key=k;try{k?sessionStorage.setItem('appCheckSession',k):sessionStorage.removeItem('appCheckSession')}catch{}};
 async function api(path,body){
@@ -77,9 +211,11 @@ async function api(path,body){
   if(r.status===401&&path!=='login'){showSignin('Please sign in again.');throw new Error('signed out')}
   return{ok:r.ok,status:r.status,...j};
 }
+
 let state={laptops:[],history:[]},targets=null,timer=null;
-function showSignin(msg){setKey('');clearInterval(timer);timer=null;targets=null;$('app').hidden=true;$('who').hidden=true;$('signin').hidden=false;$('loginMsg').textContent=msg||'';$('username').focus()}
-function showApp(){$('signin').hidden=true;$('app').hidden=false;$('who').hidden=false;load();clearInterval(timer);timer=setInterval(load,2000)}
+const expanded=new Set();
+function showSignin(msg){setKey('');clearInterval(timer);timer=null;targets=null;$('app').hidden=true;$('who').hidden=true;$('tabs').hidden=true;$('me').textContent='';$('signin').hidden=false;$('loginMsg').textContent=msg||'';$('username').focus()}
+function showApp(){$('signin').hidden=true;$('app').hidden=false;$('who').hidden=false;$('tabs').hidden=false;load();clearInterval(timer);timer=setInterval(load,2000)}
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();$('loginMsg').textContent='';
   const r=await api('login',{username:$('username').value,password:$('password').value}).catch(()=>({ok:false,error:'The server did not answer.'}));
@@ -88,46 +224,66 @@ $('loginForm').addEventListener('submit',async e=>{
 });
 $('logout').addEventListener('click',async()=>{await api('logout',{}).catch(()=>{});showSignin()});
 
-function shown(){const b=$('branch').value;return state.laptops.filter(l=>!b||l.branch===b)}
-const isRunning=l=>l.current&&!l.current.finished;
-// "HO - Lenovo IdeaPad 5 14ALC05"; the computer name is shown under it.
-const title=l=>`${l.branch||'No branch'} - ${[l.make,l.model].filter(Boolean).join(' ')||l.name}`;
-function render(){
-  $('me').textContent=state.me||'';
+// ---- tabs (remembered in the address, e.g. /app-check#history) ----
+function openTab(name){
+  if(!['laptops','apps','history'].includes(name))name='laptops';
+  document.querySelectorAll('.nav-tab-ghz').forEach(t=>{const on=t.dataset.tab===name;t.classList.toggle('active',on);t.setAttribute('aria-selected',on)});
+  document.querySelectorAll('[data-view]').forEach(v=>v.hidden=v.dataset.view!==name);
+  if(location.hash!=='#'+name)history.replaceState(null,'','#'+name);
+}
+$('tabs').addEventListener('click',e=>{const t=e.target.closest('[data-tab]');if(t)openTab(t.dataset.tab)});
+openTab(location.hash.slice(1));
+
+// ---- laptops ----
+function shown(){
+  const b=$('branch').value,q=$('search').value.trim().toLowerCase();
+  // Testing first, then online, then offline; by branch within each (the server sends them by branch).
+  const rank=l=>isRunning(l)||l.waiting?0:l.online?1:2;
+  return state.laptops.filter(l=>(!b||l.branch===b)&&(!q||[title(l),l.name,l.user].join(' ').toLowerCase().includes(q)))
+    .map((l,i)=>[l,i]).sort((x,y)=>rank(x[0])-rank(y[0])||x[1]-y[1]).map(x=>x[0]);
+}
+function fillBranches(){
   const branches=[...new Set(state.laptops.map(l=>l.branch).filter(Boolean))].sort();
-  const sel=$('branch'),cur=sel.value;
-  if(sel.options.length-1!==branches.length||branches.some((b,i)=>sel.options[i+1].value!==b)){
-    sel.innerHTML='<option value="">All branches</option>'+branches.map(b=>`<option>${esc(b)}</option>`).join('');sel.value=branches.includes(cur)?cur:'';
-  }
-  const list=shown();
+  document.querySelectorAll('.branch-filter').forEach(sel=>{
+    const cur=sel.value;
+    if(sel.options.length-1===branches.length&&branches.every((b,i)=>sel.options[i+1].value===b))return;
+    sel.innerHTML='<option value="">All branches</option>'+branches.map(b=>`<option>${esc(b)}</option>`).join('');
+    sel.value=branches.includes(cur)?cur:'';
+  });
+}
+function stepRows(targets){return Object.entries(targets).map(([n,t])=>`<tr><td style="width:34%"><strong>${esc(n)}</strong></td><td style="width:22%">${badge(t.status)}</td><td class="d">${esc(t.detail)}</td></tr>`).join('')}
+function renderLaptops(){
+  const all=state.laptops,list=shown();
+  $('stOnline').textContent=all.filter(l=>l.online).length;
+  $('stTesting').textContent=all.filter(isRunning).length;
+  $('stCheck').textContent=all.filter(l=>l.last&&!l.last.pass).length;
+  $('stTotal').textContent=all.length;
+  const online=all.filter(l=>l.online).length;$('countOnline').textContent=online;$('countOnline').hidden=!online;
   $('runAll').disabled=!list.some(l=>l.online&&!isRunning(l)&&!l.waiting);
   $('laptops').innerHTML=list.length?list.map(l=>{
     const run=isRunning(l);
-    const st=run?'Testing now':l.waiting?'Starting the test (within 5 seconds)...':l.online?'Online, ready':'Offline, last seen '+ago(l.lastSeen);
-    const who=[l.name,l.user?'Signed in: '+l.user:(l.online?'Nobody signed in':''),l.version&&'Sales Tools '+l.version].filter(Boolean).join(' · ');
-    const rows=l.current?Object.entries(l.current.targets).map(([n,t])=>`<tr><td><strong>${esc(n)}</strong></td><td>${badge(t.status)}</td><td class="d">${esc(t.detail)}</td></tr>`).join(''):'<tr><td colspan="3" class="empty">No test since the server started.</td></tr>';
-    const btn=l.waiting?`<button class="ghost" data-act="cancel" data-n="${esc(l.name)}">Cancel</button>`
-      :!l.online&&!run?`<button class="line" data-act="forget" data-n="${esc(l.name)}">Remove from list</button>`
-      :`<button data-act="run" data-n="${esc(l.name)}" ${run?'disabled':''}>Run test</button>`;
-    return`<div class="card"><div class="card-h"><div><div class="name"><span class="dot ${run?'busy':l.online?'on':''}"></span>${esc(title(l))}</div><div class="sub">${esc(st)}${who?' · '+esc(who):''}</div></div>${btn}</div>
-    <div class="scroll"><table><thead><tr><th style="width:24%">App</th><th style="width:16%">Status</th><th>What is happening</th></tr></thead><tbody>${rows}</tbody></table></div></div>`}).join('')
-  :`<div class="card"><div class="empty"><strong>${state.laptops.length?'No laptop in this branch.':'No laptop has connected yet.'}</strong><br>Laptops appear here when Gigahertz Sales Tools 1.0.30 or later is open on them.</div></div>`;
-  const b=$('branch').value,hist=state.history.filter(h=>!b||h.branch===b);
-  $('hist').innerHTML=hist.map(h=>{const ok=h.results.length&&h.results.every(r=>r.status==='ok');return`<tr><td>${esc(new Date(h.time).toLocaleString())}</td><td>${esc(h.make||h.model?[h.make,h.model].filter(Boolean).join(' '):h.laptop)}<div class="d">${esc([h.make||h.model?h.laptop:'',h.user].filter(Boolean).join(' · '))}</div></td><td>${esc(h.branch||'')}</td>
-    <td>${h.results.map(r=>esc(r.target)+' '+badge(r.status,r.detail)).join(' &nbsp; ')}${h.stoppedOnLaptop?'<div class="d">Stopped on the laptop</div>':''}</td><td>${badge(ok?'PASS':'CHECK')}</td></tr>`}).join('');
-  $('hempty').style.display=hist.length?'none':'block';
-  $('dir').textContent='Results are also saved on the server in '+state.dataDir+' (results.csv opens in Excel).';
-}
-async function load(){
-  let r;try{r=await api('state')}catch{return}
-  if(!r.ok){$('laptops').innerHTML='<div class="card"><div class="empty">The server did not answer. Retrying...</div></div>';return}
-  state=r;
-  if(!targets){targets=state.targets.map(t=>({...t}));$('demoFolder').value=state.demoFolder||'';renderTargets()}
-  render();
+    const st=run?'Testing now':l.waiting?'Starting the test (within 5 seconds)...':l.online?'Online, ready':'Offline · last seen '+ago(l.lastSeen);
+    const meta=[l.name,l.user?'Signed in: '+l.user:(l.online?'Nobody signed in':''),l.version&&'Sales Tools '+l.version].filter(Boolean).join(' · ');
+    const btn=l.waiting?`<button class="btn light sm" data-act="cancel" data-n="${esc(l.name)}">Cancel</button>`
+      :!l.online&&!run?`<button class="btn danger sm" data-act="forget" data-n="${esc(l.name)}">Remove</button>`
+      :`<button class="btn sm" data-act="run" data-n="${esc(l.name)}" ${run?'disabled':''}>Run test</button>`;
+    // Per-app steps: always while testing; otherwise when opened, from this test or the last one in the history.
+    const lastRun=state.history.find(h=>h.laptop===l.name);
+    const steps=l.current?l.current.targets:lastRun?Object.fromEntries(lastRun.results.map(r=>[r.target,{status:r.status,detail:r.detail}])):null;
+    const open=run||(steps&&expanded.has(l.name));
+    const last=l.last?`Last test ${badge(l.last.pass?'PASS':'CHECK')} ${esc(ago(l.last.time))}`:'No test yet';
+    return`<article class="panel laptop${run?' running':''}">
+      <div class="laptop-head"><span class="dot ${run?'busy':l.online?'on':''}"></span>
+        <div class="laptop-info"><div class="laptop-name">${esc(title(l))}</div><div class="laptop-meta">${esc(meta)}</div><div class="laptop-state">${esc(st)}</div></div>${btn}</div>
+      ${open?`<div class="steps scroll"><table><tbody>${stepRows(steps)}</tbody></table></div>`:''}
+      <div class="laptop-foot"><span class="last">${last}</span>${steps&&!run?`<button class="link" data-act="toggle" data-n="${esc(l.name)}">${open?'Hide details':'Details'}</button>`:''}</div>
+    </article>`}).join('')
+  :`<div class="panel empty" style="grid-column:1/-1"><strong>${all.length?'No laptop matches.':'No laptop has connected yet.'}</strong>${all.length?'Change the branch or the search.':'Laptops appear here when Gigahertz Sales Tools 1.0.30 or later is open on them.'}</div>`;
 }
 $('laptops').addEventListener('click',async e=>{
   const b=e.target.closest('button[data-act]');if(!b)return;
   const n=b.dataset.n;
+  if(b.dataset.act==='toggle'){expanded.has(n)?expanded.delete(n):expanded.add(n);renderLaptops();return}
   if(b.dataset.act==='forget'&&!confirm(`Remove ${n} from the list? It comes back when Gigahertz Sales Tools is opened on it again.`))return;
   b.disabled=true;
   if(b.dataset.act==='run')await api('run',{laptops:[n]}).catch(()=>{});
@@ -140,8 +296,42 @@ $('runAll').addEventListener('click',async()=>{
   if(!names.length||!confirm(`Start the app test on ${names.length} laptop${names.length>1?'s':''}? The apps will open on them while it runs.`))return;
   await api('run',{laptops:names}).catch(()=>{});load();
 });
-$('branch').addEventListener('change',render);
-$('clearBtn').addEventListener('click',async()=>{if(confirm('Delete the whole test history (also results.csv on the server)?')){await api('clear',{}).catch(()=>{});load()}});
+$('branch').addEventListener('change',renderLaptops);
+$('search').addEventListener('input',renderLaptops);
+
+// ---- history ----
+function renderHistory(){
+  const b=$('hBranch').value,res=$('hResult').value;
+  const hist=state.history.filter(h=>(!b||h.branch===b)&&(!res||(pass(h)?'PASS':'CHECK')===res));
+  const checks=state.history.filter(h=>!pass(h)&&Date.now()-Date.parse(h.time)<86400000).length;
+  $('countCheck').textContent=checks;$('countCheck').hidden=!checks;$('countCheck').title='Tests needing a check in the last 24 hours';
+  $('hist').innerHTML=hist.map(h=>`<tr><td style="white-space:nowrap">${esc(new Date(h.time).toLocaleString())}</td><td>${esc(h.branch||'')}</td>
+    <td><strong>${esc(device(h)||h.laptop)}</strong><div class="d">${esc([device(h)?h.laptop:'',h.user].filter(Boolean).join(' · '))}</div></td>
+    <td><div class="results">${h.results.map(r=>`<span class="app">${esc(r.target)} ${badge(r.status,r.detail)}</span>`).join('')}</div>${h.stoppedOnLaptop?'<div class="d">Stopped on the laptop</div>':''}</td>
+    <td>${badge(pass(h)?'PASS':'CHECK')}</td></tr>`).join('');
+  $('hempty').hidden=hist.length>0;
+  $('hempty').textContent=state.history.length?'No test matches the filters.':'No finished tests yet.';
+  $('dir').textContent='Saved on the server in '+state.dataDir;
+}
+$('hBranch').addEventListener('change',renderHistory);
+$('hResult').addEventListener('change',renderHistory);
+$('clearBtn').addEventListener('click',async()=>{if(confirm('Delete the whole test history (also results.csv on the server)? This cannot be undone.')){await api('clear',{}).catch(()=>{});load()}});
+$('download').addEventListener('click',async()=>{
+  const r=await fetch('/app-check/api/results.csv',{headers:{'X-SalesKit-Session':key}});
+  if(r.status===401)return showSignin('Please sign in again.');
+  const a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());
+  a.download=`app-test-results-${new Date().toISOString().slice(0,10)}.csv`;document.body.append(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+});
+
+async function load(){
+  let r;try{r=await api('state')}catch{return}
+  if(!r.ok){$('laptops').innerHTML='<div class="panel empty" style="grid-column:1/-1"><strong>The server did not answer.</strong>Retrying...</div>';return}
+  state=r;
+  $('me').textContent=' · Signed in: '+(state.me||'');
+  if(!targets){targets=state.targets.map(t=>({...t}));$('demoFolder').value=state.demoFolder||'';renderTargets()}
+  fillBranches();renderLaptops();renderHistory();
+}
 
 // ---- apps to test ----
 const unsaved=()=>{$('tmsg').textContent='Not saved yet.';$('tmsg').className='msg'};
@@ -152,7 +342,7 @@ function renderTargets(){
     <td><select data-i="${i}" data-k="mode" aria-label="How to test ${esc(t.name)}"><option value="file"${t.mode==='file'?' selected':''}>Open a demo file</option><option value="launch"${t.mode!=='file'?' selected':''}>Just open the app</option></select></td>
     <td><input data-i="${i}" data-k="exts" value="${esc((t.exts||[]).join(', '))}" placeholder=".dwg" ${t.mode==='file'?'':'disabled'} aria-label="File types for ${esc(t.name)}"></td>
     <td><input data-i="${i}" data-k="wait" type="number" min="2" max="600" value="${esc(t.wait)}" aria-label="Wait seconds for ${esc(t.name)}"></td>
-    <td><button class="line" data-del="${i}" title="Remove" aria-label="Remove ${esc(t.name)}">✕</button></td></tr>`).join('');
+    <td><button class="btn danger sm" data-del="${i}" title="Remove" aria-label="Remove ${esc(t.name)}">✕</button></td></tr>`).join('');
 }
 $('targets').addEventListener('input',e=>{
   const el=e.target,t=targets[el.dataset.i];if(!t)return;

@@ -912,7 +912,9 @@ if (!app.requestSingleInstanceLock()) {
         dataDir: path.join(app.getPath('userData'), 'app-check'),
         accounts: users,
         canAdmin: (user) => Boolean(user) && !user.disabled && hasFullAccess(user.branch),
-        log
+        log,
+        // The Sales Tools header logo: downloaded from the LOGO sheet (loadLogos), or the one built into the server.
+        getLogoPath: () => [path.join(app.getPath('userData'), 'logos', 'header.png'), path.join(__dirname, 'assets', 'header-logo.png')].find((file) => fs.existsSync(file)) || ''
       });
       backups = createBackupStore(path.join(app.getPath('userData'), 'backups'), database);
       startApi();

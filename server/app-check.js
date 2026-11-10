@@ -38,7 +38,8 @@ function readJson(file, fallback) {
 
 // accounts: { login(username, password, address), logout(key), userForSession(key) } (server/users.js).
 // canAdmin(user): who may use the web page. log(level, message): the server's activity log.
-function createAppCheck({ dataDir, accounts, canAdmin, log = () => {} }) {
+// getLogoPath(): the header logo file for the page's top bar (the LOGO sheet's, as on Sales Tools), or ''.
+function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPath = () => '' }) {
   fs.mkdirSync(dataDir, { recursive: true });
   const F = {
     settings: path.join(dataDir, 'settings.json'),
@@ -183,6 +184,13 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {} }) {
       response.end(fs.readFileSync(pagePath));
       return;
     }
+    if (request.method === 'GET' && route === '/app-check/logo.png') {
+      const file = getLogoPath();
+      if (!file || !fs.existsSync(file)) return send(response, 404, { error: 'No logo.' });
+      response.writeHead(200, { 'Cache-Control': 'max-age=3600', 'Content-Type': 'image/png' });
+      response.end(fs.readFileSync(file));
+      return;
+    }
     if (request.method !== 'GET' && request.method !== 'POST') return send(response, 405, { error: 'Not allowed.' });
 
     if (route === '/app-check/api/login' && request.method === 'POST') {
@@ -207,11 +215,27 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {} }) {
       accounts.logout(request.headers['x-saleskit-session']);
       return send(response, 200, { ok: true });
     }
+    // Every test ever recorded (runs.jsonl), one row per app, so the columns stay the same when the app list changes.
+    if (route === '/app-check/api/results.csv' && request.method === 'GET') {
+      let runs = [];
+      try { runs = fs.readFileSync(F.runs, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line)); } catch { /* none yet */ }
+      const rows = [['Time', 'Branch', 'Laptop', 'Computer name', 'Signed in', 'Sales Tools', 'App', 'Status', 'Detail', 'Test result']];
+      for (const run of runs) {
+        const device = [run.make, run.model].filter(Boolean).join(' ');
+        for (const r of run.results) rows.push([new Date(run.time).toLocaleString(), run.branch, device, run.laptop, run.user, run.version, r.target, r.status, r.detail, passed(run) ? 'PASS' : 'CHECK']);
+      }
+      response.writeHead(200, { 'Cache-Control': 'no-store', 'Content-Type': 'text/csv; charset=utf-8' });
+      // The byte-order mark makes Excel read the file as UTF-8.
+      response.end(`﻿${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`);
+      return;
+    }
     if (route === '/app-check/api/state' && request.method === 'GET') {
       const now = Date.now();
+      const lastRun = new Map();
+      for (const run of history) lastRun.set(run.laptop, { time: run.time, pass: passed(run) });
       const list = [...laptops.values()]
         .sort((a, b) => (a.branch || '~').localeCompare(b.branch || '~') || a.name.localeCompare(b.name))
-        .map((l) => ({ name: l.name, branch: l.branch, user: l.user, version: l.version, make: l.make, model: l.model, online: now - l.lastSeen < ONLINE_MS, lastSeen: l.lastSeen, current: l.current, waiting: Boolean(l.command) }));
+        .map((l) => ({ name: l.name, branch: l.branch, user: l.user, version: l.version, make: l.make, model: l.model, online: now - l.lastSeen < ONLINE_MS, lastSeen: l.lastSeen, current: l.current, waiting: Boolean(l.command), last: lastRun.get(l.name) || null }));
       return send(response, 200, { me: user.displayName, laptops: list, history: history.slice(-100).reverse(), targets, demoFolder, dataDir });
     }
     if (request.method !== 'POST') return send(response, 404, { error: 'Not found.' });
