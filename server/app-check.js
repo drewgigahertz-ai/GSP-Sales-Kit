@@ -148,8 +148,8 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
       history.push(run);
       if (history.length > 500) history = history.slice(-500);
       appendCsv(run);
-      const device = [run.make, run.model].filter(Boolean).join(' ');
-      log(passed(run) ? 'success' : 'warning', `App test on ${[run.branch, device].filter(Boolean).join(' - ') || run.laptop} (${run.laptop}): ${run.results.map((r) => `${r.target} ${r.status}`).join(', ')}`);
+      const brandModel = [run.make, run.model].filter(Boolean).join(' ');
+      log(passed(run) ? 'success' : 'warning', `App test on ${[run.branch, brandModel].filter(Boolean).join(' - ') || run.laptop} (${run.laptop}): ${run.results.map((r) => `${r.target} ${r.status}`).join(', ')}`);
       return { status: 200, body: { ok: true } };
     }
     return { status: 404, body: { error: 'Not found.' } };
