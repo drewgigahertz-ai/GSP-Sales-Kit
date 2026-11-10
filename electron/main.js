@@ -15,6 +15,7 @@ const { createPriceStream } = require('./price-stream');
 const { createRememberLogin } = require('./remember-login');
 const { createZoom } = require('./zoom');
 const { createAppCheck } = require('./app-check');
+const { createLaptopSkuStore, skuChoices } = require('./laptop-sku');
 
 // SalesKit is a client: it loads its data from the SalesKit Server, which does the Google Sheets sync.
 
@@ -33,6 +34,8 @@ let activityReporter;
 let rememberLogin;
 let zoom;
 let appCheck;
+// The Laptop SKU branch staff typed in (laptop-sku.js); sent to the server as this laptop's name.
+let laptopSku;
 
 function reportSyncProgress(progress) {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -68,6 +71,8 @@ async function serverConnection() {
   const headers = { ...CLIENT_HEADERS, 'X-SalesKit-Make': device.make, 'X-SalesKit-Model': device.model };
   if (serverToken) headers.Authorization = `Bearer ${serverToken}`;
   if (session) headers['X-SalesKit-Session'] = session.key;
+  const sku = laptopSku && laptopSku.get();
+  if (sku) headers['X-SalesKit-Sku'] = sku.sku;
   const urls = workingServerUrl && serverUrls.includes(workingServerUrl)
     ? [workingServerUrl, ...serverUrls.filter((url) => url !== workingServerUrl)]
     : serverUrls;
@@ -436,6 +441,21 @@ ipcMain.handle('images:cache', async (_event, url) => {
   await imageCache.sync([url]);
   return imageCache.resolve(url);
 });
+// Laptop SKU (laptop-sku-prompt.js): branch accounts must enter it once; HO and ALL accounts are not asked.
+const FULL_ACCESS = ['HO', 'ALL'];
+ipcMain.handle('laptopsku:get', () => {
+  const saved = laptopSku ? laptopSku.get() : null;
+  const branch = String((session && session.user && session.user.branch) || '').trim().toUpperCase();
+  return { sku: saved ? saved.sku : '', required: Boolean(session) && !!branch && !FULL_ACCESS.includes(branch) && !saved };
+});
+ipcMain.handle('laptopsku:set', (_event, sku) => {
+  const saved = laptopSku.set(sku, session && session.user ? session.user.username : '');
+  return { sku: saved.sku };
+});
+// The SKUs to pick from, from the saved SalesKit data ([] until it has downloaded once).
+ipcMain.handle('laptopsku:choices', () => {
+  try { return skuChoices(dataLoader.savedDataFor(session && session.user)); } catch { return []; }
+});
 // App tests started from the App Check Server's admin page (see app-check.js).
 ipcMain.handle('appcheck:state', () => (appCheck ? appCheck.getState() : { running: false }));
 ipcMain.handle('appcheck:stop', () => { if (appCheck) appCheck.stop(); return true; });
@@ -536,6 +556,7 @@ app.whenReady().then(() => {
   // Logo addresses come from the small meta file, so the large saved data is not read for them.
   logoCache = createLogoCache({ userDataDir: app.getPath('userData'), imageCache, snapshotCache: { load: () => dataLoader.loadMeta() } });
   updateResume = createUpdateResume(path.join(app.getPath('userData'), 'update-resume.bin'));
+  laptopSku = createLaptopSkuStore(path.join(app.getPath('userData'), 'laptop-sku.json'));
   zoom = createZoom({ filePath: path.join(app.getPath('userData'), 'zoom.json'), getWindow: () => mainWindow });
   rememberLogin = createRememberLogin({
     credentialsPath: path.join(app.getPath('userData'), 'remember-login.bin'),

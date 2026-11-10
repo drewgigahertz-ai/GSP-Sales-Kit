@@ -19,6 +19,7 @@ const { createPriceWatch } = require('./price-watch');
 const { createServerUpdater } = require('./updater');
 const { buildDataHealth } = require('./data-health');
 const { createAppCheck } = require('./app-check');
+const { skuChoices, skuKey } = require('../electron/laptop-sku');
 const { version: APP_VERSION } = require('../package.json');
 
 const APP_NAME = 'GigaHertz SalesKit Server';
@@ -60,6 +61,8 @@ let activity;
 let priceWatch;
 // App tests on the branch laptops, run from the /app-check web page (server/app-check.js).
 let appCheck = null;
+// SalesKit's SKUs by SKU, for App Tests' comparison (rebuilt when the data version changes).
+let skuIndex = { version: null, bySku: new Map() };
 // Laptops listening on /api/events for price changes.
 const priceListeners = new Set();
 const logs = [];
@@ -920,6 +923,13 @@ if (!app.requestSingleInstanceLock()) {
           return device && device.account ? device.account : null;
         },
         listBranches: () => database.listBranches(),
+        // A Laptop SKU in SalesKit's data (made again when the data changes), to compare with the laptop's model.
+        findSku: (sku) => {
+          if (skuIndex.version !== settings.dataVersion) {
+            skuIndex = { version: settings.dataVersion, bySku: new Map(skuChoices(database.getInitialData()).map((c) => [skuKey(c.sku), c])) };
+          }
+          return skuIndex.bySku.get(skuKey(sku)) || null;
+        },
         getLogoPath: () => [path.join(app.getPath('userData'), 'logos', 'header.png'), path.join(__dirname, 'assets', 'header-logo.png')].find((file) => fs.existsSync(file)) || ''
       });
       backups = createBackupStore(path.join(app.getPath('userData'), 'backups'), database);

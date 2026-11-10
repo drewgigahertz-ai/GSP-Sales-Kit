@@ -64,6 +64,8 @@ function createDeviceRegistry(filePath) {
       version: client.version || device.version || '',
       make: client.make || device.make || '',
       model: client.model || device.model || '',
+      // The Laptop SKU branch staff chose in SalesKit (1.0.34+): the laptop's name.
+      sku: client.sku || device.sku || '',
       address: ip,
       lastSeen: now,
       lastPath: pathname,

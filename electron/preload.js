@@ -45,6 +45,10 @@ contextBridge.exposeInMainWorld('saleskit', {
     ipcRenderer.on('prices:changed', listener);
     return () => ipcRenderer.removeListener('prices:changed', listener);
   },
+  // Laptop SKU: { sku, required } (required: a branch account is signed in and no SKU is saved yet).
+  getLaptopSku: () => ipcRenderer.invoke('laptopsku:get'),
+  setLaptopSku: (sku) => ipcRenderer.invoke('laptopsku:set', sku),
+  getLaptopSkuChoices: () => ipcRenderer.invoke('laptopsku:choices'),
   // App test from the App Check Server's admin page: { running, stopping, targets: [{ name, status, detail }] }.
   getAppCheckState: () => ipcRenderer.invoke('appcheck:state'),
   stopAppCheck: () => ipcRenderer.invoke('appcheck:stop'),

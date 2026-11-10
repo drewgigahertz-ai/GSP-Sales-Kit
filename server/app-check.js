@@ -6,6 +6,7 @@
 // (every result) and results.csv (one row per test, for Excel).
 const fs = require('node:fs');
 const path = require('node:path');
+const { compareSku } = require('../electron/laptop-sku');
 
 const ONLINE_MS = 20 * 1000;
 const DEFAULT_TARGETS = [
@@ -46,7 +47,9 @@ function readJson(file, fallback) {
 // getLogoPath(): the header logo file for the page's top bar (the LOGO sheet's, as on Sales Tools), or ''.
 // lastAccountFor(computerName): the account last signed in on that laptop ({ username, branch }) from the server's
 //   Devices list, or null. Used for the branch while nobody is signed in (sign-in page, or signed out by a restart).
-function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPath = () => '', lastAccountFor = () => null, listBranches = () => [] }) {
+function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPath = () => '', lastAccountFor = () => null, listBranches = () => [], findSku = () => null }) {
+  // findSku(sku): that SKU in SalesKit's data ({ sku, brand, model, partNumber }) or null, to compare it with the
+  // brand and model Windows reports (laptop-sku.js).
   fs.mkdirSync(dataDir, { recursive: true });
   const F = {
     settings: path.join(dataDir, 'settings.json'),
@@ -74,7 +77,7 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
   function saveLaptops() {
     if (!laptopsDirty) return;
     laptopsDirty = false;
-    const list = [...laptops.values()].map(({ name, branch, assignedBranch, user, version, make, model, lastSeen }) => ({ name, branch, assignedBranch, user, version, make, model, lastSeen }));
+    const list = [...laptops.values()].map(({ name, branch, assignedBranch, user, version, make, model, sku, lastSeen }) => ({ name, branch, assignedBranch, user, version, make, model, sku, lastSeen }));
     try { fs.writeFileSync(F.laptops, JSON.stringify(list, null, 1)); } catch { laptopsDirty = true; }
   }
   const saveTimer = setInterval(saveLaptops, 30 * 1000);
@@ -84,12 +87,12 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
   // while nobody is signed in on the laptop; brand and model come from the X-SalesKit-Make / -Model headers.
   function touch(body, user, device = {}, seen = true) {
     const name = text(body.laptop, 80);
-    if (!laptops.has(name)) laptops.set(name, { name, branch: '', user: '', version: '', make: '', model: '', lastSeen: 0, command: null, current: null });
+    if (!laptops.has(name)) laptops.set(name, { name, branch: '', user: '', version: '', make: '', model: '', sku: '', lastSeen: 0, command: null, current: null });
     const l = laptops.get(name);
     const known = user ? null : lastAccountFor(name);
-    const fields = { branch: user ? user.branch : (known && known.branch) || '', user: user ? user.username : '', version: body.version, make: device.make, model: device.model };
+    const fields = { branch: user ? user.branch : (known && known.branch) || '', user: user ? user.username : '', version: body.version, make: device.make, model: device.model, sku: device.sku };
     for (const [key, value] of Object.entries(fields)) {
-      if (value === undefined || text(value) === l[key] || (['branch', 'make', 'model'].includes(key) && !text(value))) continue;
+      if (value === undefined || text(value) === l[key] || (['branch', 'make', 'model', 'sku'].includes(key) && !text(value))) continue;
       l[key] = text(value);
       laptopsDirty = true;
     }
@@ -100,6 +103,13 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
     return l;
   }
   const running = (l) => Boolean(l.current && !l.current.finished);
+  // The typed SKU against the laptop Windows reports: { status: none | unknown | nodevice | brand | model | match,
+  // brand, model } (brand and model: what SalesKit's data says that SKU is).
+  function skuCheckOf(l) {
+    let found = null;
+    try { found = l.sku ? findSku(l.sku) : null; } catch { /* no database yet */ }
+    return compareSku(l.sku, found, { make: l.make, model: l.model });
+  }
   // A laptop's branch: the one the admin set on the page, else the signed-in account's, else the account last
   // signed in on it (Devices list). source says which, for the page.
   function branchOf(l) {
@@ -161,6 +171,7 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
         laptop: l.name,
         make: l.make,
         model: l.model,
+        sku: l.sku || undefined,
         branch: l.assignedBranch || text(body.branch) || branchOf(l).branch,
         user: text(body.user),
         version: text(body.version, 20),
@@ -255,10 +266,10 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
       let runs = [];
       try { runs = fs.readFileSync(F.runs, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line)); } catch { /* none yet */ }
       const secs = (ms) => (ms === undefined || ms === null ? '' : Math.round(ms / 1000));
-      const rows = [['Started', 'Finished', 'Branch', 'Laptop', 'Computer name', 'Signed in', 'Sales Tools', 'App', 'Status', 'App seconds', 'Detail', 'Test result', 'Test seconds']];
+      const rows = [['Started', 'Finished', 'Branch', 'Laptop SKU', 'Laptop', 'Computer name', 'Signed in', 'Sales Tools', 'App', 'Status', 'App seconds', 'Detail', 'Test result', 'Test seconds']];
       for (const run of runs) {
         const device = [run.make, run.model].filter(Boolean).join(' ');
-        for (const r of run.results) rows.push([run.startedAt ? new Date(run.startedAt).toLocaleString() : '', new Date(run.time).toLocaleString(), run.branch, device, run.laptop, run.user, run.version, r.target, r.status, secs(r.ms), r.detail, passed(run) ? 'PASS' : 'CHECK', secs(run.durationMs)]);
+        for (const r of run.results) rows.push([run.startedAt ? new Date(run.startedAt).toLocaleString() : '', new Date(run.time).toLocaleString(), run.branch, run.sku || '', device, run.laptop, run.user, run.version, r.target, r.status, secs(r.ms), r.detail, passed(run) ? 'PASS' : 'CHECK', secs(run.durationMs)]);
       }
       response.writeHead(200, { 'Cache-Control': 'no-store', 'Content-Type': 'text/csv; charset=utf-8' });
       // The byte-order mark makes Excel read the file as UTF-8.
@@ -277,7 +288,7 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
       const list = [...laptops.values()]
         .map((l) => ({ l, ...branchOf(l) }))
         .sort((a, b) => (a.branch || '~').localeCompare(b.branch || '~') || a.l.name.localeCompare(b.l.name))
-        .map(({ l, branch, source }) => ({ name: l.name, branch, branchSource: source, user: l.user, version: l.version, make: l.make, model: l.model, online: now - l.lastSeen < ONLINE_MS, lastSeen: l.lastSeen, current: l.current, waiting: Boolean(l.command), last: lastRun.get(l.name) || null }));
+        .map(({ l, branch, source }) => ({ name: l.name, branch, branchSource: source, user: l.user, version: l.version, make: l.make, model: l.model, sku: l.sku || '', skuCheck: skuCheckOf(l), online: now - l.lastSeen < ONLINE_MS, lastSeen: l.lastSeen, current: l.current, waiting: Boolean(l.command), last: lastRun.get(l.name) || null }));
       // Branches to choose from when setting a laptop's branch: SalesKit's branch list, HO, and any in use.
       let branches = [];
       try { branches = listBranches(); } catch { /* no database yet */ }

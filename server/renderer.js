@@ -618,8 +618,15 @@ function renderDevices(list) {
       showingCell.appendChild(since);
       showingCell.title = `Since ${formatTime(showing.since, true)}`;
     }
+    // The Laptop SKU staff chose (SalesKit 1.0.34+) first, then the brand and model Windows reports.
     const laptop = [device.make, device.model].filter(Boolean).join(' · ');
-    addCell(laptop);
+    const laptopCell = addCell(device.sku || laptop);
+    if (device.sku && laptop) {
+      const windows = document.createElement('div');
+      windows.className = 'muted-small';
+      windows.textContent = laptop;
+      laptopCell.appendChild(windows);
+    }
     addCell(device.name || 'Unknown (SalesKit 1.0.1 or older)', device.name ? '' : 'muted-small');
     addCell(device.address, 'muted-small');
     addCell(device.version ? `v${device.version}` : '');

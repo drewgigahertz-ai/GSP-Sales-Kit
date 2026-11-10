@@ -6,6 +6,13 @@
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
+      version: '1.0.34',
+      date: 'November 10, 2026',
+      changes: [
+        'Laptop SKU: when you sign in with a branch account, SalesKit asks once which laptop this is. Search for its SKU and press Save. To change it later, click "Change" next to your name at the top.'
+      ]
+    },
+    {
       version: '1.0.32',
       date: 'November 10, 2026',
       changes: [
