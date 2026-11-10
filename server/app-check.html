@@ -89,6 +89,8 @@ tr.detail td{background:#f3f6fd;padding:0 16px 14px 44px}
 .laptop-name{font-weight:800;color:var(--ghz-blue);white-space:nowrap}
 .sub{color:var(--muted);font-size:.74rem;margin-top:1px;white-space:nowrap}
 .c-app{text-align:center;white-space:nowrap}
+.dur{display:block;color:var(--muted);font-size:.7rem;margin-top:3px;font-variant-numeric:tabular-nums}
+.total{font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;margin-left:4px}
 .none{color:#b7c0d4}
 .c-last{white-space:nowrap}
 .c-act{text-align:right;white-space:nowrap}
@@ -204,6 +206,12 @@ const badge=(s,title)=>`<span class="status s-${esc(s)}"${title?` title="${esc(t
 const ago=t=>{if(!t)return'never';const ms=typeof t==='number'?t:Date.parse(t);const s=Math.round((Date.now()-ms)/1000);return s<60?'just now':s<3600?Math.round(s/60)+' min ago':s<86400?Math.round(s/3600)+' h ago':new Date(ms).toLocaleDateString()};
 const device=x=>[x.make,x.model].filter(Boolean).join(' ');
 const isRunning=l=>l.current&&!l.current.finished;
+// "45s", "4m 12s", "1h 03m".
+const dur=ms=>{if(ms===undefined||ms===null||ms<0)return'';const s=Math.round(ms/1000);if(s<60)return s+'s';const m=Math.floor(s/60);if(m<60)return m+'m '+String(s%60).padStart(2,'0')+'s';return Math.floor(m/60)+'h '+String(m%60).padStart(2,'0')+'m'};
+// "Today 10:42 AM", "Yesterday 3:05 PM", "11/8/2026 9:10 AM".
+const when=t=>{if(!t)return'';const d=new Date(t),day=new Date(d).setHours(0,0,0,0),today=new Date().setHours(0,0,0,0);const time=d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});return(day===today?'Today':day===today-86400000?'Yesterday':d.toLocaleDateString())+' '+time};
+// Time since the server started timing something (server clock, so a wrong clock on this computer does not matter).
+const elapsed=startedAt=>startedAt?Math.max(0,state.now-startedAt):undefined;
 const pass=h=>h.results.length&&h.results.every(r=>r.status==='ok');
 
 // The logo comes from the server's LOGO sheet; without one the bar shows only the title.
@@ -283,9 +291,9 @@ function shown(){
 }
 function appCell(l,name){
   const live=l.current&&l.current.targets[name];
-  if(live)return badge(live.status,live.detail);
+  if(live){const t=live.ms!==undefined?live.ms:live.status==='testing'?elapsed(live.startedAt):undefined;return badge(live.status,live.detail)+(t!==undefined?`<span class="dur">${dur(t)}</span>`:'')}
   const r=l.last&&l.last.results.find(x=>x.target===name);
-  return r?badge(r.status,r.detail):'<span class="none">—</span>';
+  return r?badge(r.status,r.detail)+(r.ms!==undefined?`<span class="dur">${dur(r.ms)}</span>`:''):'<span class="none">—</span>';
 }
 function branchCell(l){
   if(editingBranch===l.name)return`<select class="branch-select" data-branch-for="${esc(l.name)}" aria-label="Branch of ${esc(l.name)}">
@@ -315,7 +323,7 @@ function renderLaptops(){
     }
     const run=isRunning(l),open=openRows.has(l.name);
     const state_=run?'Testing now':l.waiting?'Starting within 5 seconds...':l.online?'':'Offline · seen '+ago(l.lastSeen);
-    const last=l.last?`${badge(l.last.pass?'PASS':'CHECK')} <span class="sub" style="display:inline">${esc(ago(l.last.time))}</span>`:'<span class="none">No test yet</span>';
+    const last=l.last?`${badge(l.last.pass?'PASS':'CHECK')}${l.last.durationMs?`<span class="total" title="How long the test took">${dur(l.last.durationMs)}</span>`:''}<div class="sub" title="${esc(new Date(l.last.startedAt||l.last.time).toLocaleString())}">${l.last.startedAt?'Started ':''}${esc(when(l.last.startedAt||l.last.time))}</div>`:'<span class="none">No test yet</span>';
     const btn=l.waiting?`<button class="btn light sm" data-act="cancel" data-n="${esc(l.name)}">Cancel</button>`
       :!l.online&&!run?`<button class="btn danger sm" data-act="forget" data-n="${esc(l.name)}">Remove</button>`
       :`<button class="btn sm" data-act="run" data-n="${esc(l.name)}" ${run?'disabled':''}>Run test</button>`;
@@ -325,11 +333,11 @@ function renderLaptops(){
       <td><div class="laptop-name">${esc(device(l)||l.name)}</div><div class="sub">${esc([l.name,l.version&&'v'+l.version].filter(Boolean).join(' · '))}</div></td>
       <td>${l.user?esc(l.user):`<span class="none">${l.online?'Nobody':'—'}</span>`}</td>
       ${apps.map(a=>`<td class="c-app">${appCell(l,a)}</td>`).join('')}
-      <td class="c-last">${run||l.waiting?`<span class="status s-testing">${esc(state_)}</span>`:last}${!l.online&&!run?`<div class="sub">${esc(state_)}</div>`:''}</td>
+      <td class="c-last">${run?`<span class="status s-testing">Testing now</span><span class="total">${dur(elapsed(l.current.startedAt))}</span><div class="sub">Started ${esc(when(l.current.startedAt))}</div>`:l.waiting?`<span class="status s-testing">${esc(state_)}</span>`:last}${!l.online&&!run?`<div class="sub">${esc(state_)}</div>`:''}</td>
       <td class="c-act">${btn}</td></tr>`;
     if(open){
       const items=l.current?Object.entries(l.current.targets).map(([n,t])=>({target:n,...t})):l.last?l.last.results:[];
-      html+=`<tr class="detail"><td colspan="${cols}">${items.length?`<div class="detail-grid">${items.map(r=>`<div class="detail-item"><div class="top"><span>${esc(r.target)}</span>${badge(r.status)}</div><div class="d">${esc(r.detail||'')}</div></div>`).join('')}</div>${l.last&&!l.current?`<div class="d">Tested ${esc(new Date(l.last.time).toLocaleString())}${l.last.stoppedOnLaptop?' · stopped on the laptop':''}</div>`:''}`:'<div class="d">No test yet.</div>'}</td></tr>`;
+      html+=`<tr class="detail"><td colspan="${cols}">${items.length?`<div class="detail-grid">${items.map(r=>`<div class="detail-item"><div class="top"><span>${esc(r.target)}${r.ms!==undefined?` <span class="sub" style="display:inline">· ${dur(r.ms)}</span>`:''}</span>${badge(r.status)}</div><div class="d">${esc(r.detail||'')}</div></div>`).join('')}</div>${l.last&&!l.current?`<div class="d">${l.last.startedAt?`Started ${esc(new Date(l.last.startedAt).toLocaleString())} · finished ${esc(new Date(l.last.time).toLocaleTimeString())} · took ${dur(l.last.durationMs)}`:`Finished ${esc(new Date(l.last.time).toLocaleString())}`}${l.last.stoppedOnLaptop?' · stopped on the laptop':''}</div>`:''}`:'<div class="d">No test yet.</div>'}</td></tr>`;
     }
   }
   $('laptops').innerHTML=html;
@@ -370,16 +378,16 @@ function renderHistory(){
   const hist=state.history.filter(h=>(!b||h.branch===b)&&(!res||(pass(h)?'PASS':'CHECK')===res)).sort((x,y)=>Date.parse(y.time)-Date.parse(x.time));
   const checks=state.history.filter(h=>!pass(h)&&Date.now()-Date.parse(h.time)<86400000).length;
   $('countCheck').textContent=checks;$('countCheck').hidden=!checks;$('countCheck').title='Tests needing a check in the last 24 hours';
-  const apps=appColumns(hist),cols=4+apps.length;
-  $('hhead').innerHTML=`<tr><th>Time</th><th>Branch</th><th>Laptop</th>${apps.map(a=>`<th class="c-app">${esc(a)}</th>`).join('')}<th>Test</th></tr>`;
+  const apps=appColumns(hist),cols=5+apps.length;
+  $('hhead').innerHTML=`<tr><th>Started</th><th>Branch</th><th>Laptop</th>${apps.map(a=>`<th class="c-app">${esc(a)}</th>`).join('')}<th>Test</th><th>Run time</th></tr>`;
   $('hist').innerHTML=hist.map((h,i)=>{
     const id=h.laptop+'|'+h.time,open=openHist.has(id);
-    const cell=a=>{const r=h.results.find(x=>x.target===a);return r?badge(r.status,r.detail):'<span class="none">—</span>'};
-    return`<tr class="row${open?' open':''}" data-hist="${esc(id)}"><td style="white-space:nowrap">${esc(new Date(h.time).toLocaleString())}</td><td class="c-branch"><span class="branch-name">${esc(h.branch||'—')}</span></td>
+    const cell=a=>{const r=h.results.find(x=>x.target===a);return r?badge(r.status,r.detail)+(r.ms!==undefined?`<span class="dur">${dur(r.ms)}</span>`:''):'<span class="none">—</span>'};
+    return`<tr class="row${open?' open':''}" data-hist="${esc(id)}"><td style="white-space:nowrap" title="Finished ${esc(new Date(h.time).toLocaleString())}">${esc(when(h.startedAt||h.time))}</td><td class="c-branch"><span class="branch-name">${esc(h.branch||'—')}</span></td>
       <td><div class="laptop-name">${esc(device(h)||h.laptop)}</div><div class="sub">${esc([device(h)?h.laptop:'',h.user].filter(Boolean).join(' · '))}</div></td>
       ${apps.map(a=>`<td class="c-app">${cell(a)}</td>`).join('')}
-      <td>${badge(pass(h)?'PASS':'CHECK')}${h.stoppedOnLaptop?'<div class="sub">Stopped on laptop</div>':''}</td></tr>`
-      +(open?`<tr class="detail"><td colspan="${cols}"><div class="detail-grid">${h.results.map(r=>`<div class="detail-item"><div class="top"><span>${esc(r.target)}</span>${badge(r.status)}</div><div class="d">${esc(r.detail||'')}</div></div>`).join('')}</div></td></tr>`:'');
+      <td>${badge(pass(h)?'PASS':'CHECK')}${h.stoppedOnLaptop?'<div class="sub">Stopped on laptop</div>':''}</td><td class="total" style="white-space:nowrap">${h.durationMs?dur(h.durationMs):'<span class="none" title="Sent late by the laptop, so it was not timed">—</span>'}</td></tr>`
+      +(open?`<tr class="detail"><td colspan="${cols}"><div class="detail-grid">${h.results.map(r=>`<div class="detail-item"><div class="top"><span>${esc(r.target)}${r.ms!==undefined?` <span class="sub" style="display:inline">· ${dur(r.ms)}</span>`:''}</span>${badge(r.status)}</div><div class="d">${esc(r.detail||'')}</div></div>`).join('')}</div></td></tr>`:'');
   }).join('');
   $('hempty').hidden=hist.length>0;
   $('hempty').textContent=state.history.length?'No test matches the filters.':'No finished tests yet.';

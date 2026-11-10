@@ -135,9 +135,17 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
       if (body.type === 'start') {
         l.current = { runId: body.runId, startedAt: Date.now(), finished: false, targets: Object.fromEntries((Array.isArray(body.targets) ? body.targets : []).slice(0, 40).map((n) => [text(n), { status: 'waiting', detail: '' }])) };
       } else if (l.current && body.type === 'step' && body.target) {
-        l.current.targets[text(body.target)] = { status: text(body.status, 20), detail: text(body.detail, 300) };
+        // Each app is timed from its first "testing" step to its result (startedAt / ms, server clock).
+        const name = text(body.target);
+        const before = l.current.targets[name] || {};
+        const status = text(body.status, 20);
+        const entry = { status, detail: text(body.detail, 300), startedAt: before.startedAt, ms: before.ms };
+        if (status === 'testing' && !entry.startedAt) entry.startedAt = Date.now();
+        if (!['testing', 'waiting'].includes(status) && entry.startedAt && entry.ms === undefined) entry.ms = Date.now() - entry.startedAt;
+        l.current.targets[name] = entry;
       } else if (l.current && body.type === 'finish') {
         l.current.finished = true;
+        if (!l.current.ms) l.current.ms = Date.now() - l.current.startedAt;
       }
       return { status: 200, body: { ok: true } };
     }
@@ -155,6 +163,17 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
         stoppedOnLaptop: Boolean(body.stoppedOnLaptop),
         results: body.results.slice(0, 40).map((r) => ({ target: text(r && r.target), app: text(r && r.app, 120), status: text(r && r.status, 20), detail: text(r && r.detail, 300) }))
       };
+      // How long it ran: the server timed this test while it ran (results come just before the "finish" step).
+      // Results sent late, from a laptop that could not reach the server, have no times.
+      const live = l.current && !l.current.finished ? l.current : null;
+      if (live && Math.abs(Date.parse(run.time) - Date.now()) < 2 * 60 * 1000) {
+        run.startedAt = new Date(live.startedAt).toISOString();
+        run.durationMs = Date.now() - live.startedAt;
+        for (const r of run.results) {
+          const t = live.targets[r.target];
+          if (t && t.ms !== undefined) r.ms = t.ms;
+        }
+      }
       fs.appendFileSync(F.runs, `${JSON.stringify(run)}\n`);
       history.push(run);
       if (history.length > 500) history = history.slice(-500);
@@ -230,10 +249,11 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
     if (route === '/app-check/api/results.csv' && request.method === 'GET') {
       let runs = [];
       try { runs = fs.readFileSync(F.runs, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line)); } catch { /* none yet */ }
-      const rows = [['Time', 'Branch', 'Laptop', 'Computer name', 'Signed in', 'Sales Tools', 'App', 'Status', 'Detail', 'Test result']];
+      const secs = (ms) => (ms === undefined || ms === null ? '' : Math.round(ms / 1000));
+      const rows = [['Started', 'Finished', 'Branch', 'Laptop', 'Computer name', 'Signed in', 'Sales Tools', 'App', 'Status', 'App seconds', 'Detail', 'Test result', 'Test seconds']];
       for (const run of runs) {
         const device = [run.make, run.model].filter(Boolean).join(' ');
-        for (const r of run.results) rows.push([new Date(run.time).toLocaleString(), run.branch, device, run.laptop, run.user, run.version, r.target, r.status, r.detail, passed(run) ? 'PASS' : 'CHECK']);
+        for (const r of run.results) rows.push([run.startedAt ? new Date(run.startedAt).toLocaleString() : '', new Date(run.time).toLocaleString(), run.branch, device, run.laptop, run.user, run.version, r.target, r.status, secs(r.ms), r.detail, passed(run) ? 'PASS' : 'CHECK', secs(run.durationMs)]);
       }
       response.writeHead(200, { 'Cache-Control': 'no-store', 'Content-Type': 'text/csv; charset=utf-8' });
       // The byte-order mark makes Excel read the file as UTF-8.
@@ -247,7 +267,7 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
       for (const run of history) {
         const seen = lastRun.get(run.laptop);
         if (seen && Date.parse(seen.time) > Date.parse(run.time)) continue; // a late result of an older test
-        lastRun.set(run.laptop, { time: run.time, pass: passed(run), stoppedOnLaptop: run.stoppedOnLaptop, results: run.results });
+        lastRun.set(run.laptop, { time: run.time, pass: passed(run), stoppedOnLaptop: run.stoppedOnLaptop, startedAt: run.startedAt, durationMs: run.durationMs, results: run.results });
       }
       const list = [...laptops.values()]
         .map((l) => ({ l, ...branchOf(l) }))
@@ -257,7 +277,7 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
       let branches = [];
       try { branches = listBranches(); } catch { /* no database yet */ }
       branches = [...new Set(['HO', ...branches, ...list.map((l) => l.branch)].filter(Boolean).map((b) => String(b).toUpperCase()))].sort();
-      return send(response, 200, { me: user.displayName, laptops: list, branches, history: [...history].sort((a, b) => Date.parse(b.time) - Date.parse(a.time)).slice(0, 100), targets, demoFolder, dataDir });
+      return send(response, 200, { now: Date.now(), me: user.displayName, laptops: list, branches, history: [...history].sort((a, b) => Date.parse(b.time) - Date.parse(a.time)).slice(0, 100), targets, demoFolder, dataDir });
     }
     if (request.method !== 'POST') return send(response, 404, { error: 'Not found.' });
     const body = await readBody(request);
