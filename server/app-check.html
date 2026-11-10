@@ -196,7 +196,8 @@ const badge=(s,title)=>`<span class="status s-${esc(s)}"${title?` title="${esc(t
 const ago=t=>{if(!t)return'never';const ms=typeof t==='number'?t:Date.parse(t);const s=Math.round((Date.now()-ms)/1000);return s<60?'just now':s<3600?Math.round(s/60)+' min ago':s<86400?Math.round(s/3600)+' h ago':new Date(ms).toLocaleDateString()};
 const device=x=>[x.make,x.model].filter(Boolean).join(' ');
 // "HO - Lenovo IdeaPad 5 14ALC05"; the computer name is shown under it.
-const title=l=>`${l.branch||'No branch'} - ${device(l)||l.name}`;
+// Without a branch: nobody has ever signed in to SalesKit on that laptop.
+const title=l=>`${l.branch||'Branch unknown (never signed in)'} - ${device(l)||l.name}`;
 const isRunning=l=>l.current&&!l.current.finished;
 const pass=h=>h.results.length&&h.results.every(r=>r.status==='ok');
 

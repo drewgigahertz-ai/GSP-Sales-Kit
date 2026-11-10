@@ -39,7 +39,9 @@ function readJson(file, fallback) {
 // accounts: { login(username, password, address), logout(key), userForSession(key) } (server/users.js).
 // canAdmin(user): who may use the web page. log(level, message): the server's activity log.
 // getLogoPath(): the header logo file for the page's top bar (the LOGO sheet's, as on Sales Tools), or ''.
-function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPath = () => '' }) {
+// lastAccountFor(computerName): the account last signed in on that laptop ({ username, branch }) from the server's
+//   Devices list, or null. Used for the branch while nobody is signed in (sign-in page, or signed out by a restart).
+function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPath = () => '', lastAccountFor = () => null }) {
   fs.mkdirSync(dataDir, { recursive: true });
   const F = {
     settings: path.join(dataDir, 'settings.json'),
@@ -79,7 +81,8 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
     const name = text(body.laptop, 80);
     if (!laptops.has(name)) laptops.set(name, { name, branch: '', user: '', version: '', make: '', model: '', lastSeen: 0, command: null, current: null });
     const l = laptops.get(name);
-    const fields = { branch: user ? user.branch : '', user: user ? user.username : '', version: body.version, make: device.make, model: device.model };
+    const known = user ? null : lastAccountFor(name);
+    const fields = { branch: user ? user.branch : (known && known.branch) || '', user: user ? user.username : '', version: body.version, make: device.make, model: device.model };
     for (const [key, value] of Object.entries(fields)) {
       if (value === undefined || text(value) === l[key] || (['branch', 'make', 'model'].includes(key) && !text(value))) continue;
       l[key] = text(value);
@@ -235,7 +238,7 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
       for (const run of history) lastRun.set(run.laptop, { time: run.time, pass: passed(run) });
       const list = [...laptops.values()]
         .sort((a, b) => (a.branch || '~').localeCompare(b.branch || '~') || a.name.localeCompare(b.name))
-        .map((l) => ({ name: l.name, branch: l.branch, user: l.user, version: l.version, make: l.make, model: l.model, online: now - l.lastSeen < ONLINE_MS, lastSeen: l.lastSeen, current: l.current, waiting: Boolean(l.command), last: lastRun.get(l.name) || null }));
+        .map((l) => ({ name: l.name, branch: l.branch || (lastAccountFor(l.name) || {}).branch || '', user: l.user, version: l.version, make: l.make, model: l.model, online: now - l.lastSeen < ONLINE_MS, lastSeen: l.lastSeen, current: l.current, waiting: Boolean(l.command), last: lastRun.get(l.name) || null }));
       return send(response, 200, { me: user.displayName, laptops: list, history: history.slice(-100).reverse(), targets, demoFolder, dataDir });
     }
     if (request.method !== 'POST') return send(response, 404, { error: 'Not found.' });

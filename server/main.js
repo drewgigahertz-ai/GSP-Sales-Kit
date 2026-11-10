@@ -914,6 +914,11 @@ if (!app.requestSingleInstanceLock()) {
         canAdmin: (user) => Boolean(user) && !user.disabled && hasFullAccess(user.branch),
         log,
         // The Sales Tools header logo: downloaded from the LOGO sheet (loadLogos), or the one built into the server.
+        // The branch of the account last signed in on a laptop (Devices list), for laptops on the sign-in page.
+        lastAccountFor: (name) => {
+          const device = devices.list().find((d) => String(d.name).toLowerCase() === String(name).toLowerCase());
+          return device && device.account ? device.account : null;
+        },
         getLogoPath: () => [path.join(app.getPath('userData'), 'logos', 'header.png'), path.join(__dirname, 'assets', 'header-logo.png')].find((file) => fs.existsSync(file)) || ''
       });
       backups = createBackupStore(path.join(app.getPath('userData'), 'backups'), database);
