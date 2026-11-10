@@ -90,6 +90,8 @@ $('logout').addEventListener('click',async()=>{await api('logout',{}).catch(()=>
 
 function shown(){const b=$('branch').value;return state.laptops.filter(l=>!b||l.branch===b)}
 const isRunning=l=>l.current&&!l.current.finished;
+// "HO - Lenovo IdeaPad 5 14ALC05"; the computer name is shown under it.
+const title=l=>`${l.branch||'No branch'} - ${[l.make,l.model].filter(Boolean).join(' ')||l.name}`;
 function render(){
   $('me').textContent=state.me||'';
   const branches=[...new Set(state.laptops.map(l=>l.branch).filter(Boolean))].sort();
@@ -102,16 +104,16 @@ function render(){
   $('laptops').innerHTML=list.length?list.map(l=>{
     const run=isRunning(l);
     const st=run?'Testing now':l.waiting?'Starting the test (within 5 seconds)...':l.online?'Online, ready':'Offline, last seen '+ago(l.lastSeen);
-    const who=[l.user?'Signed in: '+l.user:(l.online?'Nobody signed in':''),l.version&&'Sales Tools '+l.version].filter(Boolean).join(' · ');
+    const who=[l.name,l.user?'Signed in: '+l.user:(l.online?'Nobody signed in':''),l.version&&'Sales Tools '+l.version].filter(Boolean).join(' · ');
     const rows=l.current?Object.entries(l.current.targets).map(([n,t])=>`<tr><td><strong>${esc(n)}</strong></td><td>${badge(t.status)}</td><td class="d">${esc(t.detail)}</td></tr>`).join(''):'<tr><td colspan="3" class="empty">No test since the server started.</td></tr>';
     const btn=l.waiting?`<button class="ghost" data-act="cancel" data-n="${esc(l.name)}">Cancel</button>`
       :!l.online&&!run?`<button class="line" data-act="forget" data-n="${esc(l.name)}">Remove from list</button>`
       :`<button data-act="run" data-n="${esc(l.name)}" ${run?'disabled':''}>Run test</button>`;
-    return`<div class="card"><div class="card-h"><div><div class="name"><span class="dot ${run?'busy':l.online?'on':''}"></span>${esc(l.name)} ${l.branch?`<span class="tag">${esc(l.branch)}</span>`:''}</div><div class="sub">${esc(st)}${who?' · '+esc(who):''}</div></div>${btn}</div>
+    return`<div class="card"><div class="card-h"><div><div class="name"><span class="dot ${run?'busy':l.online?'on':''}"></span>${esc(title(l))}</div><div class="sub">${esc(st)}${who?' · '+esc(who):''}</div></div>${btn}</div>
     <div class="scroll"><table><thead><tr><th style="width:24%">App</th><th style="width:16%">Status</th><th>What is happening</th></tr></thead><tbody>${rows}</tbody></table></div></div>`}).join('')
   :`<div class="card"><div class="empty"><strong>${state.laptops.length?'No laptop in this branch.':'No laptop has connected yet.'}</strong><br>Laptops appear here when Gigahertz Sales Tools 1.0.30 or later is open on them.</div></div>`;
   const b=$('branch').value,hist=state.history.filter(h=>!b||h.branch===b);
-  $('hist').innerHTML=hist.map(h=>{const ok=h.results.length&&h.results.every(r=>r.status==='ok');return`<tr><td>${esc(new Date(h.time).toLocaleString())}</td><td>${esc(h.laptop)}${h.user?`<div class="d">${esc(h.user)}</div>`:''}</td><td>${esc(h.branch||'')}</td>
+  $('hist').innerHTML=hist.map(h=>{const ok=h.results.length&&h.results.every(r=>r.status==='ok');return`<tr><td>${esc(new Date(h.time).toLocaleString())}</td><td>${esc(h.make||h.model?[h.make,h.model].filter(Boolean).join(' '):h.laptop)}<div class="d">${esc([h.make||h.model?h.laptop:'',h.user].filter(Boolean).join(' · '))}</div></td><td>${esc(h.branch||'')}</td>
     <td>${h.results.map(r=>esc(r.target)+' '+badge(r.status,r.detail)).join(' &nbsp; ')}${h.stoppedOnLaptop?'<div class="d">Stopped on the laptop</div>':''}</td><td>${badge(ok?'PASS':'CHECK')}</td></tr>`}).join('');
   $('hempty').style.display=hist.length?'none':'block';
   $('dir').textContent='Results are also saved on the server in '+state.dataDir+' (results.csv opens in Excel).';

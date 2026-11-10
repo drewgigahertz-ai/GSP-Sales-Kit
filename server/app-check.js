@@ -66,21 +66,21 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {} }) {
   function saveLaptops() {
     if (!laptopsDirty) return;
     laptopsDirty = false;
-    const list = [...laptops.values()].map(({ name, branch, user, version, lastSeen }) => ({ name, branch, user, version, lastSeen }));
+    const list = [...laptops.values()].map(({ name, branch, user, version, make, model, lastSeen }) => ({ name, branch, user, version, make, model, lastSeen }));
     try { fs.writeFileSync(F.laptops, JSON.stringify(list, null, 1)); } catch { laptopsDirty = true; }
   }
   const saveTimer = setInterval(saveLaptops, 30 * 1000);
   saveTimer.unref?.();
 
   // seen: false for results sent late (kept on the laptop while the server was unreachable). The branch is kept
-  // while nobody is signed in on the laptop.
-  function touch(body, user, seen = true) {
+  // while nobody is signed in on the laptop; brand and model come from the X-SalesKit-Make / -Model headers.
+  function touch(body, user, device = {}, seen = true) {
     const name = text(body.laptop, 80);
-    if (!laptops.has(name)) laptops.set(name, { name, branch: '', user: '', version: '', lastSeen: 0, command: null, current: null });
+    if (!laptops.has(name)) laptops.set(name, { name, branch: '', user: '', version: '', make: '', model: '', lastSeen: 0, command: null, current: null });
     const l = laptops.get(name);
-    const fields = { branch: user ? user.branch : '', user: user ? user.username : '', version: body.version };
+    const fields = { branch: user ? user.branch : '', user: user ? user.username : '', version: body.version, make: device.make, model: device.model };
     for (const [key, value] of Object.entries(fields)) {
-      if (value === undefined || text(value) === l[key] || (key === 'branch' && !text(value))) continue;
+      if (value === undefined || text(value) === l[key] || (['branch', 'make', 'model'].includes(key) && !text(value))) continue;
       l[key] = text(value);
       laptopsDirty = true;
     }
@@ -108,17 +108,18 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {} }) {
 
   // ---------- Laptops: POST /api/app-check/<route> (after the app token check) ----------
   // user: the SalesKit account signed in on the laptop, or null on the sign-in page.
-  function handleLaptop(route, body, user) {
+  // device: { make, model } of the laptop (electron/device-info.js), e.g. { make: 'Lenovo', model: 'IdeaPad 5 14ALC05' }.
+  function handleLaptop(route, body, user, device = {}) {
     if (!body || typeof body !== 'object' || !text(body.laptop)) return { status: 400, body: { error: 'Bad request.' } };
     if (route === 'poll') {
-      const l = touch(body, user);
+      const l = touch(body, user, device);
       // A laptop busy with a test gets the command on its next check-in after the test.
       if (body.busy || l.command !== 'run') return { status: 200, body: { command: null } };
       l.command = null;
       return { status: 200, body: { command: 'run', targets, demoFolder } };
     }
     if (route === 'event') {
-      const l = touch(body, user);
+      const l = touch(body, user, device);
       if (body.type === 'start') {
         l.current = { runId: body.runId, startedAt: Date.now(), finished: false, targets: Object.fromEntries((Array.isArray(body.targets) ? body.targets : []).slice(0, 40).map((n) => [text(n), { status: 'waiting', detail: '' }])) };
       } else if (l.current && body.type === 'step' && body.target) {
@@ -130,9 +131,11 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {} }) {
     }
     if (route === 'results') {
       if (!Array.isArray(body.results)) return { status: 400, body: { error: 'Missing results.' } };
-      const l = touch(body, user, false);
+      const l = touch(body, user, device, false);
       const run = {
         laptop: l.name,
+        make: l.make,
+        model: l.model,
         branch: text(body.branch) || l.branch,
         user: text(body.user),
         version: text(body.version, 20),
@@ -144,7 +147,8 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {} }) {
       history.push(run);
       if (history.length > 500) history = history.slice(-500);
       appendCsv(run);
-      log(passed(run) ? 'success' : 'warning', `App test on ${run.laptop}${run.branch ? ` (${run.branch})` : ''}: ${run.results.map((r) => `${r.target} ${r.status}`).join(', ')}`);
+      const device = [run.make, run.model].filter(Boolean).join(' ');
+      log(passed(run) ? 'success' : 'warning', `App test on ${[run.branch, device].filter(Boolean).join(' - ') || run.laptop} (${run.laptop}): ${run.results.map((r) => `${r.target} ${r.status}`).join(', ')}`);
       return { status: 200, body: { ok: true } };
     }
     return { status: 404, body: { error: 'Not found.' } };
@@ -207,7 +211,7 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {} }) {
       const now = Date.now();
       const list = [...laptops.values()]
         .sort((a, b) => (a.branch || '~').localeCompare(b.branch || '~') || a.name.localeCompare(b.name))
-        .map((l) => ({ name: l.name, branch: l.branch, user: l.user, version: l.version, online: now - l.lastSeen < ONLINE_MS, lastSeen: l.lastSeen, current: l.current, waiting: Boolean(l.command) }));
+        .map((l) => ({ name: l.name, branch: l.branch, user: l.user, version: l.version, make: l.make, model: l.model, online: now - l.lastSeen < ONLINE_MS, lastSeen: l.lastSeen, current: l.current, waiting: Boolean(l.command) }));
       return send(response, 200, { me: user.displayName, laptops: list, history: history.slice(-100).reverse(), targets, demoFolder, dataDir });
     }
     if (request.method !== 'POST') return send(response, 404, { error: 'Not found.' });

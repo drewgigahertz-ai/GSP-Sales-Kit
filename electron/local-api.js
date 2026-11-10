@@ -120,7 +120,8 @@ function createLocalApi({ database, token = '', onRequest = null, getDataVersion
 
       if (appCheck && request.method === 'POST' && url.pathname.startsWith('/api/app-check/')) {
         user = accounts ? accounts.userForSession(request.headers['x-saleskit-session']) : null;
-        const result = appCheck.handleLaptop(url.pathname.slice('/api/app-check/'.length), await readJsonBody(request, 64 * 1024), user);
+        const device = { make: headerText(request, 'x-saleskit-make'), model: headerText(request, 'x-saleskit-model') };
+        const result = appCheck.handleLaptop(url.pathname.slice('/api/app-check/'.length), await readJsonBody(request, 64 * 1024), user, device);
         sendJson(response, result.status, result.body);
         return;
       }
