@@ -24,12 +24,17 @@ function cleanTarget(t) {
   const keyword = text(t.keyword, 120).toLowerCase();
   if (!name || !keyword) return null;
   const mode = t.mode === 'file' ? 'file' : 'launch';
+  // file (optional): one exact file to open, as a file name ("Price list.xlsx", searched for on each laptop) or a
+  // full path ("D:\APPLICATION DEMO\Price list.xlsx"). Its type is added to exts, so laptops before 1.0.33
+  // (which do not know file) still open a file of that type.
+  const file = mode === 'file' ? text(t.file, 260).replace(/^["']+|["']+$/g, '').trim() : '';
+  const fileExt = path.extname(file).toLowerCase();
   const exts = mode === 'file'
-    ? [...new Set((Array.isArray(t.exts) ? t.exts : String(t.exts || '').split(/[,\s]+/))
+    ? [...new Set([...(Array.isArray(t.exts) ? t.exts : String(t.exts || '').split(/[,\s]+/)), fileExt]
       .map((e) => text(e, 12).toLowerCase()).filter(Boolean).map((e) => (e.startsWith('.') ? e : `.${e}`)))]
     : [];
   if (mode === 'file' && !exts.length) return null;
-  return { name, keyword, mode, exts, wait: Math.min(600, Math.max(2, Math.round(Number(t.wait) || 90))) };
+  return { name, keyword, mode, exts, ...(file ? { file } : {}), wait: Math.min(600, Math.max(2, Math.round(Number(t.wait) || 90))) };
 }
 
 function readJson(file, fallback) {
@@ -314,7 +319,7 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
     }
     if (route === '/app-check/api/targets') {
       const list = Array.isArray(body.targets) ? body.targets.slice(0, 40).map(cleanTarget) : [];
-      if (!list.length || list.some((t) => !t)) return send(response, 400, { error: 'Every app needs a name and a keyword, and "Open a demo file" needs at least one file type.' });
+      if (!list.length || list.some((t) => !t)) return send(response, 400, { error: 'Every app needs a name and a keyword, and "Open a demo file" needs a file type or a specific file.' });
       if (new Set(list.map((t) => t.name.toLowerCase())).size !== list.length) return send(response, 400, { error: 'Two apps have the same name.' });
       targets = list;
       demoFolder = text(body.demoFolder, 260).replace(/^["']+|["']+$/g, '');

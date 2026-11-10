@@ -83,10 +83,13 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
           continue;
         }
         step(target.name, 'testing', 'Looking for the app...');
-        // One search of the laptop for every file type in the list, the first time an app needs a sample file.
-        if (!demoRoot && target.mode === 'file' && !sampleFiles) {
+        // One search of the laptop for every file type in the list, the first time an app needs a sample file
+        // (not for an app whose specific file is given as a full path).
+        const fullPath = /^[a-z]:[\\/]|^\\\\/i.test(String(target.file || '').trim());
+        if (!demoRoot && target.mode === 'file' && !fullPath && !sampleFiles) {
           step(target.name, 'testing', 'Looking for sample files on this laptop...');
-          const exts = [...new Set(list.filter((t) => t.mode === 'file').flatMap((t) => t.exts || []))];
+          const exts = [...new Set(list.filter((t) => t.mode === 'file')
+            .flatMap((t) => [...(t.exts || []), path.extname(String(t.file || '')).toLowerCase()]).filter(Boolean))];
           sampleFiles = await collectSampleFiles(exts, places);
         }
         const result = await testTarget(target, { apps, demoRoot, sampleFiles: sampleFiles || [], isStopped, onStep: (detail) => step(target.name, 'testing', detail) });

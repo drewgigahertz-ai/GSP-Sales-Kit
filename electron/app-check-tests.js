@@ -259,6 +259,26 @@ async function openFileTest(exe, file, waitSeconds, onStep, isStopped) {
 
 // One app from the admin's list: { name, keyword, mode: 'file' | 'launch', exts, wait }.
 // demoRoot: the folder the admin chose, or '' to pick from sampleFiles (collectSampleFiles: the whole laptop).
+// The one file the admin named for an app ("Specific file"): a full path is used as it is; a file name
+// ("Price list.xlsx", or "Price list" for any type) is looked for in the demo folder if one is set, otherwise
+// among the files found on the laptop (newest first when there are several with that name).
+function findNamedFile(wanted, { demoRoot, sampleFiles }) {
+  const name = String(wanted).trim().replace(/^["']+|["']+$/g, '');
+  if (/^[a-z]:[\\/]|^\\\\/i.test(name)) {
+    return fs.existsSync(name) ? { file: name } : { error: `${name} is not on this laptop.` };
+  }
+  const low = path.basename(name).toLowerCase();
+  const same = (file) => {
+    const base = path.basename(file).toLowerCase();
+    return path.extname(low) ? base === low : base.slice(0, -path.extname(base).length || undefined) === low;
+  };
+  const candidates = demoRoot
+    ? walk(demoRoot, (n) => same(n), [], 8).map((file) => ({ file, mtime: 0 }))
+    : sampleFiles.filter((f) => same(f.file));
+  const best = candidates.sort((a, b) => b.mtime - a.mtime)[0];
+  return best ? { file: best.file } : { error: `${name} is not on this laptop${demoRoot ? ` (looked in ${demoRoot})` : ''}.` };
+}
+
 async function testTarget(target, { apps, demoRoot, sampleFiles = [], onStep, isStopped }) {
   if (!IS_WIN) return { app: '', status: 'failed', detail: 'App tests only run on Windows.' };
   const found = apps.find((a) => matches(a.name, target.keyword));
@@ -267,7 +287,8 @@ async function testTarget(target, { apps, demoRoot, sampleFiles = [], onStep, is
   let result;
   if (target.mode === 'file') {
     const exts = (target.exts || []).map((e) => String(e).toLowerCase());
-    const demo = demoRoot ? findDemoFile(demoRoot, target.keyword, exts) : pickSampleFile(sampleFiles, target.keyword, exts);
+    const demo = target.file ? findNamedFile(target.file, { demoRoot, sampleFiles })
+      : demoRoot ? findDemoFile(demoRoot, target.keyword, exts) : pickSampleFile(sampleFiles, target.keyword, exts);
     result = demo.error ? { status: 'missing', detail: demo.error } : await openFileTest(found.exe, demo.file, wait, onStep, isStopped);
   } else {
     onStep(`Launching, waiting ${wait}s...`);
@@ -276,4 +297,4 @@ async function testTarget(target, { apps, demoRoot, sampleFiles = [], onStep, is
   return { app: found.name, ...result };
 }
 
-module.exports = { listApps, testTarget, collectSampleFiles, pickSampleFile, lockFileCleanup };
+module.exports = { listApps, testTarget, collectSampleFiles, pickSampleFile, findNamedFile, lockFileCleanup };
