@@ -919,6 +919,7 @@ if (!app.requestSingleInstanceLock()) {
           const device = devices.list().find((d) => String(d.name).toLowerCase() === String(name).toLowerCase());
           return device && device.account ? device.account : null;
         },
+        listBranches: () => database.listBranches(),
         getLogoPath: () => [path.join(app.getPath('userData'), 'logos', 'header.png'), path.join(__dirname, 'assets', 'header-logo.png')].find((file) => fs.existsSync(file)) || ''
       });
       backups = createBackupStore(path.join(app.getPath('userData'), 'backups'), database);

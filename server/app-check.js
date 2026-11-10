@@ -41,7 +41,7 @@ function readJson(file, fallback) {
 // getLogoPath(): the header logo file for the page's top bar (the LOGO sheet's, as on Sales Tools), or ''.
 // lastAccountFor(computerName): the account last signed in on that laptop ({ username, branch }) from the server's
 //   Devices list, or null. Used for the branch while nobody is signed in (sign-in page, or signed out by a restart).
-function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPath = () => '', lastAccountFor = () => null }) {
+function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPath = () => '', lastAccountFor = () => null, listBranches = () => [] }) {
   fs.mkdirSync(dataDir, { recursive: true });
   const F = {
     settings: path.join(dataDir, 'settings.json'),
@@ -69,7 +69,7 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
   function saveLaptops() {
     if (!laptopsDirty) return;
     laptopsDirty = false;
-    const list = [...laptops.values()].map(({ name, branch, user, version, make, model, lastSeen }) => ({ name, branch, user, version, make, model, lastSeen }));
+    const list = [...laptops.values()].map(({ name, branch, assignedBranch, user, version, make, model, lastSeen }) => ({ name, branch, assignedBranch, user, version, make, model, lastSeen }));
     try { fs.writeFileSync(F.laptops, JSON.stringify(list, null, 1)); } catch { laptopsDirty = true; }
   }
   const saveTimer = setInterval(saveLaptops, 30 * 1000);
@@ -95,6 +95,14 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
     return l;
   }
   const running = (l) => Boolean(l.current && !l.current.finished);
+  // A laptop's branch: the one the admin set on the page, else the signed-in account's, else the account last
+  // signed in on it (Devices list). source says which, for the page.
+  function branchOf(l) {
+    if (l.assignedBranch) return { branch: l.assignedBranch, source: 'set' };
+    if (l.branch) return { branch: l.branch, source: 'account' };
+    const known = lastAccountFor(l.name);
+    return known && known.branch ? { branch: String(known.branch).toUpperCase(), source: 'account' } : { branch: '', source: '' };
+  }
 
   // results.csv: when the list of apps changes, the old file is kept under another name and a new one starts.
   const csvHeader = () => ['Time', 'Laptop', 'Branch', ...targets.map((t) => t.name), 'Overall'].map(csvCell).join(',');
@@ -140,7 +148,7 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
         laptop: l.name,
         make: l.make,
         model: l.model,
-        branch: text(body.branch) || l.branch,
+        branch: l.assignedBranch || text(body.branch) || branchOf(l).branch,
         user: text(body.user),
         version: text(body.version, 20),
         time: Number.isNaN(Date.parse(body.time)) ? new Date().toISOString() : new Date(body.time).toISOString(),
@@ -235,11 +243,21 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
     if (route === '/app-check/api/state' && request.method === 'GET') {
       const now = Date.now();
       const lastRun = new Map();
-      for (const run of history) lastRun.set(run.laptop, { time: run.time, pass: passed(run) });
+      // Each laptop's last test, with every app's result, for the list's app columns.
+      for (const run of history) {
+        const seen = lastRun.get(run.laptop);
+        if (seen && Date.parse(seen.time) > Date.parse(run.time)) continue; // a late result of an older test
+        lastRun.set(run.laptop, { time: run.time, pass: passed(run), stoppedOnLaptop: run.stoppedOnLaptop, results: run.results });
+      }
       const list = [...laptops.values()]
-        .sort((a, b) => (a.branch || '~').localeCompare(b.branch || '~') || a.name.localeCompare(b.name))
-        .map((l) => ({ name: l.name, branch: l.branch || (lastAccountFor(l.name) || {}).branch || '', user: l.user, version: l.version, make: l.make, model: l.model, online: now - l.lastSeen < ONLINE_MS, lastSeen: l.lastSeen, current: l.current, waiting: Boolean(l.command), last: lastRun.get(l.name) || null }));
-      return send(response, 200, { me: user.displayName, laptops: list, history: history.slice(-100).reverse(), targets, demoFolder, dataDir });
+        .map((l) => ({ l, ...branchOf(l) }))
+        .sort((a, b) => (a.branch || '~').localeCompare(b.branch || '~') || a.l.name.localeCompare(b.l.name))
+        .map(({ l, branch, source }) => ({ name: l.name, branch, branchSource: source, user: l.user, version: l.version, make: l.make, model: l.model, online: now - l.lastSeen < ONLINE_MS, lastSeen: l.lastSeen, current: l.current, waiting: Boolean(l.command), last: lastRun.get(l.name) || null }));
+      // Branches to choose from when setting a laptop's branch: SalesKit's branch list, HO, and any in use.
+      let branches = [];
+      try { branches = listBranches(); } catch { /* no database yet */ }
+      branches = [...new Set(['HO', ...branches, ...list.map((l) => l.branch)].filter(Boolean).map((b) => String(b).toUpperCase()))].sort();
+      return send(response, 200, { me: user.displayName, laptops: list, branches, history: [...history].sort((a, b) => Date.parse(b.time) - Date.parse(a.time)).slice(0, 100), targets, demoFolder, dataDir });
     }
     if (request.method !== 'POST') return send(response, 404, { error: 'Not found.' });
     const body = await readBody(request);
@@ -255,6 +273,16 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
     if (route === '/app-check/api/cancel') {
       const l = laptops.get(text(body.laptop, 80));
       if (l) l.command = null;
+      return send(response, 200, { ok: true });
+    }
+    // { laptop, branch }: the admin sets the laptop's branch ('' goes back to the signed-in account's branch).
+    if (route === '/app-check/api/branch') {
+      const l = laptops.get(text(body.laptop, 80));
+      if (!l) return send(response, 404, { error: 'Unknown laptop.' });
+      l.assignedBranch = text(body.branch, 40).toUpperCase();
+      laptopsDirty = true;
+      saveLaptops();
+      log('info', `${user.displayName} set the branch of ${l.name} to ${l.assignedBranch || "the signed-in account's"}`);
       return send(response, 200, { ok: true });
     }
     if (route === '/app-check/api/forget') {

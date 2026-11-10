@@ -34,63 +34,75 @@ button,input,select{font:inherit}
 .tab-count.alert{background:var(--bad)}
 
 /* ---- Page ---- */
-.main-content{max-width:1280px;margin:0 auto;padding:24px 32px 48px}
+.main-content{max-width:1440px;margin:0 auto;padding:22px 32px 48px}
 .panel{background:#fff;border:1px solid var(--ghz-border);border-radius:14px;box-shadow:0 1px 3px rgba(15,23,42,.04)}
 .section-title{font-size:1.05rem;font-weight:800;color:var(--ink-strong);margin:0}
 .section-sub{font-size:.8rem;color:var(--muted);margin-top:2px}
-.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
 .toolbar-left,.toolbar-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .field{display:flex;align-items:center;gap:8px;font-size:.8rem;font-weight:700;color:var(--muted)}
 input,select{border:1px solid var(--ghz-border);border-radius:9px;padding:8px 10px;background:#fff;color:var(--ink);width:100%}
 input:focus,select:focus{outline:2px solid rgba(0,62,203,.25);border-color:var(--ghz-btn)}
-.field select{width:auto;min-width:150px}.search{width:220px}
+.field select{width:auto;min-width:150px}.search{width:260px}
 .btn{border:1px solid var(--ghz-btn);background:var(--ghz-btn);color:#fff;border-radius:10px;padding:8px 16px;font-weight:700;cursor:pointer;white-space:nowrap}
 .btn:hover:not(:disabled){background:#0030a8}
 .btn:disabled{background:#b8c4ea;border-color:#b8c4ea;cursor:not-allowed}
 .btn.light{background:#fff;color:var(--ghz-btn);border-color:var(--ghz-border)}.btn.light:hover:not(:disabled){background:var(--ghz-soft)}
 .btn.danger{background:#fff;color:var(--bad);border-color:#f0c4c4}.btn.danger:hover:not(:disabled){background:var(--bad-bg)}
-.btn.sm{padding:6px 12px;font-size:.8rem;border-radius:8px}
+.btn.sm{padding:5px 12px;font-size:.78rem;border-radius:8px}
 
-/* Summary tiles */
-.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:20px}
-.stat{padding:16px 18px;display:flex;flex-direction:column;gap:4px}
-.stat .k{font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.stat .v{font-size:1.8rem;font-weight:800;color:var(--ink-strong);line-height:1.1}
-.stat.ok .v{color:var(--ok)}.stat.busy .v{color:var(--ghz-btn)}.stat.bad .v{color:var(--bad)}
+/* Quick filters: "1 online · 0 testing · 2 need checking · 6 laptops" */
+.quick{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;border:1px solid var(--ghz-border);background:#fff;color:var(--ink);font-size:.8rem;font-weight:700;cursor:pointer}
+.chip b{font-size:.95rem;font-weight:800}
+.chip:hover{border-color:#9db1f0}
+.chip.active{background:var(--ghz-btn);border-color:var(--ghz-btn);color:#fff}
+.chip .dot{margin:0}
 
-/* Laptop cards */
-.laptops{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px;align-items:start}
-.laptop{overflow:hidden;display:flex;flex-direction:column}
-.laptop.running{border-color:#9db1f0;box-shadow:0 0 0 3px rgba(0,62,203,.08)}
-.laptop-head{display:flex;gap:12px;align-items:flex-start;padding:16px 18px}
-.dot{width:11px;height:11px;border-radius:50%;background:#b7c0d4;flex:none;margin-top:6px}.dot.on{background:#16a34a}.dot.busy{background:var(--ghz-btn);animation:pulse 1s infinite}
-@keyframes pulse{50%{opacity:.35}}
-.laptop-info{flex:1;min-width:0}
-.laptop-name{font-weight:800;color:var(--ghz-blue);font-size:1rem;line-height:1.3;word-break:break-word}
-.laptop-meta{font-size:.78rem;color:var(--muted);margin-top:3px;word-break:break-word}
-.laptop-state{font-size:.78rem;font-weight:700;margin-top:6px;color:var(--ink)}
-.laptop-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 18px;border-top:1px solid var(--line);background:#fafcff;margin-top:auto}
-.last{font-size:.78rem;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.link{background:none;border:0;color:var(--ghz-btn);font-weight:700;font-size:.78rem;cursor:pointer;padding:0}
-.steps{border-top:1px solid var(--line)}
-.steps table td{padding:8px 18px}
-
-/* Tables and badges */
+/* The list */
+.list{overflow-x:auto}
 table{width:100%;border-collapse:collapse}
-th{text-align:left;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:11px 18px;border-bottom:2px solid var(--line);background:#fafcff;white-space:nowrap}
-td{padding:11px 18px;border-bottom:1px solid var(--line);vertical-align:top}
-tr:last-child td{border-bottom:0}
-.d{color:var(--muted);font-size:.76rem;margin-top:2px;word-break:break-word}
-.status{display:inline-block;padding:3px 10px;border-radius:999px;font-size:.72rem;font-weight:800;background:#eef1f6;color:var(--muted);white-space:nowrap}
+th{text-align:left;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:10px 12px;border-bottom:2px solid var(--line);background:#fafcff;white-space:nowrap;position:sticky;top:0;z-index:1}
+th.sortable{cursor:pointer;user-select:none}th.sortable:hover{color:var(--ghz-btn)}
+th .arrow{opacity:.35;margin-left:3px}th.sorted .arrow{opacity:1;color:var(--ghz-btn)}
+td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+th:first-child,td:first-child{padding-left:16px}th:last-child,td:last-child{padding-right:16px}
+tbody tr.row{cursor:pointer}
+tbody tr.row:hover td{background:#f7f9fd}
+tbody tr.row.open td{background:#f3f6fd;border-bottom-color:transparent}
+tbody tr.row.running td{background:#f2f5ff}
+tr.group td{background:#f4f7fb;font-size:.72rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ghz-blue);padding:7px 16px;border-bottom:1px solid var(--line)}
+tr.group span{color:var(--muted);font-weight:700;letter-spacing:0;text-transform:none;margin-left:8px}
+tr.detail td{background:#f3f6fd;padding:0 16px 14px 44px}
+.detail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+.detail-item{background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+.detail-item .top{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:700}
+.dot{width:10px;height:10px;border-radius:50%;background:#b7c0d4;display:inline-block;flex:none}.dot.on{background:#16a34a}.dot.busy{background:var(--ghz-btn);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.c-dot{width:28px;padding-right:0}
+.c-branch{white-space:nowrap}
+.branch-name{font-weight:800;color:var(--ink-strong)}
+.branch-btn{background:none;border:1px dashed transparent;border-radius:7px;padding:3px 6px;margin:-3px -6px;cursor:pointer;text-align:left;color:inherit}
+.branch-btn:hover{border-color:#9db1f0;background:#fff}
+.branch-unknown{color:var(--bad);font-weight:700;font-size:.8rem}
+.branch-select{width:auto;min-width:140px;padding:5px 8px;font-size:.82rem}
+.laptop-name{font-weight:800;color:var(--ghz-blue);white-space:nowrap}
+.sub{color:var(--muted);font-size:.74rem;margin-top:1px;white-space:nowrap}
+.c-app{text-align:center;white-space:nowrap}
+.none{color:#b7c0d4}
+.c-last{white-space:nowrap}
+.c-act{text-align:right;white-space:nowrap}
+.d{color:var(--muted);font-size:.76rem;margin-top:3px;word-break:break-word;font-weight:400}
+.status{display:inline-block;padding:3px 9px;border-radius:999px;font-size:.7rem;font-weight:800;background:#eef1f6;color:var(--muted);white-space:nowrap}
 .s-ok,.s-PASS{background:var(--ok-bg);color:var(--ok)}.s-exited,.s-stopped{background:var(--warn-bg);color:var(--warn)}
 .s-crashed,.s-failed,.s-missing,.s-not_installed,.s-CHECK{background:var(--bad-bg);color:var(--bad)}.s-testing{background:#e4e9fb;color:var(--ghz-btn)}
-.results{display:flex;flex-wrap:wrap;gap:6px 14px}.results span.app{white-space:nowrap}
-.scroll{overflow-x:auto}
 .empty{padding:40px 20px;text-align:center;color:var(--muted)}
 .empty strong{display:block;color:var(--ink);margin-bottom:4px}
+.legend{font-size:.76rem;color:var(--muted);margin-top:10px}
 
 /* Apps to test */
-.targets td{padding:8px 10px}.targets th{padding:10px}.targets td:first-child,.targets th:first-child{padding-left:18px}
+.scroll{overflow-x:auto}
+.targets td{padding:8px 10px}.targets th{padding:10px;position:static}.targets td:first-child,.targets th:first-child{padding-left:18px}
 .foot{display:flex;align-items:flex-end;gap:16px;padding:14px 18px;border-top:1px solid var(--line);flex-wrap:wrap}.foot>div{flex:1 1 220px;min-width:0}
 .k{font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
 .hint{font-size:.8rem;color:var(--muted);padding:0 18px 16px;line-height:1.5}
@@ -104,12 +116,11 @@ code{background:var(--ghz-soft);padding:1px 5px;border-radius:5px;font-size:.85e
 .login label{display:block;margin:16px 0 6px;font-weight:700;font-size:.82rem}
 .login .btn{width:100%;margin-top:20px;padding:10px}
 
-@media (max-width:820px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:700px){
   .header-bar{padding:14px 16px 0}.main-content{padding:18px 16px 40px}
   .brand-divider{display:none}.brand{gap:12px}.brand-logo img{max-width:130px}
-  .laptops{grid-template-columns:1fr}.search{width:100%}.toolbar-left,.toolbar-right{width:100%}
-  th,td{padding-left:12px;padding-right:12px}.nav-tab-ghz{padding:8px 14px}
+  .search{width:100%}.toolbar-left,.toolbar-right{width:100%}.nav-tab-ghz{padding:8px 14px}
+  tr.detail td{padding-left:16px}
 }
 </style></head><body>
 
@@ -146,20 +157,16 @@ code{background:var(--ghz-soft);padding:1px 5px;border-radius:5px;font-size:.85e
 <main class="main-content" id="app" hidden>
   <!-- LAPTOPS -->
   <section data-view="laptops">
-    <div class="stats">
-      <div class="panel stat ok"><span class="k">Online</span><span class="v" id="stOnline">0</span></div>
-      <div class="panel stat busy"><span class="k">Testing now</span><span class="v" id="stTesting">0</span></div>
-      <div class="panel stat bad"><span class="k">Last test: check</span><span class="v" id="stCheck">0</span></div>
-      <div class="panel stat"><span class="k">Laptops</span><span class="v" id="stTotal">0</span></div>
-    </div>
     <div class="toolbar">
       <div class="toolbar-left">
         <label class="field">Branch <select class="branch-filter" id="branch"><option value="">All branches</option></select></label>
-        <input class="search" id="search" type="search" placeholder="Search laptop, model or user" aria-label="Search laptops">
+        <input class="search" id="search" type="search" placeholder="Search laptop, model, branch or user" aria-label="Search laptops">
       </div>
       <div class="toolbar-right"><button class="btn" id="runAll">Run test on all online</button></div>
     </div>
-    <div class="laptops" id="laptops"></div>
+    <div class="quick" id="quick" role="group" aria-label="Show"></div>
+    <div class="panel list"><table id="laptopTable"><thead id="lhead"></thead><tbody id="laptops"></tbody></table></div>
+    <div class="legend">Click a laptop to see each app's message and the file it opened. Click a branch to set it yourself.</div>
   </section>
 
   <!-- APPS TO TEST -->
@@ -184,7 +191,8 @@ code{background:var(--ghz-soft);padding:1px 5px;border-radius:5px;font-size:.85e
       </div>
       <div class="toolbar-right"><button class="btn light" id="download">Download results (CSV)</button><button class="btn danger" id="clearBtn">Clear history</button></div>
     </div>
-    <div class="panel scroll"><table><thead><tr><th>Time</th><th>Branch</th><th>Laptop</th><th>Results</th><th>Test</th></tr></thead><tbody id="hist"></tbody></table><div class="empty" id="hempty">No finished tests yet.</div></div>
+    <div class="panel list"><table><thead id="hhead"></thead><tbody id="hist"></tbody></table><div class="empty" id="hempty">No finished tests yet.</div></div>
+    <div class="legend">Click a test to see each app's message.</div>
     <div class="path" id="dir"></div>
   </section>
 </main>
@@ -195,9 +203,6 @@ const LABEL={not_installed:'not installed',exited:'closed early'};
 const badge=(s,title)=>`<span class="status s-${esc(s)}"${title?` title="${esc(title)}"`:''}>${esc(LABEL[s]||s)}</span>`;
 const ago=t=>{if(!t)return'never';const ms=typeof t==='number'?t:Date.parse(t);const s=Math.round((Date.now()-ms)/1000);return s<60?'just now':s<3600?Math.round(s/60)+' min ago':s<86400?Math.round(s/3600)+' h ago':new Date(ms).toLocaleDateString()};
 const device=x=>[x.make,x.model].filter(Boolean).join(' ');
-// "HO - Lenovo IdeaPad 5 14ALC05"; the computer name is shown under it.
-// Without a branch: nobody has ever signed in to SalesKit on that laptop.
-const title=l=>`${l.branch||'Branch unknown (never signed in)'} - ${device(l)||l.name}`;
 const isRunning=l=>l.current&&!l.current.finished;
 const pass=h=>h.results.length&&h.results.every(r=>r.status==='ok');
 
@@ -213,8 +218,10 @@ async function api(path,body){
   return{ok:r.ok,status:r.status,...j};
 }
 
-let state={laptops:[],history:[]},targets=null,timer=null;
-const expanded=new Set();
+let state={laptops:[],history:[],branches:[],targets:[]},targets=null,timer=null;
+const openRows=new Set(),openHist=new Set();
+let quick='all',sortBy='branch',sortDir=1,editingBranch=null;
+
 function showSignin(msg){setKey('');clearInterval(timer);timer=null;targets=null;$('app').hidden=true;$('who').hidden=true;$('tabs').hidden=true;$('me').textContent='';$('signin').hidden=false;$('loginMsg').textContent=msg||'';$('username').focus()}
 function showApp(){$('signin').hidden=true;$('app').hidden=false;$('who').hidden=false;$('tabs').hidden=false;load();clearInterval(timer);timer=setInterval(load,2000)}
 $('loginForm').addEventListener('submit',async e=>{
@@ -235,56 +242,105 @@ function openTab(name){
 $('tabs').addEventListener('click',e=>{const t=e.target.closest('[data-tab]');if(t)openTab(t.dataset.tab)});
 openTab(location.hash.slice(1));
 
+// The app columns: the apps in the list, then any other app that shows up in a result.
+function appColumns(runs){
+  const names=state.targets.map(t=>t.name);
+  for(const r of runs)for(const x of r.results||[])if(!names.includes(x.target))names.push(x.target);
+  return names;
+}
+
 // ---- laptops ----
+const needsCheck=l=>l.last&&!l.last.pass;
+const QUICK={
+  all:{label:'Laptops',test:()=>true},
+  online:{label:'Online',dot:'on',test:l=>l.online},
+  testing:{label:'Testing now',dot:'busy',test:l=>isRunning(l)||l.waiting},
+  check:{label:'Last test: check',test:needsCheck},
+  offline:{label:'Offline',dot:'',test:l=>!l.online},
+  unknown:{label:'Branch unknown',test:l=>!l.branch}
+};
+function renderQuick(){
+  $('quick').innerHTML=Object.entries(QUICK).map(([k,q])=>{
+    const n=state.laptops.filter(q.test).length;
+    if(k==='unknown'&&!n&&quick!=='unknown')return'';
+    return`<button class="chip${quick===k?' active':''}" data-q="${k}" aria-pressed="${quick===k}">${q.dot!==undefined?`<span class="dot ${q.dot}"></span>`:''}<b>${n}</b> ${q.label}</button>`;
+  }).join('');
+}
+$('quick').addEventListener('click',e=>{const b=e.target.closest('[data-q]');if(!b)return;quick=quick===b.dataset.q&&b.dataset.q!=='all'?'all':b.dataset.q;renderLaptops()});
+
 function shown(){
-  const b=$('branch').value,q=$('search').value.trim().toLowerCase();
-  // Testing first, then online, then offline; by branch within each (the server sends them by branch).
+  const b=$('branch').value,q=$('search').value.trim().toLowerCase(),test=QUICK[quick].test;
   const rank=l=>isRunning(l)||l.waiting?0:l.online?1:2;
-  return state.laptops.filter(l=>(!b||l.branch===b)&&(!q||[title(l),l.name,l.user].join(' ').toLowerCase().includes(q)))
-    .map((l,i)=>[l,i]).sort((x,y)=>rank(x[0])-rank(y[0])||x[1]-y[1]).map(x=>x[0]);
+  const lastKey=l=>l.last?(l.last.pass?2:0):1;
+  const list=state.laptops.filter(l=>(!b||l.branch===b)&&test(l)&&(!q||[l.branch,device(l),l.name,l.user].join(' ').toLowerCase().includes(q)));
+  const cmp={
+    // Laptops without a branch go last.
+    branch:(x,y)=>(!x.branch-!y.branch)||x.branch.localeCompare(y.branch)*sortDir||rank(x)-rank(y)||device(x).localeCompare(device(y)),
+    laptop:(x,y)=>(device(x)||x.name).localeCompare(device(y)||y.name)*sortDir,
+    last:(x,y)=>(lastKey(x)-lastKey(y))*sortDir||Date.parse(x.last?.time||0)-Date.parse(y.last?.time||0)
+  }[sortBy];
+  return list.sort(cmp);
 }
-function fillBranches(){
-  const branches=[...new Set(state.laptops.map(l=>l.branch).filter(Boolean))].sort();
-  document.querySelectorAll('.branch-filter').forEach(sel=>{
-    const cur=sel.value;
-    if(sel.options.length-1===branches.length&&branches.every((b,i)=>sel.options[i+1].value===b))return;
-    sel.innerHTML='<option value="">All branches</option>'+branches.map(b=>`<option>${esc(b)}</option>`).join('');
-    sel.value=branches.includes(cur)?cur:'';
-  });
+function appCell(l,name){
+  const live=l.current&&l.current.targets[name];
+  if(live)return badge(live.status,live.detail);
+  const r=l.last&&l.last.results.find(x=>x.target===name);
+  return r?badge(r.status,r.detail):'<span class="none">—</span>';
 }
-function stepRows(targets){return Object.entries(targets).map(([n,t])=>`<tr><td style="width:34%"><strong>${esc(n)}</strong></td><td style="width:22%">${badge(t.status)}</td><td class="d">${esc(t.detail)}</td></tr>`).join('')}
+function branchCell(l){
+  if(editingBranch===l.name)return`<select class="branch-select" data-branch-for="${esc(l.name)}" aria-label="Branch of ${esc(l.name)}">
+    <option value="">From the signed-in account</option>${state.branches.map(b=>`<option${b===l.branch&&l.branchSource==='set'?' selected':''}>${esc(b)}</option>`).join('')}</select>`;
+  const label=l.branch?`<span class="branch-name">${esc(l.branch)}</span>`:'<span class="branch-unknown">Unknown</span>';
+  const how=l.branchSource==='set'?'Set here':l.branch?'From sign-in':'Never signed in · click to set';
+  return`<button class="branch-btn" data-act="branch" data-n="${esc(l.name)}" title="Click to set this laptop's branch">${label}<div class="sub">${how}</div></button>`;
+}
 function renderLaptops(){
-  const all=state.laptops,list=shown();
-  $('stOnline').textContent=all.filter(l=>l.online).length;
-  $('stTesting').textContent=all.filter(isRunning).length;
-  $('stCheck').textContent=all.filter(l=>l.last&&!l.last.pass).length;
-  $('stTotal').textContent=all.length;
+  renderQuick();
+  const all=state.laptops,list=shown(),apps=appColumns(all.filter(l=>l.last).map(l=>l.last));
   const online=all.filter(l=>l.online).length;$('countOnline').textContent=online;$('countOnline').hidden=!online;
   $('runAll').disabled=!list.some(l=>l.online&&!isRunning(l)&&!l.waiting);
-  $('laptops').innerHTML=list.length?list.map(l=>{
-    const run=isRunning(l);
-    const st=run?'Testing now':l.waiting?'Starting the test (within 5 seconds)...':l.online?'Online, ready':'Offline · last seen '+ago(l.lastSeen);
-    const meta=[l.name,l.user?'Signed in: '+l.user:(l.online?'Nobody signed in':''),l.version&&'Sales Tools '+l.version].filter(Boolean).join(' · ');
+  const sortTh=(k,label)=>`<th class="sortable${sortBy===k?' sorted':''}" data-sort="${k}">${label}<span class="arrow">${sortBy===k?(sortDir>0?'▲':'▼'):'▲'}</span></th>`;
+  const cols=6+apps.length;
+  $('lhead').innerHTML=`<tr><th class="c-dot"></th>${sortTh('branch','Branch')}${sortTh('laptop','Laptop')}<th>Signed in</th>${apps.map(a=>`<th class="c-app">${esc(a)}</th>`).join('')}${sortTh('last','Last test')}<th></th></tr>`;
+  if(!list.length){
+    $('laptops').innerHTML=`<tr><td colspan="${cols}"><div class="empty"><strong>${all.length?'No laptop matches.':'No laptop has connected yet.'}</strong>${all.length?'Change the branch, the search or the filter above.':'Laptops appear here when Gigahertz Sales Tools 1.0.30 or later is open on them.'}</div></td></tr>`;
+    return;
+  }
+  let html='',group=null;
+  for(const l of list){
+    // Branch dividers while the list is in branch order and shows every branch.
+    if(sortBy==='branch'&&!$('branch').value&&l.branch!==group){
+      group=l.branch;const inGroup=list.filter(x=>x.branch===group);
+      html+=`<tr class="group"><td colspan="${cols}">${esc(group||'Branch unknown')}<span>${inGroup.length} laptop${inGroup.length>1?'s':''} · ${inGroup.filter(x=>x.online).length} online</span></td></tr>`;
+    }
+    const run=isRunning(l),open=openRows.has(l.name);
+    const state_=run?'Testing now':l.waiting?'Starting within 5 seconds...':l.online?'':'Offline · seen '+ago(l.lastSeen);
+    const last=l.last?`${badge(l.last.pass?'PASS':'CHECK')} <span class="sub" style="display:inline">${esc(ago(l.last.time))}</span>`:'<span class="none">No test yet</span>';
     const btn=l.waiting?`<button class="btn light sm" data-act="cancel" data-n="${esc(l.name)}">Cancel</button>`
       :!l.online&&!run?`<button class="btn danger sm" data-act="forget" data-n="${esc(l.name)}">Remove</button>`
       :`<button class="btn sm" data-act="run" data-n="${esc(l.name)}" ${run?'disabled':''}>Run test</button>`;
-    // Per-app steps: always while testing; otherwise when opened, from this test or the last one in the history.
-    const lastRun=state.history.find(h=>h.laptop===l.name);
-    const steps=l.current?l.current.targets:lastRun?Object.fromEntries(lastRun.results.map(r=>[r.target,{status:r.status,detail:r.detail}])):null;
-    const open=run||(steps&&expanded.has(l.name));
-    const last=l.last?`Last test ${badge(l.last.pass?'PASS':'CHECK')} ${esc(ago(l.last.time))}`:'No test yet';
-    return`<article class="panel laptop${run?' running':''}">
-      <div class="laptop-head"><span class="dot ${run?'busy':l.online?'on':''}"></span>
-        <div class="laptop-info"><div class="laptop-name">${esc(title(l))}</div><div class="laptop-meta">${esc(meta)}</div><div class="laptop-state">${esc(st)}</div></div>${btn}</div>
-      ${open?`<div class="steps scroll"><table><tbody>${stepRows(steps)}</tbody></table></div>`:''}
-      <div class="laptop-foot"><span class="last">${last}</span>${steps&&!run?`<button class="link" data-act="toggle" data-n="${esc(l.name)}">${open?'Hide details':'Details'}</button>`:''}</div>
-    </article>`}).join('')
-  :`<div class="panel empty" style="grid-column:1/-1"><strong>${all.length?'No laptop matches.':'No laptop has connected yet.'}</strong>${all.length?'Change the branch or the search.':'Laptops appear here when Gigahertz Sales Tools 1.0.30 or later is open on them.'}</div>`;
+    html+=`<tr class="row${open?' open':''}${run?' running':''}" data-row="${esc(l.name)}">
+      <td class="c-dot"><span class="dot ${run||l.waiting?'busy':l.online?'on':''}" title="${run?'Testing':l.online?'Online':'Offline'}"></span></td>
+      <td class="c-branch">${branchCell(l)}</td>
+      <td><div class="laptop-name">${esc(device(l)||l.name)}</div><div class="sub">${esc([l.name,l.version&&'v'+l.version].filter(Boolean).join(' · '))}</div></td>
+      <td>${l.user?esc(l.user):`<span class="none">${l.online?'Nobody':'—'}</span>`}</td>
+      ${apps.map(a=>`<td class="c-app">${appCell(l,a)}</td>`).join('')}
+      <td class="c-last">${run||l.waiting?`<span class="status s-testing">${esc(state_)}</span>`:last}${!l.online&&!run?`<div class="sub">${esc(state_)}</div>`:''}</td>
+      <td class="c-act">${btn}</td></tr>`;
+    if(open){
+      const items=l.current?Object.entries(l.current.targets).map(([n,t])=>({target:n,...t})):l.last?l.last.results:[];
+      html+=`<tr class="detail"><td colspan="${cols}">${items.length?`<div class="detail-grid">${items.map(r=>`<div class="detail-item"><div class="top"><span>${esc(r.target)}</span>${badge(r.status)}</div><div class="d">${esc(r.detail||'')}</div></div>`).join('')}</div>${l.last&&!l.current?`<div class="d">Tested ${esc(new Date(l.last.time).toLocaleString())}${l.last.stoppedOnLaptop?' · stopped on the laptop':''}</div>`:''}`:'<div class="d">No test yet.</div>'}</td></tr>`;
+    }
+  }
+  $('laptops').innerHTML=html;
 }
+$('lhead').addEventListener('click',e=>{const th=e.target.closest('[data-sort]');if(!th)return;if(sortBy===th.dataset.sort)sortDir=-sortDir;else{sortBy=th.dataset.sort;sortDir=1}renderLaptops()});
 $('laptops').addEventListener('click',async e=>{
-  const b=e.target.closest('button[data-act]');if(!b)return;
+  if(e.target.closest('select'))return;
+  const b=e.target.closest('button[data-act]');
+  if(!b){const row=e.target.closest('tr[data-row]');if(row){const n=row.dataset.row;openRows.has(n)?openRows.delete(n):openRows.add(n);renderLaptops()}return}
   const n=b.dataset.n;
-  if(b.dataset.act==='toggle'){expanded.has(n)?expanded.delete(n):expanded.add(n);renderLaptops();return}
+  if(b.dataset.act==='branch'){editingBranch=n;renderLaptops();const s=document.querySelector('.branch-select');if(s)s.focus();return}
   if(b.dataset.act==='forget'&&!confirm(`Remove ${n} from the list? It comes back when Gigahertz Sales Tools is opened on it again.`))return;
   b.disabled=true;
   if(b.dataset.act==='run')await api('run',{laptops:[n]}).catch(()=>{});
@@ -292,6 +348,13 @@ $('laptops').addEventListener('click',async e=>{
   if(b.dataset.act==='forget')await api('forget',{laptop:n}).catch(()=>{});
   load();
 });
+// Setting a branch: choosing saves it; leaving the list without choosing cancels.
+$('laptops').addEventListener('change',async e=>{
+  const s=e.target.closest('.branch-select');if(!s)return;
+  editingBranch=null;await api('branch',{laptop:s.dataset.branchFor,branch:s.value}).catch(()=>{});load();
+});
+$('laptops').addEventListener('focusout',e=>{if(e.target.closest('.branch-select'))setTimeout(()=>{if(editingBranch&&!document.activeElement.closest?.('.branch-select')){editingBranch=null;renderLaptops()}},150)});
+$('laptops').addEventListener('keydown',e=>{if(e.key==='Escape'&&editingBranch){editingBranch=null;renderLaptops()}});
 $('runAll').addEventListener('click',async()=>{
   const names=shown().filter(l=>l.online&&!isRunning(l)&&!l.waiting).map(l=>l.name);
   if(!names.length||!confirm(`Start the app test on ${names.length} laptop${names.length>1?'s':''}? The apps will open on them while it runs.`))return;
@@ -303,17 +366,26 @@ $('search').addEventListener('input',renderLaptops);
 // ---- history ----
 function renderHistory(){
   const b=$('hBranch').value,res=$('hResult').value;
-  const hist=state.history.filter(h=>(!b||h.branch===b)&&(!res||(pass(h)?'PASS':'CHECK')===res));
+  // Newest first by when the test ran (results kept on a laptop while offline arrive late).
+  const hist=state.history.filter(h=>(!b||h.branch===b)&&(!res||(pass(h)?'PASS':'CHECK')===res)).sort((x,y)=>Date.parse(y.time)-Date.parse(x.time));
   const checks=state.history.filter(h=>!pass(h)&&Date.now()-Date.parse(h.time)<86400000).length;
   $('countCheck').textContent=checks;$('countCheck').hidden=!checks;$('countCheck').title='Tests needing a check in the last 24 hours';
-  $('hist').innerHTML=hist.map(h=>`<tr><td style="white-space:nowrap">${esc(new Date(h.time).toLocaleString())}</td><td>${esc(h.branch||'')}</td>
-    <td><strong>${esc(device(h)||h.laptop)}</strong><div class="d">${esc([device(h)?h.laptop:'',h.user].filter(Boolean).join(' · '))}</div></td>
-    <td><div class="results">${h.results.map(r=>`<span class="app">${esc(r.target)} ${badge(r.status,r.detail)}</span>`).join('')}</div>${h.stoppedOnLaptop?'<div class="d">Stopped on the laptop</div>':''}</td>
-    <td>${badge(pass(h)?'PASS':'CHECK')}</td></tr>`).join('');
+  const apps=appColumns(hist),cols=4+apps.length;
+  $('hhead').innerHTML=`<tr><th>Time</th><th>Branch</th><th>Laptop</th>${apps.map(a=>`<th class="c-app">${esc(a)}</th>`).join('')}<th>Test</th></tr>`;
+  $('hist').innerHTML=hist.map((h,i)=>{
+    const id=h.laptop+'|'+h.time,open=openHist.has(id);
+    const cell=a=>{const r=h.results.find(x=>x.target===a);return r?badge(r.status,r.detail):'<span class="none">—</span>'};
+    return`<tr class="row${open?' open':''}" data-hist="${esc(id)}"><td style="white-space:nowrap">${esc(new Date(h.time).toLocaleString())}</td><td class="c-branch"><span class="branch-name">${esc(h.branch||'—')}</span></td>
+      <td><div class="laptop-name">${esc(device(h)||h.laptop)}</div><div class="sub">${esc([device(h)?h.laptop:'',h.user].filter(Boolean).join(' · '))}</div></td>
+      ${apps.map(a=>`<td class="c-app">${cell(a)}</td>`).join('')}
+      <td>${badge(pass(h)?'PASS':'CHECK')}${h.stoppedOnLaptop?'<div class="sub">Stopped on laptop</div>':''}</td></tr>`
+      +(open?`<tr class="detail"><td colspan="${cols}"><div class="detail-grid">${h.results.map(r=>`<div class="detail-item"><div class="top"><span>${esc(r.target)}</span>${badge(r.status)}</div><div class="d">${esc(r.detail||'')}</div></div>`).join('')}</div></td></tr>`:'');
+  }).join('');
   $('hempty').hidden=hist.length>0;
   $('hempty').textContent=state.history.length?'No test matches the filters.':'No finished tests yet.';
   $('dir').textContent='Saved on the server in '+state.dataDir;
 }
+$('hist').addEventListener('click',e=>{const row=e.target.closest('tr[data-hist]');if(!row)return;const id=row.dataset.hist;openHist.has(id)?openHist.delete(id):openHist.add(id);renderHistory()});
 $('hBranch').addEventListener('change',renderHistory);
 $('hResult').addEventListener('change',renderHistory);
 $('clearBtn').addEventListener('click',async()=>{if(confirm('Delete the whole test history (also results.csv on the server)? This cannot be undone.')){await api('clear',{}).catch(()=>{});load()}});
@@ -325,13 +397,25 @@ $('download').addEventListener('click',async()=>{
   setTimeout(()=>URL.revokeObjectURL(a.href),5000);
 });
 
+function fillBranches(){
+  const branches=[...new Set(state.laptops.map(l=>l.branch).filter(Boolean))].sort();
+  document.querySelectorAll('.branch-filter').forEach(sel=>{
+    const cur=sel.value;
+    if(sel.options.length-1===branches.length&&branches.every((b,i)=>sel.options[i+1].value===b))return;
+    sel.innerHTML='<option value="">All branches</option>'+branches.map(b=>`<option>${esc(b)}</option>`).join('');
+    sel.value=branches.includes(cur)?cur:'';
+  });
+}
 async function load(){
   let r;try{r=await api('state')}catch{return}
-  if(!r.ok){$('laptops').innerHTML='<div class="panel empty" style="grid-column:1/-1"><strong>The server did not answer.</strong>Retrying...</div>';return}
+  if(!r.ok){$('laptops').innerHTML='<tr><td><div class="empty"><strong>The server did not answer.</strong>Retrying...</div></td></tr>';return}
   state=r;
   $('me').textContent=' · Signed in: '+(state.me||'');
   if(!targets){targets=state.targets.map(t=>({...t}));$('demoFolder').value=state.demoFolder||'';renderTargets()}
-  fillBranches();renderLaptops();renderHistory();
+  fillBranches();
+  // While a branch list is open, the list is not redrawn (that would close it).
+  if(!editingBranch)renderLaptops();
+  renderHistory();
 }
 
 // ---- apps to test ----
