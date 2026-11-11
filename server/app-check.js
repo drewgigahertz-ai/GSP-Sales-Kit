@@ -69,7 +69,8 @@ function readJson(file, fallback) {
 // getLogoPath(): the header logo file for the page's top bar (the LOGO sheet's, as on Sales Tools), or ''.
 // lastAccountFor(computerName): the account last signed in on that laptop ({ username, branch }) from the server's
 //   Devices list, or null. Used for the branch while nobody is signed in (sign-in page, or signed out by a restart).
-function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPath = () => '', lastAccountFor = () => null, listBranches = () => [], findSku = () => null, listSegments = () => [] }) {
+function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPath = () => '', lastAccountFor = () => null, listBranches = () => [], findSku = () => null, listSegments = () => [], showingFor = () => null }) {
+  // showingFor(name): what Sales Tools shows on that laptop now ({ text, since, idle, banner }, server/activity.js).
   // findSku(sku): that SKU in SalesKit's data ({ sku, brand, model, partNumber, segment }) or null, to compare it
   // with the brand and model Windows reports (laptop-sku.js); segment (LAPTOP DB's SEGMENT 2) picks its apps.
   // listSegments(): every SEGMENT 2 value in LAPTOP DB, for the page's app editor.
@@ -316,7 +317,9 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
         .sort((a, b) => (a.branch || '~').localeCompare(b.branch || '~') || a.l.name.localeCompare(b.l.name))
         .map(({ l, branch, source }) => {
           const segment = segmentOf(l);
-          return { name: l.name, branch, branchSource: source, user: l.user, version: l.version, make: l.make, model: l.model, sku: l.sku || '', skuCheck: skuCheckOf(l), segment, apps: targetsForSegment(targets, segment).map((t) => t.name), online: now - l.lastSeen < ONLINE_MS, lastSeen: l.lastSeen, current: l.current, waiting: Boolean(l.command), last: lastRun.get(l.name) || null };
+          let showing = null;
+          try { showing = now - l.lastSeen < ONLINE_MS ? showingFor(l.name) : null; } catch { /* not reported */ }
+          return { showing, name: l.name, branch, branchSource: source, user: l.user, version: l.version, make: l.make, model: l.model, sku: l.sku || '', skuCheck: skuCheckOf(l), segment, apps: targetsForSegment(targets, segment).map((t) => t.name), online: now - l.lastSeen < ONLINE_MS, lastSeen: l.lastSeen, current: l.current, waiting: Boolean(l.command), last: lastRun.get(l.name) || null };
         });
       let segments = [];
       try { segments = listSegments(); } catch { /* no database yet */ }

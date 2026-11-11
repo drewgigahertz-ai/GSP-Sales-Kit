@@ -930,6 +930,8 @@ if (!app.requestSingleInstanceLock()) {
           return device && device.account ? device.account : null;
         },
         listBranches: () => database.listBranches(),
+        // What the laptop shows now (Devices → "Showing now"): { text, since, idle, banner } or null.
+        showingFor: (name) => (activity ? activity.liveFor(deviceKey('', { name })) : null),
         // A Laptop SKU in SalesKit's data (made again when the data changes), to compare with the laptop's model.
         findSku: (sku) => currentSkuIndex().bySku.get(skuKey(sku)) || null,
         // LAPTOP DB's SEGMENT 2 values, for choosing which apps each segment is tested on.
