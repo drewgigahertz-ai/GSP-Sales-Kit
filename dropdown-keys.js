@@ -76,9 +76,11 @@
     }
   }, true);
 
-  // Typing in a dropdown's search box highlights the first option that still shows.
+  // Typing in a dropdown's search box highlights the first option that still shows. Ticking a checkbox also
+  // sends an input event; that must not jump the list back to the first option.
   document.addEventListener('input', (event) => {
     const menu = openMenu();
-    if (menu && menu.contains(event.target)) setTimeout(() => highlight(menu, 0), 0);
+    const typing = event.target instanceof HTMLInputElement && event.target.type !== 'checkbox' && event.target.type !== 'radio';
+    if (menu && typing && menu.contains(event.target)) setTimeout(() => highlight(menu, 0), 0);
   }, true);
 })();
