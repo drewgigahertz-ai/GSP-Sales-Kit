@@ -2304,6 +2304,44 @@
       color: #0012b3;
     }
 
+    /* Best / Better / Good, in the Specs legend's colours: a light tint when not selected, solid and raised when
+       selected. */
+    .saleskit-presentation-banner-tab[class*="tier-"] {
+      --tier-light: #e2e8f0;
+      --tier-edge: #cbd5e1;
+      --tier-solid: #64748b;
+      --tier-text: #ffffff;
+      border: 2px solid var(--tier-edge);
+      border-top-width: 4px;
+      background: var(--tier-light);
+      color: #334155;
+    }
+    .saleskit-presentation-banner-tab.tier-best { --tier-light: #dcfce7; --tier-edge: #86efac; --tier-solid: #16a34a; }
+    .saleskit-presentation-banner-tab.tier-better { --tier-light: #e0f2fe; --tier-edge: #7dd3fc; --tier-solid: #0284c7; }
+    .saleskit-presentation-banner-tab.tier-good { --tier-light: #fef9c3; --tier-edge: #fde047; --tier-solid: #facc15; --tier-text: #1f2937; }
+    .saleskit-presentation-banner-tab[class*="tier-"]:not(.is-active) { opacity: .78; }
+    .saleskit-presentation-banner-tab[class*="tier-"]:not(.is-active):hover { opacity: 1; }
+    .saleskit-presentation-banner-tab[class*="tier-"].is-active {
+      border-color: var(--tier-solid);
+      background: var(--tier-solid);
+      color: var(--tier-text);
+      box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .85);
+    }
+    .saleskit-presentation-banner-tab-select .banner-tab-tier {
+      margin-right: 6px;
+      padding: 0 5px;
+      border-radius: 4px;
+      background: var(--tier-solid, #64748b);
+      color: var(--tier-text, #ffffff);
+      font-size: .95em;
+      letter-spacing: .5px;
+    }
+    .saleskit-presentation-banner-tab.is-active .banner-tab-tier {
+      background: rgba(255, 255, 255, .9);
+      color: var(--tier-solid);
+    }
+    .saleskit-presentation-banner-tab.tier-good.is-active .banner-tab-tier { color: #854d0e; }
+
     .saleskit-presentation-banner-tab-select,
     .saleskit-presentation-banner-tab-close {
       border: 0;
@@ -7538,7 +7576,9 @@
           showAppNotification('A presentation slide can have up to three banner tabs.', 'info', 3500);
           return;
         }
-        tab = { ...banner, bannerIndex: 0 };
+        // The slide's banners follow the Exceed / Meet / Budget columns: Best / Better / Good.
+        const tier = ['best', 'better', 'good'][slide.banners.indexOf(banner)] || '';
+        tab = { ...banner, bannerIndex: 0, tier };
         slide.bannerTabs.push(tab);
       }
       slide.activeBannerTabId = tab.id;
@@ -7579,6 +7619,7 @@
         slide.bannerTabs.forEach(tab => {
           const tabElement = document.createElement('div');
           tabElement.className = `saleskit-presentation-banner-tab${tab.id === slide.activeBannerTabId ? ' is-active' : ''}`;
+          if (tab.tier) tabElement.classList.add(`tier-${tab.tier}`);
 
           const selectButton = document.createElement('button');
           selectButton.type = 'button';
@@ -7590,10 +7631,16 @@
           tabModel.className = 'banner-tab-model';
           tabModel.textContent = tab.model;
           selectButton.appendChild(tabModel);
-          if (tab.partNumber) {
+          if (tab.partNumber || tab.tier) {
             const tabPart = document.createElement('span');
             tabPart.className = 'banner-tab-part';
-            tabPart.textContent = tab.partNumber;
+            if (tab.tier) {
+              const tierLabel = document.createElement('b');
+              tierLabel.className = 'banner-tab-tier';
+              tierLabel.textContent = tab.tier.toUpperCase();
+              tabPart.appendChild(tierLabel);
+            }
+            if (tab.partNumber) tabPart.append(tab.partNumber);
             selectButton.appendChild(tabPart);
           }
           selectButton.title = `${[tab.model, tab.partNumber].filter(Boolean).join(' ')} - ${slide.title}`;
