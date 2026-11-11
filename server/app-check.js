@@ -35,7 +35,29 @@ function cleanTarget(t) {
       .map((e) => text(e, 12).toLowerCase()).filter(Boolean).map((e) => (e.startsWith('.') ? e : `.${e}`)))]
     : [];
   if (mode === 'file' && !exts.length) return null;
-  return { name, keyword, mode, exts, ...(file ? { file } : {}), wait: Math.min(600, Math.max(2, Math.round(Number(t.wait) || 90))) };
+  // segments (optional): LAPTOP DB's SEGMENT 2 values this app is tested on; none = every laptop.
+  const segments = uniqueSegments(Array.isArray(t.segments) ? t.segments : []).slice(0, 20);
+  return { name, keyword, mode, exts, ...(file ? { file } : {}), ...(segments.length ? { segments } : {}), wait: Math.min(600, Math.max(2, Math.round(Number(t.wait) || 90))) };
+}
+
+const segmentKey = (value) => String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+// Segment names once each (ignoring case and spacing), as first written.
+function uniqueSegments(list) {
+  const byKey = new Map();
+  for (const value of list) {
+    const name = text(value, 60).replace(/\s+/g, ' ');
+    if (name && !byKey.has(segmentKey(name))) byKey.set(segmentKey(name), name);
+  }
+  return [...byKey.values()];
+}
+
+// The apps a laptop of this segment is tested on: those for every laptop and those ticked for its segment. A laptop
+// without a segment (no Laptop SKU, or none in SEGMENT 2) is tested on every app.
+function targetsForSegment(targets, segment) {
+  const key = segmentKey(segment);
+  if (!key) return targets;
+  const list = targets.filter((t) => !t.segments || t.segments.some((s) => segmentKey(s) === key));
+  return list.length ? list : targets;
 }
 
 function readJson(file, fallback) {
@@ -47,9 +69,10 @@ function readJson(file, fallback) {
 // getLogoPath(): the header logo file for the page's top bar (the LOGO sheet's, as on Sales Tools), or ''.
 // lastAccountFor(computerName): the account last signed in on that laptop ({ username, branch }) from the server's
 //   Devices list, or null. Used for the branch while nobody is signed in (sign-in page, or signed out by a restart).
-function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPath = () => '', lastAccountFor = () => null, listBranches = () => [], findSku = () => null }) {
-  // findSku(sku): that SKU in SalesKit's data ({ sku, brand, model, partNumber }) or null, to compare it with the
-  // brand and model Windows reports (laptop-sku.js).
+function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPath = () => '', lastAccountFor = () => null, listBranches = () => [], findSku = () => null, listSegments = () => [] }) {
+  // findSku(sku): that SKU in SalesKit's data ({ sku, brand, model, partNumber, segment }) or null, to compare it
+  // with the brand and model Windows reports (laptop-sku.js); segment (LAPTOP DB's SEGMENT 2) picks its apps.
+  // listSegments(): every SEGMENT 2 value in LAPTOP DB, for the page's app editor.
   fs.mkdirSync(dataDir, { recursive: true });
   const F = {
     settings: path.join(dataDir, 'settings.json'),
@@ -105,11 +128,14 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
   const running = (l) => Boolean(l.current && !l.current.finished);
   // The typed SKU against the laptop Windows reports: { status: none | unknown | nodevice | brand | model | match,
   // brand, model } (brand and model: what SalesKit's data says that SKU is).
+  const skuEntry = (l) => {
+    try { return l.sku ? findSku(l.sku) : null; } catch { return null; } // no database yet
+  };
   function skuCheckOf(l) {
-    let found = null;
-    try { found = l.sku ? findSku(l.sku) : null; } catch { /* no database yet */ }
-    return compareSku(l.sku, found, { make: l.make, model: l.model });
+    return compareSku(l.sku, skuEntry(l), { make: l.make, model: l.model });
   }
+  // The laptop's SEGMENT 2 (from its Laptop SKU), or ''.
+  const segmentOf = (l) => text((skuEntry(l) || {}).segment, 60);
   // A laptop's branch: the one the admin set on the page, else the signed-in account's, else the account last
   // signed in on it (Devices list). source says which, for the page.
   function branchOf(l) {
@@ -143,7 +169,7 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
       // A laptop busy with a test gets the command on its next check-in after the test.
       if (body.busy || l.command !== 'run') return { status: 200, body: { command: null } };
       l.command = null;
-      return { status: 200, body: { command: 'run', targets, demoFolder } };
+      return { status: 200, body: { command: 'run', targets: targetsForSegment(targets, segmentOf(l)).map(({ segments, ...t }) => t), demoFolder } };
     }
     if (route === 'event') {
       const l = touch(body, user, device);
@@ -288,12 +314,18 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
       const list = [...laptops.values()]
         .map((l) => ({ l, ...branchOf(l) }))
         .sort((a, b) => (a.branch || '~').localeCompare(b.branch || '~') || a.l.name.localeCompare(b.l.name))
-        .map(({ l, branch, source }) => ({ name: l.name, branch, branchSource: source, user: l.user, version: l.version, make: l.make, model: l.model, sku: l.sku || '', skuCheck: skuCheckOf(l), online: now - l.lastSeen < ONLINE_MS, lastSeen: l.lastSeen, current: l.current, waiting: Boolean(l.command), last: lastRun.get(l.name) || null }));
+        .map(({ l, branch, source }) => {
+          const segment = segmentOf(l);
+          return { name: l.name, branch, branchSource: source, user: l.user, version: l.version, make: l.make, model: l.model, sku: l.sku || '', skuCheck: skuCheckOf(l), segment, apps: targetsForSegment(targets, segment).map((t) => t.name), online: now - l.lastSeen < ONLINE_MS, lastSeen: l.lastSeen, current: l.current, waiting: Boolean(l.command), last: lastRun.get(l.name) || null };
+        });
+      let segments = [];
+      try { segments = listSegments(); } catch { /* no database yet */ }
+      segments = uniqueSegments([...segments, ...targets.flatMap((t) => t.segments || [])]).sort();
       // Branches to choose from when setting a laptop's branch: SalesKit's branch list, HO, and any in use.
       let branches = [];
       try { branches = listBranches(); } catch { /* no database yet */ }
       branches = [...new Set(['HO', ...branches, ...list.map((l) => l.branch)].filter(Boolean).map((b) => String(b).toUpperCase()))].sort();
-      return send(response, 200, { now: Date.now(), me: user.displayName, laptops: list, branches, history: [...history].sort((a, b) => Date.parse(b.time) - Date.parse(a.time)).slice(0, 100), targets, demoFolder, dataDir });
+      return send(response, 200, { now: Date.now(), me: user.displayName, laptops: list, branches, history: [...history].sort((a, b) => Date.parse(b.time) - Date.parse(a.time)).slice(0, 100), targets, segments, demoFolder, dataDir });
     }
     if (request.method !== 'POST') return send(response, 404, { error: 'Not found.' });
     const body = await readBody(request);

@@ -63,6 +63,13 @@ let priceWatch;
 let appCheck = null;
 // SalesKit's SKUs by SKU, for App Tests' comparison (rebuilt when the data version changes).
 let skuIndex = { version: null, bySku: new Map() };
+// App Tests' Laptop SKU index (made again when the data changes): SKU → { sku, brand, model, partNumber, segment }.
+function currentSkuIndex() {
+  if (skuIndex.version !== settings.dataVersion) {
+    skuIndex = { version: settings.dataVersion, bySku: new Map(skuChoices(database.getInitialData()).map((c) => [skuKey(c.sku), c])) };
+  }
+  return skuIndex;
+}
 // Laptops listening on /api/events for price changes.
 const priceListeners = new Set();
 const logs = [];
@@ -924,12 +931,9 @@ if (!app.requestSingleInstanceLock()) {
         },
         listBranches: () => database.listBranches(),
         // A Laptop SKU in SalesKit's data (made again when the data changes), to compare with the laptop's model.
-        findSku: (sku) => {
-          if (skuIndex.version !== settings.dataVersion) {
-            skuIndex = { version: settings.dataVersion, bySku: new Map(skuChoices(database.getInitialData()).map((c) => [skuKey(c.sku), c])) };
-          }
-          return skuIndex.bySku.get(skuKey(sku)) || null;
-        },
+        findSku: (sku) => currentSkuIndex().bySku.get(skuKey(sku)) || null,
+        // LAPTOP DB's SEGMENT 2 values, for choosing which apps each segment is tested on.
+        listSegments: () => [...new Set([...currentSkuIndex().bySku.values()].map((c) => c.segment).filter(Boolean))],
         getLogoPath: () => [path.join(app.getPath('userData'), 'logos', 'header.png'), path.join(__dirname, 'assets', 'header-logo.png')].find((file) => fs.existsSync(file)) || ''
       });
       backups = createBackupStore(path.join(app.getPath('userData'), 'backups'), database);

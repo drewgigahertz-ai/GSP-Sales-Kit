@@ -29,16 +29,18 @@ function createLaptopSkuStore(filePath) {
 // Reco Table laptops (SKU, brand, title, model code). [{ sku, brand, model, partNumber }], by SKU.
 function skuChoices(data) {
   const bySku = new Map();
-  const add = (sku, brand, model, partNumber) => {
+  const add = (sku, brand, model, partNumber, segment = '') => {
     const key = skuKey(sku);
     if (!key) return;
-    const entry = bySku.get(key) || { sku: clean(sku, 60), brand: '', model: '', partNumber: '' };
+    const entry = bySku.get(key) || { sku: clean(sku, 60), brand: '', model: '', partNumber: '', segment: '' };
     entry.brand = entry.brand || clean(brand, 40);
     entry.model = entry.model || clean(model, 80);
     entry.partNumber = entry.partNumber || clean(partNumber, 40);
+    // LAPTOP DB's SEGMENT 2 (App Tests: which apps to check).
+    entry.segment = entry.segment || clean(segment, 60);
     bySku.set(key, entry);
   };
-  for (const laptop of (data && data.laptopDatabase) || []) add(laptop.item, laptop.brand, laptop.model, laptop.partNumber);
+  for (const laptop of (data && data.laptopDatabase) || []) add(laptop.item, laptop.brand, laptop.model, laptop.partNumber, laptop.segment2);
   const reco = data && data.criteriaSegmentData && data.criteriaSegmentData.laptops;
   for (const laptop of reco || []) add(laptop.cleanSku || laptop.sku, laptop.brand, laptop.title, laptop.modelCode);
   return [...bySku.values()].sort((a, b) => a.sku.localeCompare(b.sku));

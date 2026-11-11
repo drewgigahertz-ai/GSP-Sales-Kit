@@ -68,12 +68,18 @@ function locateColumns(values) {
     if (picture !== -1) break;
   }
   found.picture = picture !== -1 ? picture : found.item - 1;
-  // Branch stock columns: right of the last field found, headed (row 1) with a branch code.
+  // SEGMENT 2 (optional): the laptop's segment for App Tests (Mainstream Regular, Gaming Entry, …).
+  found.segment2 = -1;
+  for (const row of top) {
+    found.segment2 = (row || []).findIndex((cell) => headerKey(cell) === 'SEGMENT2');
+    if (found.segment2 !== -1) break;
+  }
+  // Branch stock columns: right of the last field found, headed (row 1) with a branch code (not SEGMENT 2).
   const last = Math.max(...FIELDS.map(([field]) => (found[field] === undefined ? -1 : found[field])));
   found.stock = [];
   ((top[0]) || []).forEach((cell, index) => {
     const code = text(cell).toUpperCase();
-    if (index > last && /^[A-Z0-9][A-Z0-9 -]{0,19}$/.test(code)) found.stock.push([index, code]);
+    if (index > last && index !== found.segment2 && /^[A-Z0-9][A-Z0-9 -]{0,19}$/.test(code)) found.stock.push([index, code]);
   });
   return found;
 }
@@ -93,13 +99,19 @@ function isHeaderItem(value) {
 // Throws while the sheet is still loading or has no laptops, so the caller keeps the last synced data.
 function parseLaptopDb(values = []) {
   const columns = locateColumns(values);
-  const loading = values.some((row) => /^(Loading|#REF!|#ERROR!|#N\/A)/i.test(String((row || [])[columns.item] ?? '').trim()));
+  const isLoading = (value) => /^(Loading|#REF!|#ERROR!|#N\/A)/i.test(String(value ?? '').trim());
+  const loading = values.some((row) => isLoading((row || [])[columns.item]));
   if (loading) throw new Error('LAPTOP DB is still loading (its IMPORTRANGE has not finished)');
+  let picturesLoading = 0;
   const laptops = values.flatMap((row, index) => {
     if (index < 2 || !row) return [];
     const item = text(row[columns.item]).replace(/\s+/g, ' ');
     if (!item || isHeaderItem(item) || headerKey(row[columns.processor]) === 'PROCESSOR') return [];
-    const laptop = { row: index + 1, item, picture: columns.picture >= 0 ? text(row[columns.picture]) : '' };
+    // Only a link is a picture: "Loading..." / an error leaves it blank, so SPECS' Image URL is used instead.
+    const rawPicture = columns.picture >= 0 ? String(row[columns.picture] ?? '').trim() : '';
+    if (isLoading(rawPicture)) picturesLoading += 1;
+    const laptop = { row: index + 1, item, picture: /^https?:\/\//i.test(rawPicture) ? rawPicture : '' };
+    laptop.segment2 = columns.segment2 >= 0 ? text(row[columns.segment2]).replace(/\s+/g, ' ') : '';
     for (const [field] of FIELDS) {
       if (field !== 'item') laptop[field] = columns[field] === undefined ? '' : text(row[columns[field]]);
     }
@@ -109,6 +121,10 @@ function parseLaptopDb(values = []) {
     return [laptop];
   });
   if (!laptops.length) throw new Error('LAPTOP DB has no laptops');
+  // Most pictures still loading: the sheet is recalculating, so keep the last synced laptops (and their pictures).
+  if (picturesLoading > laptops.length / 2) {
+    throw new Error(`LAPTOP DB pictures are still loading (${picturesLoading} of ${laptops.length} say "Loading...")`);
+  }
   return laptops;
 }
 
@@ -117,7 +133,7 @@ const rowId = (laptop) => `item_${String(laptop.row).padStart(4, '0')}`;
 // → collection laptop_database (Flyers page, Data health, the SPECS replacement). Ids keep the sheet row.
 function laptopDatabaseCollection(laptops) {
   const columns = ['item', 'picture', 'brand', 'eol_status', 'mtm', 'model', 'processor', 'graphics', 'storage', 'memory',
-    'resolution', 'os', 'ksp1', 'ksp2', 'ksp3', 'ksp4', 'stock'];
+    'resolution', 'os', 'ksp1', 'ksp2', 'ksp3', 'ksp4', 'stock', 'segment2'];
   return {
     collection: 'laptop_database',
     columns,
@@ -253,6 +269,8 @@ function makeLaptopDatabase(rows = []) {
       model: text(row.model),
       partNumber: text(row.mtm),
       endOfLife: /^(END OF LIFE|EOL)$/.test(text(row.eol_status)),
+      // SEGMENT 2: which apps App Tests checks on this laptop.
+      segment2: text(row.segment2),
       // { BRANCH: units } from LAPTOP DB's inventory columns (the Reco Table's ALL BRANCHES lists).
       stock: parseStock(row.stock),
       specs: {
