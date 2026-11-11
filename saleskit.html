@@ -4934,6 +4934,8 @@
     function buildSidebarAppsCheckboxes() {
       const containerSidebar = document.getElementById('appsCheckboxList');
       if (!containerSidebar) return;
+      // Ticking an app rebuilds the list; keep it where it was scrolled instead of jumping back to the top.
+      const scrollTop = containerSidebar.scrollTop;
       containerSidebar.innerHTML = '';
 
       APP_DATABASE.forEach(app => {
@@ -4958,11 +4960,13 @@
 
       updateAppsDisplayText();
       filterAppsCheckboxes(document.getElementById('appsSearchInput')?.value);
+      containerSidebar.scrollTop = scrollTop;
     }
 
     function buildSalesKitAppsCheckboxes() {
       const containerSalesKit = document.getElementById('salesKitAppsCheckboxesList');
       if (!containerSalesKit) return;
+      const scrollTop = containerSalesKit.scrollTop;
       containerSalesKit.innerHTML = '';
 
       APP_DATABASE.forEach(app => {
@@ -4990,6 +4994,7 @@
 
       updateSalesKitAppsDisplayText();
       filterSalesKitAppsMenu(document.getElementById('salesKitAppsSearchInput')?.value);
+      containerSalesKit.scrollTop = scrollTop;
     }
 
     function buildAppsCheckboxes() {
