@@ -61,8 +61,7 @@ function readJsonBody(request, limit = 10 * 1024) {
 //   GET /api/price-changes?since=<id> lists the changes a laptop missed; GET /api/events stays open and sends
 //   each new price change the moment it happens (Server-Sent Events).
 // appCheck (optional): server/app-check.js. Its web page (/app-check) has its own sign-in instead of the app token;
-//   laptops send POST /api/app-check/<route> with the app token, also from the sign-in page (no user needed), and
-//   download uploaded demo files with GET /api/app-check/file/<id>.
+//   laptops send POST /api/app-check/<route> with the app token, also from the sign-in page (no user needed).
 function createLocalApi({ database, token = '', onRequest = null, getDataVersion = () => null, getLatestClientVersion = () => null, getInitialPayload = null, onActivity = null, accounts = null, priceChanges = null, appCheck = null }) {
   return http.createServer(async (request, response) => {
     const url = new URL(request.url, 'http://localhost');
@@ -120,11 +119,6 @@ function createLocalApi({ database, token = '', onRequest = null, getDataVersion
         return;
       }
 
-      // An uploaded demo file for an app test (app token only, like the other App Check routes).
-      if (appCheck && appCheck.serveUpload && request.method === 'GET' && url.pathname.startsWith('/api/app-check/file/')) {
-        appCheck.serveUpload(url.pathname.slice('/api/app-check/file/'.length), response);
-        return;
-      }
       if (appCheck && request.method === 'POST' && url.pathname.startsWith('/api/app-check/')) {
         user = accounts ? accounts.userForSession(request.headers['x-saleskit-session']) : null;
         const device = { make: headerText(request, 'x-saleskit-make'), model: headerText(request, 'x-saleskit-model'), sku: headerText(request, 'x-saleskit-sku') };

@@ -124,12 +124,6 @@ td.segs input{width:auto;margin:0}
 
 /* Apps to test */
 .scroll{overflow-x:auto}
-.upl{display:flex;flex-direction:column;gap:6px}
-.upl-file{display:flex;align-items:center;gap:6px;background:var(--ghz-soft);border-radius:8px;padding:5px 6px 5px 10px;font-size:.8rem;font-weight:700;color:#0012b3;min-width:0}
-.upl-file .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
-.upl-file .sz{font-weight:600;color:var(--muted);white-space:nowrap}
-.upl .or{font-size:.72rem;color:var(--muted)}
-.upl progress{width:100%;height:8px}
 .targets td{padding:8px 10px}.targets th{padding:10px;position:static}.targets td:first-child,.targets th:first-child{padding-left:18px}
 .foot{display:flex;align-items:flex-end;gap:16px;padding:14px 18px;border-top:1px solid var(--line);flex-wrap:wrap}.foot>div{flex:1 1 220px;min-width:0}
 .k{font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
@@ -206,7 +200,7 @@ code{background:var(--ghz-soft);padding:1px 5px;border-radius:5px;font-size:.85e
         <div><div class="k">Only look for demo files in this folder (optional)</div><input id="demoFolder" placeholder="Leave empty: each laptop finds a file by itself"></div>
         <div class="toolbar-right" style="flex:none"><button class="btn light" id="addTarget">Add app</button><button class="btn" id="saveTargets">Save</button></div>
       </div>
-      <div class="hint">Separate alternatives with | (for example <code>assassin|mirage</code>). "Open a demo file" opens a file of that type and checks its name shows in the app's window. Each laptop looks on its desktop, Documents, Downloads, OneDrive and its drives, and prefers files or folders named after the app or with "demo" or "sample" in the name (like <code>APPLICATION DEMO</code>). To open one exact file, put its name in "Specific file" (for example <code>Price list.xlsx</code>, found anywhere on each laptop) or a full path (<code>D:\APPLICATION DEMO\Price list.xlsx</code>), or press <b>Upload file…</b> to send a file from this computer (up to 200 MB): each laptop downloads it once before its test (Sales Tools 1.0.35 or later; older ones open any file of that type). The result says which file was opened. <span class="msg" id="tmsg"></span></div>
+      <div class="hint">Separate alternatives with | (for example <code>assassin|mirage</code>). "Open a demo file" opens a file of that type and checks its name shows in the app's window. Each laptop looks on its desktop, Documents, Downloads, OneDrive and its drives, and prefers files or folders named after the app or with "demo" or "sample" in the name (like <code>APPLICATION DEMO</code>). To open one exact file, put its name in "Specific file" (for example <code>Price list.xlsx</code>, found anywhere on each laptop) or a full path (<code>D:\APPLICATION DEMO\Price list.xlsx</code>). The result says which file was opened. <span class="msg" id="tmsg"></span></div>
     </div>
   </section>
 
@@ -515,44 +509,11 @@ function renderTargets(){
     <td><input data-i="${i}" data-k="keyword" value="${esc(t.keyword)}" aria-label="Keyword for ${esc(t.name)}"></td>
     <td><select data-i="${i}" data-k="mode" aria-label="How to test ${esc(t.name)}"><option value="file"${t.mode==='file'?' selected':''}>Open a demo file</option><option value="launch"${t.mode!=='file'?' selected':''}>Just open the app</option></select></td>
     <td><input data-i="${i}" data-k="exts" value="${esc((t.exts||[]).join(', '))}" placeholder=".dwg" ${t.mode==='file'?'':'disabled'} aria-label="File types for ${esc(t.name)}"></td>
-    <td>${fileCell(t,i)}</td>
+    <td><input data-i="${i}" data-k="file" value="${esc(t.file||'')}" placeholder="${t.mode==='file'?'Any file of the type above':''}" ${t.mode==='file'?'':'disabled'} title="A file name (each laptop finds it) or a full path, like D:\\APPLICATION DEMO\\Price list.xlsx" aria-label="Specific file for ${esc(t.name)}"></td>
     <td class="segs">${segmentChoices(t,i)}</td>
     <td><input data-i="${i}" data-k="wait" type="number" min="2" max="600" value="${esc(t.wait)}" aria-label="Wait seconds for ${esc(t.name)}"></td>
     <td><button class="btn danger sm" data-del="${i}" title="Remove" aria-label="Remove ${esc(t.name)}">✕</button></td></tr>`).join('');
 }
-// Specific file: an uploaded file (sent to each laptop before the test), or a file name / full path on the laptops.
-const size=b=>b>=1048576?(b/1048576).toFixed(b>=10485760?0:1)+' MB':Math.max(1,Math.round(b/1024))+' KB';
-const uploading={}; // row → percent while its file uploads
-function fileCell(t,i){
-  const on=t.mode==='file';
-  if(uploading[i]!==undefined)return`<div class="upl"><div class="sub">Uploading… ${uploading[i]}%</div><progress max="100" value="${uploading[i]}"></progress></div>`;
-  if(t.upload)return`<div class="upl"><div class="upl-file" title="Uploaded: each laptop downloads this file before the test (Sales Tools 1.0.35 or later)"><span>📎</span><span class="nm">${esc(t.upload.name)}</span><span class="sz">${size(t.upload.size)}</span><button class="btn light sm" data-unupload="${i}" title="Stop using this file" aria-label="Remove the uploaded file for ${esc(t.name)}">✕</button></div><button class="btn light sm" data-upload="${i}">Replace…</button></div>`;
-  return`<div class="upl"><input data-i="${i}" data-k="file" value="${esc(t.file||'')}" placeholder="${on?'Any file of the type above':''}" ${on?'':'disabled'} title="A file name (each laptop finds it) or a full path, like D:\\APPLICATION DEMO\\Price list.xlsx" aria-label="Specific file for ${esc(t.name)}">${on?`<span class="or">or</span><button class="btn light sm" data-upload="${i}" title="Upload a file from this computer; each laptop downloads it before the test (up to 200 MB)">Upload file…</button>`:''}</div>`;
-}
-const picker=Object.assign(document.createElement('input'),{type:'file',hidden:true});document.body.appendChild(picker);
-let pickFor=null;
-function upload(i,f){
-  const t=targets[i];
-  if(f.size>200*1024*1024){$('tmsg').textContent=f.name+' is larger than 200 MB.';$('tmsg').className='msg bad';return}
-  uploading[i]=0;renderTargets();
-  const x=new XMLHttpRequest();
-  x.open('POST','/app-check/api/upload?name='+encodeURIComponent(f.name));
-  x.setRequestHeader('X-SalesKit-Session',key);x.setRequestHeader('Content-Type','application/octet-stream');
-  x.upload.onprogress=e=>{if(e.lengthComputable){uploading[i]=Math.round(e.loaded/e.total*100);renderTargets()}};
-  x.onloadend=()=>{
-    delete uploading[i];let r={};try{r=JSON.parse(x.responseText)}catch{}
-    if(x.status===401){showSignin('Please sign in again.');return}
-    if(x.status===200&&r.upload){
-      t.upload=r.upload;t.file='';
-      // The uploaded file's type counts as a demo file type.
-      const ext=(r.upload.name.match(/\.[^.]+$/)||[''])[0].toLowerCase();if(ext&&!(t.exts||[]).includes(ext))t.exts=[...(t.exts||[]),ext];
-      $('tmsg').textContent='Uploaded '+r.upload.name+'. Press Save to use it.';$('tmsg').className='msg';
-    }else{$('tmsg').textContent=r.error||'Upload failed. Check the connection and try again.';$('tmsg').className='msg bad'}
-    renderTargets();
-  };
-  x.send(f);
-}
-picker.addEventListener('change',()=>{const f=picker.files[0];picker.value='';if(f&&pickFor!==null)upload(pickFor,f)});
 // Segments (LAPTOP DB's SEGMENT 2): none ticked = every laptop.
 const segKey=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
 function segmentChoices(t,i){
@@ -574,14 +535,9 @@ $('targets').addEventListener('input',e=>{
   if(el.dataset.k==='mode')renderTargets();
   unsaved();
 });
-$('targets').addEventListener('click',e=>{
-  const b=e.target.closest('button');if(!b)return;
-  if(b.dataset.upload!==undefined){pickFor=+b.dataset.upload;picker.click();return}
-  if(b.dataset.unupload!==undefined){delete targets[+b.dataset.unupload].upload;renderTargets();unsaved();return}
-  const i=b.dataset.del;if(i===undefined)return;targets.splice(+i,1);renderTargets();unsaved()});
+$('targets').addEventListener('click',e=>{const i=e.target.dataset.del;if(i===undefined)return;targets.splice(+i,1);renderTargets();unsaved()});
 $('addTarget').addEventListener('click',()=>{targets.push({name:'',keyword:'',mode:'launch',exts:[],wait:90});renderTargets();$('targets').querySelector('tr:last-child input').focus();unsaved()});
 $('saveTargets').addEventListener('click',async()=>{
-  if(Object.keys(uploading).length){$('tmsg').textContent='Wait for the upload to finish, then Save.';$('tmsg').className='msg bad';return}
   const r=await api('targets',{targets,demoFolder:$('demoFolder').value}).catch(()=>null);if(!r)return;
   if(r.ok){targets=r.targets.map(t=>({...t}));$('demoFolder').value=r.demoFolder||'';renderTargets();$('tmsg').textContent='Saved. The next test uses this list.';$('tmsg').className='msg good'}
   else{$('tmsg').textContent=r.error||'Could not save.';$('tmsg').className='msg bad'}

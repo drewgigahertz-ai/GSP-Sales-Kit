@@ -6,14 +6,9 @@
 // (every result) and results.csv (one row per test, for Excel).
 const fs = require('node:fs');
 const path = require('node:path');
-const crypto = require('node:crypto');
 const { compareSku, compareBanner } = require('../electron/laptop-sku');
 
 const ONLINE_MS = 20 * 1000;
-// Demo files the admin uploads ("Upload file" on Apps to test): kept in app-check/files/<sha256>, sent to each laptop
-// before its test (SalesKit 1.0.35 and later).
-const UPLOAD_MAX_BYTES = 200 * 1024 * 1024;
-const UPLOAD_ID = /^[a-f0-9]{64}$/;
 const DEFAULT_TARGETS = [
   { name: 'AutoCAD', keyword: 'autocad', mode: 'file', exts: ['.dwg'], wait: 120 },
   { name: 'Blender', keyword: 'blender', mode: 'file', exts: ['.blend'], wait: 90 },
@@ -22,8 +17,6 @@ const DEFAULT_TARGETS = [
 ];
 
 const text = (value, max = 60) => String(value ?? '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, max);
-// A file name that is safe on Windows, keeping the name the admin chose (the test looks for it in the app's title bar).
-const safeFileName = (value) => text(path.basename(String(value || '').replace(/\\/g, '/')), 120).replace(/[<>:"/\\|?*]/g, '_').replace(/[. ]+$/, '');
 const csvCell = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
 
 function cleanTarget(t) {
@@ -36,12 +29,7 @@ function cleanTarget(t) {
   // full path ("D:\APPLICATION DEMO\Price list.xlsx"). Its type is added to exts, so laptops before 1.0.33
   // (which do not know file) still open a file of that type.
   const file = mode === 'file' ? text(t.file, 260).replace(/^["']+|["']+$/g, '').trim() : '';
-  // upload (optional): { id, name, size } of a file the admin uploaded; used instead of file by SalesKit 1.0.35+.
-  const up = t.upload && typeof t.upload === 'object' ? t.upload : null;
-  const upload = mode === 'file' && up && UPLOAD_ID.test(String(up.id)) && safeFileName(up.name)
-    ? { id: String(up.id), name: safeFileName(up.name), size: Math.max(0, Math.round(Number(up.size) || 0)) } : null;
-  // The uploaded file's type is added to exts too, so older laptops still open a file of that type.
-  const fileExt = path.extname(upload ? upload.name : file).toLowerCase();
+  const fileExt = path.extname(file).toLowerCase();
   const exts = mode === 'file'
     ? [...new Set([...(Array.isArray(t.exts) ? t.exts : String(t.exts || '').split(/[,\s]+/)), fileExt]
       .map((e) => text(e, 12).toLowerCase()).filter(Boolean).map((e) => (e.startsWith('.') ? e : `.${e}`)))]
@@ -49,7 +37,7 @@ function cleanTarget(t) {
   if (mode === 'file' && !exts.length) return null;
   // segments (optional): LAPTOP DB's SEGMENT 2 values this app is tested on; none = every laptop.
   const segments = uniqueSegments(Array.isArray(t.segments) ? t.segments : []).slice(0, 20);
-  return { name, keyword, mode, exts, ...(file ? { file } : {}), ...(upload ? { upload } : {}), ...(segments.length ? { segments } : {}), wait: Math.min(600, Math.max(2, Math.round(Number(t.wait) || 90))) };
+  return { name, keyword, mode, exts, ...(file ? { file } : {}), ...(segments.length ? { segments } : {}), wait: Math.min(600, Math.max(2, Math.round(Number(t.wait) || 90))) };
 }
 
 const segmentKey = (value) => String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -91,11 +79,8 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
     settings: path.join(dataDir, 'settings.json'),
     laptops: path.join(dataDir, 'laptops.json'),
     runs: path.join(dataDir, 'runs.jsonl'),
-    csv: path.join(dataDir, 'results.csv'),
-    files: path.join(dataDir, 'files')
+    csv: path.join(dataDir, 'results.csv')
   };
-  fs.mkdirSync(F.files, { recursive: true });
-  const uploadPath = (id) => path.join(F.files, id);
   const pagePath = path.join(__dirname, 'app-check.html');
 
   const settings = readJson(F.settings, {});
@@ -103,71 +88,6 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
   if (!targets.length) targets = DEFAULT_TARGETS;
   let demoFolder = text(settings.demoFolder, 260);
   const saveSettings = () => fs.writeFileSync(F.settings, JSON.stringify({ targets, demoFolder }, null, 2));
-
-  // Uploaded files no app uses any more (replaced or removed) are deleted when the list is saved, and on start.
-  // Uploads younger than a day are kept: the admin may not have pressed Save yet.
-  function removeUnusedUploads() {
-    const used = new Set(targets.map((t) => t.upload && t.upload.id).filter(Boolean));
-    let names = [];
-    try { names = fs.readdirSync(F.files); } catch { return; }
-    for (const name of names) {
-      if (used.has(name)) continue;
-      const file = path.join(F.files, name);
-      try {
-        if (Date.now() - fs.statSync(file).mtimeMs > 24 * 60 * 60 * 1000) fs.rmSync(file, { force: true });
-      } catch { /* in use; next time */ }
-    }
-  }
-  removeUnusedUploads();
-
-  // The admin's upload: the request body is the file itself. Saved under its SHA-256, so the same file uploaded
-  // twice is stored once and laptops download it only once. Resolves to { id, size } or rejects.
-  function receiveUpload(request) {
-    return new Promise((resolve, reject) => {
-      const tooBig = () => Object.assign(new Error('The file is larger than 200 MB.'), { status: 413 });
-      if (Number(request.headers['content-length']) > UPLOAD_MAX_BYTES) {
-        request.resume();
-        return reject(tooBig());
-      }
-      const temp = path.join(F.files, `upload-${process.pid}-${Date.now()}.part`);
-      const out = fs.createWriteStream(temp);
-      const hash = crypto.createHash('sha256');
-      let size = 0;
-      let failed = false;
-      const fail = (error) => {
-        if (failed) return;
-        failed = true;
-        request.unpipe(out);
-        request.resume();
-        out.destroy();
-        fs.rm(temp, { force: true }, () => reject(error));
-      };
-      request.on('data', (chunk) => {
-        size += chunk.length;
-        hash.update(chunk);
-        if (size > UPLOAD_MAX_BYTES) fail(tooBig());
-      });
-      request.on('aborted', () => fail(new Error('The upload was interrupted.')));
-      request.on('error', fail);
-      out.on('error', fail);
-      out.on('finish', () => {
-        if (failed) return;
-        if (!size) return fs.rm(temp, { force: true }, () => reject(Object.assign(new Error('The file is empty.'), { status: 400 })));
-        const id = hash.digest('hex');
-        try {
-          if (fs.existsSync(uploadPath(id))) {
-            fs.rmSync(temp, { force: true });
-            fs.utimesSync(uploadPath(id), new Date(), new Date()); // counts as new for the clean-up above
-          } else fs.renameSync(temp, uploadPath(id));
-          resolve({ id, size });
-        } catch (error) {
-          failed = false;
-          fail(error);
-        }
-      });
-      request.pipe(out);
-    });
-  }
 
   let history = [];
   try {
@@ -412,21 +332,6 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
       branches = [...new Set(['HO', ...branches, ...list.map((l) => l.branch)].filter(Boolean).map((b) => String(b).toUpperCase()))].sort();
       return send(response, 200, { now: Date.now(), me: user.displayName, laptops: list, branches, history: [...history].sort((a, b) => Date.parse(b.time) - Date.parse(a.time)).slice(0, 100), targets, segments, demoFolder, dataDir });
     }
-    // POST /app-check/api/upload?name=<file name>: the body is the file (Apps to test -> Upload file).
-    if (route === '/app-check/api/upload' && request.method === 'POST') {
-      const name = safeFileName(url.searchParams.get('name'));
-      if (!name || !path.extname(name)) {
-        request.resume();
-        return send(response, 400, { error: 'The file needs a name with a type, like Floor plan.dwg.' });
-      }
-      try {
-        const { id, size } = await receiveUpload(request);
-        log('info', `${user.displayName} uploaded ${name} (${Math.max(1, Math.round(size / 1024))} KB) for App tests`);
-        return send(response, 200, { ok: true, upload: { id, name, size } });
-      } catch (error) {
-        return send(response, error.status || 500, { error: error.message || 'Upload failed.' });
-      }
-    }
     if (request.method !== 'POST') return send(response, 404, { error: 'Not found.' });
     const body = await readBody(request);
     if (!body) return send(response, 400, { error: 'Bad request.' });
@@ -464,12 +369,9 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
       const list = Array.isArray(body.targets) ? body.targets.slice(0, 40).map(cleanTarget) : [];
       if (!list.length || list.some((t) => !t)) return send(response, 400, { error: 'Every app needs a name and a keyword, and "Open a demo file" needs a file type or a specific file.' });
       if (new Set(list.map((t) => t.name.toLowerCase())).size !== list.length) return send(response, 400, { error: 'Two apps have the same name.' });
-      const lost = list.find((t) => t.upload && !fs.existsSync(uploadPath(t.upload.id)));
-      if (lost) return send(response, 400, { error: `The uploaded file for ${lost.name} is no longer on the server. Upload it again.` });
       targets = list;
       demoFolder = text(body.demoFolder, 260).replace(/^["']+|["']+$/g, '');
       saveSettings();
-      removeUnusedUploads();
       log('info', `${user.displayName} changed the apps to test`);
       return send(response, 200, { ok: true, targets, demoFolder });
     }
@@ -483,20 +385,9 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
     return send(response, 404, { error: 'Not found.' });
   }
 
-  // GET /api/app-check/file/<id> (laptops, with the app token): an uploaded demo file, for a test.
-  function serveUpload(id, response) {
-    const file = UPLOAD_ID.test(String(id)) ? uploadPath(id) : '';
-    let size = -1;
-    try { size = file ? fs.statSync(file).size : -1; } catch { /* missing */ }
-    if (size < 0) return send(response, 404, { error: 'That file is no longer on the server.' });
-    response.writeHead(200, { 'Cache-Control': 'no-store', 'Content-Type': 'application/octet-stream', 'Content-Length': size });
-    fs.createReadStream(file).on('error', () => response.destroy()).pipe(response);
-  }
-
   return {
     handleLaptop,
     handleAdmin,
-    serveUpload,
     stop() {
       clearInterval(saveTimer);
       saveLaptops();

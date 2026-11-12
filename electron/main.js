@@ -121,42 +121,6 @@ async function requestServer(pathname, options = {}) {
   throw Object.assign(new Error(`SalesKit Server is not reachable (${ordered.join(', ')}): ${networkError.message}`), { code: 'unreachable' });
 }
 
-// Saves <pathname> from the SalesKit Server into file, streamed (App tests: the admin's uploaded demo files).
-// onProgress(got, total) as it arrives. Tries each server address like requestServer.
-async function downloadFromServer(pathname, file, onProgress = () => {}, timeoutMs = 30 * 60 * 1000) {
-  const { urls, headers } = await serverConnection();
-  let networkError;
-  for (const serverUrl of urls) {
-    let response;
-    try {
-      response = await fetch(`${serverUrl}${pathname}`, { headers, signal: AbortSignal.timeout(timeoutMs) });
-    } catch (error) {
-      networkError = error;
-      continue;
-    }
-    if (!response.ok) {
-      const result = await response.json().catch(() => ({}));
-      throw new Error(result.error || `SalesKit Server returned HTTP ${response.status}.`);
-    }
-    const total = Number(response.headers.get('content-length')) || 0;
-    let got = 0;
-    const out = fs.createWriteStream(file);
-    try {
-      for await (const chunk of response.body) {
-        got += chunk.length;
-        if (!out.write(chunk)) await new Promise((resolve) => out.once('drain', resolve));
-        onProgress(got, total);
-      }
-      await new Promise((resolve, reject) => out.end((error) => (error ? reject(error) : resolve())));
-    } catch (error) {
-      out.destroy();
-      throw error;
-    }
-    return { size: got };
-  }
-  throw new Error(`SalesKit Server is not reachable: ${networkError ? networkError.message : 'no address'}`);
-}
-
 async function getRemoteSnapshot() {
   try {
     const { dataVersion, latestClientVersion } = await requestServer('/api/version').catch(() => ({ dataVersion: null }));
@@ -618,7 +582,6 @@ app.whenReady().then(() => {
   });
   appCheck = createAppCheck({
     request: (route, body, timeoutMs) => requestServer(`/api/app-check/${route}`, { method: 'POST', body, timeoutMs }),
-    download: downloadFromServer,
     getUser: () => (session ? session.user : null),
     getWindow: () => mainWindow,
     readShortcutLink: (file) => shell.readShortcutLink(file),
