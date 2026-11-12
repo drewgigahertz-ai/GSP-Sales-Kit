@@ -4,7 +4,8 @@
 (function () {
   const PAGE_NAMES = { recotable: 'Reco Table', saleskit: 'Sales Kit', banner: 'Banner' };
   let lastReport = '';
-  // Set by banner-bridge.js: { item, view: 'ageing' | 'generated', fullscreen }.
+  // Set by banner-bridge.js: { item, code, view: 'ageing' | 'generated', fullscreen }.
+  // code: the SKU of the laptop the banner is for, so the server can check it is this laptop's banner.
   window.bannerPageScreen = null;
 
   function value(read) {
@@ -26,7 +27,7 @@
       if (tab) {
         const banners = tab.banners && tab.banners.length ? tab.banners : [{ name: '' }];
         const banner = banners[Math.min(tab.bannerIndex || 0, banners.length - 1)];
-        return { page: 'Presentation', kind: 'feature-banner', item: tab.model, detail: [slide.title, banner.name].filter(Boolean).join(' · '), fullscreen };
+        return { page: 'Presentation', kind: 'feature-banner', item: tab.model, code: tab.sku || '', detail: [slide.title, banner.name].filter(Boolean).join(' · '), fullscreen };
       }
     }
     return { page: 'Presentation', kind: '', item: '', detail: slide ? slide.title : '', fullscreen };
@@ -40,7 +41,7 @@
     if (!tab) return null;
     const banners = tab.banners && tab.banners.length ? tab.banners : [{ name: '' }];
     const banner = banners[Math.min(tab.bannerIndex || 0, banners.length - 1)];
-    return { page: 'Sales Kit', kind: 'feature-banner', item: tab.model, detail: [tab.feature, banner.name].filter(Boolean).join(' · '), fullscreen: false };
+    return { page: 'Sales Kit', kind: 'feature-banner', item: tab.model, code: tab.sku || '', detail: [tab.feature, banner.name].filter(Boolean).join(' · '), fullscreen: false };
   }
 
   function bannerPageScreen() {
@@ -51,6 +52,7 @@
       page: 'Banner',
       kind: clearance ? 'clearance' : 'banner',
       item: screen.item,
+      code: screen.code || '',
       detail: clearance ? 'Clearance banner' : 'Generated banner',
       fullscreen: Boolean(screen.fullscreen)
     };

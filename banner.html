@@ -1339,7 +1339,7 @@
       toParent({
         channel: 'saleskit-banner-activity',
         activity: item
-          ? { item: [item.brandModel, item.partNumber].filter(Boolean).join(' ') || item.itemCode, view: bannerView, fullscreen: document.fullscreenElement === $('wrap') }
+          ? { item: [item.brandModel, item.partNumber].filter(Boolean).join(' ') || item.itemCode, code: item.itemCode, view: bannerView, fullscreen: document.fullscreenElement === $('wrap') }
           : null
       });
     }

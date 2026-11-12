@@ -40,13 +40,14 @@ function createActivityReporter({ send, getWindow, isSignedIn }) {
   }, IDLE_CHECK_MS);
 
   return {
-    // activity: { page, kind, item, detail, fullscreen } from the window.
+    // activity: { page, kind, item, code, detail, fullscreen } from the window (code: the banner's laptop SKU).
     set(activity) {
       if (!activity || typeof activity !== 'object') return;
       current = {
         page: String(activity.page || '').slice(0, 160),
         kind: String(activity.kind || '').slice(0, 40),
         item: String(activity.item || '').slice(0, 160),
+        code: String(activity.code || '').slice(0, 60),
         detail: String(activity.detail || '').slice(0, 160),
         fullscreen: Boolean(activity.fullscreen)
       };

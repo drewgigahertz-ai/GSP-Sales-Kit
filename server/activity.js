@@ -11,13 +11,15 @@ function clip(value) {
   return String(value ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, FIELD_LIMIT);
 }
 
-// The laptop's report: { page, kind, item, detail, fullscreen, idle }. kind is 'banner', 'clearance' or
+// The laptop's report: { page, kind, item, code, detail, fullscreen, idle }. code: the SKU of the laptop the banner
+// is for (SalesKit 1.0.35 and later), to check it is the laptop's own banner. kind is 'banner', 'clearance' or
 // 'feature-banner' while a banner is on screen, '' otherwise.
 function normalize(activity = {}) {
   return {
     page: clip(activity.page),
     kind: ['banner', 'clearance', 'feature-banner'].includes(activity.kind) ? activity.kind : '',
     item: clip(activity.item),
+    code: clip(activity.code).slice(0, 60),
     detail: clip(activity.detail),
     fullscreen: Boolean(activity.fullscreen),
     idle: Boolean(activity.idle)
@@ -59,7 +61,7 @@ function createActivityLog(dbPath) {
     const activity = normalize(rawActivity);
     const now = new Date().toISOString();
     const previous = live.get(deviceKey);
-    const sameScreen = previous && describe(previous.activity) === describe(activity) && previous.activity.kind === activity.kind;
+    const sameScreen = previous && describe(previous.activity) === describe(activity) && previous.activity.kind === activity.kind && previous.activity.code === activity.code;
     if (sameScreen && previous.activity.idle === activity.idle) return false;
     live.set(deviceKey, { activity, since: sameScreen ? previous.since : now, at: now });
     // History: each time a banner comes on screen (not when the same one only wakes from idle).
@@ -70,11 +72,12 @@ function createActivityLog(dbPath) {
     return true;
   }
 
-  // { text, since, idle, banner } for the Devices tab, or null when the laptop has not reported yet.
+  // { text, since, idle, banner, item, code } for the Devices tab, or null when the laptop has not reported yet.
   function liveFor(deviceKey) {
     const entry = live.get(deviceKey);
     if (!entry) return null;
-    return { text: describe(entry.activity), since: entry.since, idle: entry.activity.idle, banner: Boolean(entry.activity.kind) };
+    const { activity } = entry;
+    return { text: describe(activity), since: entry.since, idle: activity.idle, banner: Boolean(activity.kind), item: activity.item, code: activity.code };
   }
 
   // Most shown banners over the last `days` days, overall and per branch.

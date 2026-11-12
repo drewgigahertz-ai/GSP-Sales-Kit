@@ -107,6 +107,8 @@ tr.detail td{background:#f3f6fd;padding:0 16px 14px 44px}
 .showing.is-banner .show-dot{background:#16a34a;box-shadow:0 0 0 3px #dcfce7}
 .showing.is-idle .show-dot{background:#f59e0b;box-shadow:none}
 .showing .show-main b{color:#0012b3}
+.showing.is-wrong .show-dot{background:var(--bad);box-shadow:0 0 0 3px var(--bad-bg)}
+.showing .check{margin-top:4px}
 .seg-chip.none-seg{background:#eef1f6;color:var(--muted)}
 td.segs label.seg{display:flex;align-items:center;gap:5px;font-size:.78rem;white-space:nowrap;cursor:pointer}
 td.segs input{width:auto;margin:0}
@@ -299,12 +301,13 @@ const QUICK={
   offline:{label:'Offline',dot:'',test:l=>!l.online},
   mismatch:{label:'SKU mismatch',test:l=>['brand','model','unknown'].includes(l.skuCheck&&l.skuCheck.status)},
   nosku:{label:'No SKU',test:l=>!l.sku},
+  wrongbanner:{label:'Wrong banner',test:l=>l.online&&l.showing&&l.showing.check==='different'},
   unknown:{label:'Branch unknown',test:l=>!l.branch}
 };
 function renderQuick(){
   $('quick').innerHTML=Object.entries(QUICK).map(([k,q])=>{
     const n=state.laptops.filter(q.test).length;
-    if(['unknown','mismatch','nosku'].includes(k)&&!n&&quick!==k)return'';
+    if(['unknown','mismatch','nosku','wrongbanner'].includes(k)&&!n&&quick!==k)return'';
     return`<button class="chip${quick===k?' active':''}" data-q="${k}" aria-pressed="${quick===k}">${q.dot!==undefined?`<span class="dot ${q.dot}"></span>`:''}<b>${n}</b> ${q.label}</button>`;
   }).join('');
 }
@@ -332,6 +335,9 @@ function appCell(l,name){
   if(l.apps&&!l.apps.includes(name))return`<span class="none" title="Not tested on ${esc(l.segment||'this segment')} laptops (Apps to test → Segments)">Not tested</span>`;
   return'<span class="none">—</span>';
 }
+// Is the banner on screen this laptop's own? (server: compareBanner in electron/laptop-sku.js)
+const BANNER_CHECK={match:['ok','✓ Matches SKU',"The banner on screen is for this laptop's SKU"],different:['bad','✗ Not this laptop',"The banner on screen is for a different laptop than this laptop's SKU"],unknown:['none','? Cannot check',"Could not tell: this laptop's SalesKit is older than 1.0.35, or its SKU is not in SalesKit's list"],nosku:['none','? No SKU to compare','This laptop has no Laptop SKU yet']};
+const bannerCheck=s=>{const c=s.banner&&BANNER_CHECK[s.check];return c?`<span class="check ${c[0]}" title="${esc(c[2])}">${c[1]}</span>`:''};
 // What Sales Tools shows on the laptop now (the same as the server's Devices → "Showing now").
 function showingCell(l){
   const s=l.showing;
@@ -339,7 +345,7 @@ function showingCell(l){
   if(!s)return`<span class="none" title="${l.user?'Not reported yet':'Shown only while someone is signed in'}">${l.user?'Not reported yet':'Sign-in page'}</span>`;
   const [page,...rest]=String(s.text||'').split(' · ');
   const time=new Date(s.since).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
-  return`<div class="showing${s.banner?' is-banner':''}${s.idle?' is-idle':''}"><span class="show-dot"></span><div><div class="show-main">${esc(page||'')}${rest.length?` · <b>${esc(rest[0])}</b>`:''}</div>${rest.length>1?`<div class="sub">${esc(rest.slice(1).join(' · '))}</div>`:''}<div class="sub">${s.idle?'Idle · ':''}since ${esc(time)}</div></div></div>`;
+  return`<div class="showing${s.banner?' is-banner':''}${s.idle?' is-idle':''}${s.banner&&s.check==='different'?' is-wrong':''}"><span class="show-dot"></span><div><div class="show-main">${esc(page||'')}${rest.length?` · <b>${esc(rest[0])}</b>`:''}</div>${rest.length>1?`<div class="sub">${esc(rest.slice(1).join(' · '))}</div>`:''}<div class="sub">${s.idle?'Idle · ':''}since ${esc(time)}</div>${bannerCheck(s)}</div></div>`;
 }
 function branchCell(l){
   if(editingBranch===l.name)return`<select class="branch-select" data-branch-for="${esc(l.name)}" aria-label="Branch of ${esc(l.name)}">

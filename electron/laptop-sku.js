@@ -83,4 +83,28 @@ function compareSku(sku, found, device = {}) {
   return { status: shared ? 'match' : 'model', ...result };
 }
 
-module.exports = { createLaptopSkuStore, skuChoices, compareSku, skuKey };
+// Is the banner on screen for this laptop? banner: { code, item } from the laptop's report (code: the banner's
+// SKU, sent by SalesKit 1.0.35 and later; item: its brand, model and part number as shown). sku: the laptop's own
+// SKU, found: that SKU in skuChoices or null. { status }: 'match', 'different', 'nosku' (no SKU on this laptop) or
+// 'unknown' (cannot tell: an older SalesKit that sends no code, and the text does not settle it).
+function compareBanner(banner, sku, found) {
+  const mine = skuKey(sku);
+  if (!mine) return { status: 'nosku' };
+  const code = skuKey(banner && banner.code);
+  if (code) return { status: code === mine ? 'match' : 'different' };
+  if (!found) return { status: 'unknown' };
+  const flat = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const text = flat(banner && banner.item);
+  if (!text) return { status: 'unknown' };
+  if ([found.sku, found.partNumber].some((id) => flat(id).length >= 5 && text.includes(flat(id)))) return { status: 'match' };
+  const bannerNumbers = numbers(words(banner.item));
+  const skuNumbers = numbers(words(`${found.model} ${found.partNumber} ${found.sku}`));
+  if (!bannerNumbers.length || !skuNumbers.length) return { status: 'unknown' };
+  // Every model number on the banner must be the SKU's; none in common is another laptop; anything between
+  // ("ANV15-41" vs "ANV15-52": same family) cannot be told from the text alone.
+  const same = (w) => skuNumbers.some((s) => s === w || (s.length >= 4 && w.length >= 4 && (s.includes(w) || w.includes(s))));
+  const matched = bannerNumbers.filter(same).length;
+  return { status: matched === bannerNumbers.length ? 'match' : matched === 0 ? 'different' : 'unknown' };
+}
+
+module.exports = { createLaptopSkuStore, skuChoices, compareSku, compareBanner, skuKey };

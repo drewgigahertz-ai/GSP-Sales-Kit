@@ -6,7 +6,7 @@
 // (every result) and results.csv (one row per test, for Excel).
 const fs = require('node:fs');
 const path = require('node:path');
-const { compareSku } = require('../electron/laptop-sku');
+const { compareSku, compareBanner } = require('../electron/laptop-sku');
 
 const ONLINE_MS = 20 * 1000;
 const DEFAULT_TARGETS = [
@@ -319,6 +319,8 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
           const segment = segmentOf(l);
           let showing = null;
           try { showing = now - l.lastSeen < ONLINE_MS ? showingFor(l.name) : null; } catch { /* not reported */ }
+          // Is the banner on screen this laptop's own (its Laptop SKU)?
+          if (showing && showing.banner) showing = { ...showing, check: compareBanner(showing, l.sku, skuEntry(l)).status };
           return { showing, name: l.name, branch, branchSource: source, user: l.user, version: l.version, make: l.make, model: l.model, sku: l.sku || '', skuCheck: skuCheckOf(l), segment, apps: targetsForSegment(targets, segment).map((t) => t.name), online: now - l.lastSeen < ONLINE_MS, lastSeen: l.lastSeen, current: l.current, waiting: Boolean(l.command), last: lastRun.get(l.name) || null };
         });
       let segments = [];
