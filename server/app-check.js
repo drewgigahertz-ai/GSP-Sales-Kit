@@ -40,6 +40,18 @@ function cleanTarget(t) {
   return { name, keyword, mode, exts, ...(file ? { file } : {}), ...(segments.length ? { segments } : {}), wait: Math.min(600, Math.max(2, Math.round(Number(t.wait) || 90))) };
 }
 
+// Desktop check: always allowed (the Sales Tools shortcut), and the starting "also allowed" list.
+const ALWAYS_ALLOWED = ['gigahertz sales tools|saleskit|sales tools'];
+const DEFAULT_DESKTOP_ALLOWED = '';
+// A laptop's desktop list as sent ([{ name, kind, target }]), kept short and printable.
+function cleanDesktop(list) {
+  return list.slice(0, 150).map((item) => ({
+    name: text(item && item.name, 120),
+    kind: ['app', 'web', 'file', 'folder'].includes(item && item.kind) ? item.kind : 'file',
+    target: text(item && item.target, 160)
+  })).filter((item) => item.name);
+}
+
 const segmentKey = (value) => String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 // Segment names once each (ignoring case and spacing), as first written.
 function uniqueSegments(list) {
@@ -87,7 +99,25 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
   let targets = (Array.isArray(settings.targets) ? settings.targets : DEFAULT_TARGETS).map(cleanTarget).filter(Boolean);
   if (!targets.length) targets = DEFAULT_TARGETS;
   let demoFolder = text(settings.demoFolder, 260);
-  const saveSettings = () => fs.writeFileSync(F.settings, JSON.stringify({ targets, demoFolder }, null, 2));
+  // Desktop check: besides the apps to test, what else may sit on a laptop's desktop (names or words, one per line
+  // or comma; | for alternatives). Sales Tools itself always may.
+  let desktopAllowed = typeof settings.desktopAllowed === 'string' ? settings.desktopAllowed : DEFAULT_DESKTOP_ALLOWED;
+  const saveSettings = () => fs.writeFileSync(F.settings, JSON.stringify({ targets, demoFolder, desktopAllowed }, null, 2));
+
+  // The laptop's desktop against the rules: { status: 'ok' | 'check' | 'unknown', extra: [names of apps and website
+  // links that are not allowed], missing: [apps to test for its segment with no shortcut], other: [files and
+  // folders], at }.
+  function desktopCheck(l) {
+    if (!l.desktop) return { status: 'unknown', extra: [], missing: [], other: [] };
+    const words = (keyword) => String(keyword || '').toLowerCase().split('|').map((w) => w.trim()).filter(Boolean);
+    const fits = (item, keyword) => words(keyword).some((w) => `${item.name} ${item.target}`.toLowerCase().includes(w));
+    const allowed = [...targets.map((t) => t.keyword), ...ALWAYS_ALLOWED, ...desktopAllowed.split(/[\n,]+/)].filter((k) => words(k).length);
+    const apps = l.desktop.items.filter((item) => item.kind === 'app' || item.kind === 'web');
+    const extra = apps.filter((item) => !allowed.some((k) => fits(item, k))).map((item) => item.name);
+    const missing = targetsForSegment(targets, segmentOf(l)).filter((t) => !apps.some((item) => fits(item, t.keyword))).map((t) => t.name);
+    const other = l.desktop.items.filter((item) => item.kind === 'file' || item.kind === 'folder').map((item) => item.name);
+    return { status: extra.length || missing.length ? 'check' : 'ok', extra, missing, other, at: l.desktop.at };
+  }
 
   let history = [];
   try {
@@ -101,7 +131,7 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
   function saveLaptops() {
     if (!laptopsDirty) return;
     laptopsDirty = false;
-    const list = [...laptops.values()].map(({ name, branch, assignedBranch, user, version, make, model, sku, lastSeen }) => ({ name, branch, assignedBranch, user, version, make, model, sku, lastSeen }));
+    const list = [...laptops.values()].map(({ name, branch, assignedBranch, user, version, make, model, sku, lastSeen, desktop }) => ({ name, branch, assignedBranch, user, version, make, model, sku, lastSeen, desktop }));
     try { fs.writeFileSync(F.laptops, JSON.stringify(list, null, 1)); } catch { laptopsDirty = true; }
   }
   const saveTimer = setInterval(saveLaptops, 30 * 1000);
@@ -167,10 +197,23 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
     if (!body || typeof body !== 'object' || !text(body.laptop)) return { status: 400, body: { error: 'Bad request.' } };
     if (route === 'poll') {
       const l = touch(body, user, device);
+      // What is on its desktop (Sales Tools 1.0.36+), sent when it changes; needDesktop asks for it again (after the
+      // server lost it, or before the laptop ever sent it).
+      if (Array.isArray(body.desktop)) {
+        l.desktop = { items: cleanDesktop(body.desktop), at: Date.now() };
+        laptopsDirty = true;
+      }
+      const reply = (answer) => ({ status: 200, body: { ...answer, needDesktop: !l.desktop } });
+      // Cancel test on the page: a testing laptop (1.0.36+) stops after the app it is on; one that already
+      // finished has nothing to stop.
+      if (l.command === 'stop') {
+        l.command = null;
+        return reply({ command: body.busy ? 'stop' : null });
+      }
       // A laptop busy with a test gets the command on its next check-in after the test.
-      if (body.busy || l.command !== 'run') return { status: 200, body: { command: null } };
+      if (body.busy || l.command !== 'run') return reply({ command: null });
       l.command = null;
-      return { status: 200, body: { command: 'run', targets: targetsForSegment(targets, segmentOf(l)).map(({ segments, ...t }) => t), demoFolder } };
+      return reply({ command: 'run', targets: targetsForSegment(targets, segmentOf(l)).map(({ segments, ...t }) => t), demoFolder });
     }
     if (route === 'event') {
       const l = touch(body, user, device);
@@ -204,6 +247,7 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
         version: text(body.version, 20),
         time: Number.isNaN(Date.parse(body.time)) ? new Date().toISOString() : new Date(body.time).toISOString(),
         stoppedOnLaptop: Boolean(body.stoppedOnLaptop),
+        stoppedByAdmin: Boolean(body.stoppedByAdmin) || undefined,
         results: body.results.slice(0, 40).map((r) => ({ target: text(r && r.target), app: text(r && r.app, 120), status: text(r && r.status, 20), detail: text(r && r.detail, 300) }))
       };
       // How long it ran: the server timed this test while it ran (results come just before the "finish" step).
@@ -310,7 +354,7 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
       for (const run of history) {
         const seen = lastRun.get(run.laptop);
         if (seen && Date.parse(seen.time) > Date.parse(run.time)) continue; // a late result of an older test
-        lastRun.set(run.laptop, { time: run.time, pass: passed(run), stoppedOnLaptop: run.stoppedOnLaptop, startedAt: run.startedAt, durationMs: run.durationMs, results: run.results });
+        lastRun.set(run.laptop, { time: run.time, pass: passed(run), stoppedOnLaptop: run.stoppedOnLaptop, stoppedByAdmin: run.stoppedByAdmin, startedAt: run.startedAt, durationMs: run.durationMs, results: run.results });
       }
       const list = [...laptops.values()]
         .map((l) => ({ l, ...branchOf(l) }))
@@ -321,7 +365,7 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
           try { showing = now - l.lastSeen < ONLINE_MS ? showingFor(l.name) : null; } catch { /* not reported */ }
           // Is the banner on screen this laptop's own (its Laptop SKU)?
           if (showing && showing.banner) showing = { ...showing, check: compareBanner(showing, l.sku, skuEntry(l)).status };
-          return { showing, name: l.name, branch, branchSource: source, user: l.user, version: l.version, make: l.make, model: l.model, sku: l.sku || '', skuCheck: skuCheckOf(l), segment, apps: targetsForSegment(targets, segment).map((t) => t.name), online: now - l.lastSeen < ONLINE_MS, lastSeen: l.lastSeen, current: l.current, waiting: Boolean(l.command), last: lastRun.get(l.name) || null };
+          return { showing, name: l.name, branch, branchSource: source, user: l.user, version: l.version, make: l.make, model: l.model, sku: l.sku || '', skuCheck: skuCheckOf(l), desktop: desktopCheck(l), segment, apps: targetsForSegment(targets, segment).map((t) => t.name), online: now - l.lastSeen < ONLINE_MS, lastSeen: l.lastSeen, current: l.current, waiting: Boolean(l.command), last: lastRun.get(l.name) || null };
         });
       let segments = [];
       try { segments = listSegments(); } catch { /* no database yet */ }
@@ -330,7 +374,7 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
       let branches = [];
       try { branches = listBranches(); } catch { /* no database yet */ }
       branches = [...new Set(['HO', ...branches, ...list.map((l) => l.branch)].filter(Boolean).map((b) => String(b).toUpperCase()))].sort();
-      return send(response, 200, { now: Date.now(), me: user.displayName, laptops: list, branches, history: [...history].sort((a, b) => Date.parse(b.time) - Date.parse(a.time)).slice(0, 100), targets, segments, demoFolder, dataDir });
+      return send(response, 200, { now: Date.now(), me: user.displayName, laptops: list, branches, history: [...history].sort((a, b) => Date.parse(b.time) - Date.parse(a.time)).slice(0, 100), targets, segments, demoFolder, desktopAllowed, dataDir });
     }
     if (request.method !== 'POST') return send(response, 404, { error: 'Not found.' });
     const body = await readBody(request);
@@ -343,10 +387,19 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
       if (started.length) log('info', `${user.displayName} started an app test on ${started.length === 1 ? started[0] : `${started.length} laptops`}`);
       return send(response, started.length ? 200 : 404, started.length ? { ok: true, started: started.length } : { error: 'Unknown laptop.' });
     }
+    // { laptop }: a test not started yet is called off; a running one is stopped (laptops on Sales Tools 1.0.36+
+    // stop after the app they are on, close it and send the results so far).
     if (route === '/app-check/api/cancel') {
       const l = laptops.get(text(body.laptop, 80));
-      if (l) l.command = null;
-      return send(response, 200, { ok: true });
+      if (!l) return send(response, 404, { error: 'Unknown laptop.' });
+      if (running(l)) {
+        l.command = 'stop';
+        l.current.stopping = true;
+        log('info', `${user.displayName} stopped the app test on ${l.name}`);
+      } else {
+        l.command = null;
+      }
+      return send(response, 200, { ok: true, stopping: running(l) });
     }
     // { laptop, branch }: the admin sets the laptop's branch ('' goes back to the signed-in account's branch).
     if (route === '/app-check/api/branch') {
@@ -371,9 +424,10 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
       if (new Set(list.map((t) => t.name.toLowerCase())).size !== list.length) return send(response, 400, { error: 'Two apps have the same name.' });
       targets = list;
       demoFolder = text(body.demoFolder, 260).replace(/^["']+|["']+$/g, '');
+      if (typeof body.desktopAllowed === "string") desktopAllowed = body.desktopAllowed.slice(0, 2000);
       saveSettings();
       log('info', `${user.displayName} changed the apps to test`);
-      return send(response, 200, { ok: true, targets, demoFolder });
+      return send(response, 200, { ok: true, targets, demoFolder, desktopAllowed });
     }
     if (route === '/app-check/api/clear') {
       for (const file of [F.runs, F.csv]) fs.rmSync(file, { force: true });

@@ -196,7 +196,7 @@ async function waitUnlessStopped(ms, isStopped) {
   return isStopped();
 }
 
-const STOPPED = { status: 'stopped', detail: 'Stopped on the laptop. The app was closed.' };
+const STOPPED = { status: 'stopped', detail: 'Test stopped. The app was closed.' };
 
 // Launch, wait, judge, close. OK = still running after the wait.
 async function launchTest(exe, waitSeconds, isStopped) {
@@ -297,4 +297,50 @@ async function testTarget(target, { apps, demoRoot, sampleFiles = [], onStep, is
   return { app: found.name, ...result };
 }
 
-module.exports = { listApps, testTarget, collectSampleFiles, pickSampleFile, findNamedFile, lockFileCleanup };
+// Everything on the desktops (the user's and Public), for App Tests' desktop check: [{ name, kind, target }].
+// kind: 'app' (a program shortcut, an .exe, or a game launcher link like steam:// or uplay://), 'web' (a website
+// link), 'file' or 'folder'. target: the program's file name or the link's address, to tell apps apart.
+function listDesktop(readLink, desktopDirs) {
+  const items = new Map();
+  const add = (name, kind, target = '') => {
+    const key = `${kind}|${name.toLowerCase()}`;
+    if (!items.has(key)) items.set(key, { name: name.slice(0, 120), kind, target: String(target).slice(0, 160) });
+  };
+  for (const dir of desktopDirs) {
+    let names = [];
+    try { names = fs.readdirSync(dir); } catch { continue; }
+    for (const entry of names) {
+      if (/^(desktop\.ini|thumbs\.db)$/i.test(entry) || entry.startsWith('~$')) continue;
+      const full = path.join(dir, entry);
+      const ext = path.extname(entry).toLowerCase();
+      const name = ext ? path.basename(entry, ext) : entry;
+      let stat;
+      try { stat = fs.statSync(full); } catch { continue; }
+      if (stat.isDirectory()) { add(entry, 'folder'); continue; }
+      if (ext === '.exe' || ext === '.appref-ms') { add(name, 'app', entry); continue; }
+      if (ext === '.lnk') {
+        let target = '';
+        try { target = readLink(full).target || ''; } catch { /* unreadable shortcut */ }
+        // Office and Store apps have shortcuts without a readable target: they are programs too.
+        let isFolder = false;
+        try { isFolder = Boolean(target) && fs.statSync(target).isDirectory(); } catch { /* target gone */ }
+        if (isFolder) add(name, 'folder', path.basename(target));
+        else if (!target || /\.(exe|bat|cmd|msc)$/i.test(target)) add(name, 'app', path.basename(target));
+        else add(name, 'file', path.basename(target));
+        continue;
+      }
+      if (ext === '.url') {
+        let url = '';
+        try { url = ((fs.readFileSync(full, 'utf8').match(/^URL=(.*)$/mi) || [])[1] || '').trim(); } catch { /* unreadable */ }
+        add(name, /^https?:/i.test(url) || !url ? 'web' : 'app', url);
+        continue;
+      }
+      add(name + ext, 'file');
+    }
+  }
+  // Apps and links first, so a desktop full of files never pushes an app out of the 150 sent.
+  const order = { app: 0, web: 1, folder: 2, file: 3 };
+  return [...items.values()].sort((a, b) => order[a.kind] - order[b.kind] || a.name.localeCompare(b.name)).slice(0, 150);
+}
+
+module.exports = { listApps, listDesktop, testTarget, collectSampleFiles, pickSampleFile, findNamedFile, lockFileCleanup };

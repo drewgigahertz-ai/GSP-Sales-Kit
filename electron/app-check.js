@@ -7,7 +7,9 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { listApps, testTarget, collectSampleFiles } = require('./app-check-tests');
+const { listApps, listDesktop, testTarget, collectSampleFiles } = require('./app-check-tests');
+// The desktop is read again at most once a minute, and sent only when it changed (or the server asks for it).
+const DESKTOP_READ_MS = 60 * 1000;
 
 const POLL_MS = 5000;
 
@@ -19,6 +21,9 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
   const laptop = os.hostname();
   let state = { running: false };
   let stopRequested = false;
+  // Who stopped the test: 'laptop' (Stop test on the card) or 'admin' (Cancel test on the App Tests page).
+  let stoppedBy = '';
+  const stoppedText = () => (stoppedBy === 'admin' ? 'Stopped by head office' : 'Stopped on the laptop');
 
   function readPending() {
     try { return JSON.parse(fs.readFileSync(pendingPath, 'utf8')); } catch { return []; }
@@ -55,6 +60,7 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
 
   async function runTest({ targets, demoFolder }) {
     stopRequested = false;
+    stoppedBy = '';
     const runId = Date.now();
     const list = (Array.isArray(targets) ? targets : []).filter((t) => t && t.name);
     const user = getUser();
@@ -63,7 +69,7 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
     let sampleFiles = null;
     const isStopped = () => stopRequested;
     const steps = Object.fromEntries(list.map((t) => [t.name, { status: 'waiting', detail: '' }]));
-    const show = () => setState({ running: true, stopping: stopRequested, targets: list.map((t) => ({ name: t.name, ...steps[t.name] })) });
+    const show = () => setState({ running: true, stopping: stopRequested, stoppedBy, targets: list.map((t) => ({ name: t.name, ...steps[t.name] })) });
     const step = (target, status, detail) => {
       steps[target] = { status, detail };
       show();
@@ -78,7 +84,7 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
     try {
       for (const target of list) {
         if (stopRequested) {
-          results.push({ target: target.name, app: '', status: 'stopped', detail: 'Stopped on the laptop before this app was tested.' });
+          results.push({ target: target.name, app: '', status: 'stopped', detail: `${stoppedText()} before this app was tested.` });
           step(target.name, 'stopped', 'Not tested');
           continue;
         }
@@ -102,7 +108,8 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
         user: user ? user.username || '' : '',
         version,
         time: new Date().toISOString(),
-        stoppedOnLaptop: stopRequested,
+        stoppedOnLaptop: stopRequested && stoppedBy !== 'admin',
+        stoppedByAdmin: stopRequested && stoppedBy === 'admin',
         results
       };
       if (!(await post('results', payload))) writePending([...readPending(), payload]);
@@ -112,11 +119,32 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
     }
   }
 
+  // What is on the desktop, for App Tests' desktop check: the list when it changed since it was last sent.
+  let desktop = { list: null, readAt: 0, sent: '', wanted: false };
+  function desktopToSend() {
+    if (!desktop.list || Date.now() - desktop.readAt > DESKTOP_READ_MS) {
+      try {
+        desktop.list = listDesktop(readShortcutLink, [places.desktop, path.join(process.env.PUBLIC || 'C:\\Users\\Public', 'Desktop')].filter(Boolean));
+      } catch { desktop.list = []; }
+      desktop.readAt = Date.now();
+    }
+    const signature = JSON.stringify(desktop.list);
+    return desktop.wanted || signature !== desktop.sent ? { list: desktop.list, signature } : null;
+  }
+
   async function poll() {
     // Keeps checking in during a test, so the web page shows the laptop online; commands wait until it ends.
     // (The server knows the signed-in user and branch from the session.)
-    const reply = await post('poll', { laptop, version, busy: state.running }, 5000);
-    if (!reply || state.running) return;
+    const desk = desktopToSend();
+    const reply = await post('poll', { laptop, version, busy: state.running, ...(desk ? { desktop: desk.list } : {}) }, 5000);
+    if (!reply) return;
+    if (desk) desktop.sent = desk.signature;
+    desktop.wanted = Boolean(reply.needDesktop);
+    // During a test the only command is "stop" (Cancel test on the App Tests page).
+    if (state.running) {
+      if (reply.command === 'stop') stop('admin');
+      return;
+    }
     await sendPending();
     // Not awaited: the check-ins carry on while the test runs.
     if (reply.command === 'run') runTest(reply).catch(() => setState({ running: false }));
@@ -129,13 +157,17 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
     try { await poll(); } catch { /* try again next time */ } finally { polling = false; }
   }, POLL_MS);
 
+  // by: 'laptop' (the card's Stop test) or 'admin' (the App Tests page).
+  function stop(by = 'laptop') {
+    if (!state.running || stopRequested) return;
+    stopRequested = true;
+    stoppedBy = by;
+    setState({ ...state, stopping: true, stoppedBy });
+  }
+
   return {
     getState: () => state,
-    stop() {
-      if (!state.running) return;
-      stopRequested = true;
-      setState({ ...state, stopping: true });
-    }
+    stop: () => stop('laptop')
   };
 }
 

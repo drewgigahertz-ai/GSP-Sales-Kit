@@ -6,6 +6,14 @@
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
+      version: '1.0.36',
+      date: 'November 13, 2026',
+      changes: [
+        'App test: head office can now cancel a test that is running. The app open at that moment closes, the rest are skipped, and the card in the corner says "Stopped by head office".',
+        'App test: head office can now see which apps are on this laptop’s desktop, to check that only the allowed apps are there.'
+      ]
+    },
+    {
       version: '1.0.34',
       date: 'November 10, 2026',
       changes: [

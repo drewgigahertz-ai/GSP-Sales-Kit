@@ -106,7 +106,7 @@
       return item;
     }));
     stopButton.disabled = Boolean(state.stopping);
-    stopButton.textContent = state.stopping ? 'Stopping...' : 'Stop test';
+    stopButton.textContent = state.stopping ? (state.stoppedBy === 'admin' ? 'Stopped by head office...' : 'Stopping...') : 'Stop test';
     card.hidden = false;
   }
 

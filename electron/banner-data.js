@@ -307,15 +307,17 @@ function buildBannerData(rows, imageUrl = (value) => value, now = new Date()) {
   // promo-icons.js), else DB PHOTOS. Without a picture for the whole combination, the promo title's and each freebie's
   // own pictures are shown side by side. A blank promo means "NO PROMO", which has its own picture in DB PHOTOS; a
   // promo with none of these also shows the NO PROMO picture.
+  // Only a web address is a picture: a file name left in the link cell would show as a broken image.
+  const isPictureLink = (value) => /^(https?:|data:image\/)/i.test(text(value));
   const promoIcons = new Map();
   for (const row of rows.promoIcons || []) {
     const iconKey = promoKey(row.name);
-    if (iconKey && text(row.link) && !promoIcons.has(iconKey)) promoIcons.set(iconKey, row);
+    if (iconKey && isPictureLink(row.link) && !promoIcons.has(iconKey)) promoIcons.set(iconKey, row);
   }
   const promoPicture = (name) => {
     if (!text(name)) return null;
     const row = photo('promo', name);
-    return promoIcons.get(promoKey(name)) || (row && row.link ? row : null);
+    return promoIcons.get(promoKey(name)) || (row && isPictureLink(row.link) ? row : null);
   };
   const freebiesOf = (price) => {
     try {
