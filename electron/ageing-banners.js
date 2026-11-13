@@ -1,8 +1,13 @@
 // Ageing banners (server side) for the Banner page. The AGEING BANNER sheet lists ready-made marketing
-// banners: A = ITEM DESCRIPTION (item code), G = MARKETING REMARKS (LINKS) (Drive link),
-// H = DATE AND TIME. When a laptop is listed more than once, the row with the latest date is used.
+// banners: ITEM DESCRIPTION (item code), MARKETING REMARKS (LINKS) (Drive link) and DATE AND TIME. Columns are
+// found by their headers, so inserted columns (like BUNDLE DESCRIPTION / BUNDLE WORTH) do not matter. When a
+// laptop is listed more than once, the row with the latest date is used.
 
 const AGEING_BANNER_SHEET = 'AGEING BANNER';
+// Read wide enough for columns added later.
+const AGEING_BANNER_RANGE = 'A:Z';
+
+const headerKey = (value) => String(value ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
 function text(value) {
   return value === null || value === undefined ? '' : String(value).trim();
@@ -18,14 +23,19 @@ function parseDate(value) {
 
 // Sheet values → collection for database.replaceSheetsData (table ageing_banner), one row per laptop.
 function ageingBannerCollection(values = []) {
-  const headers = (values[0] || []).map((value) => text(value).toUpperCase());
-  const column = (name, fallback) => {
-    const index = headers.indexOf(name);
-    return index >= 0 ? index : fallback;
-  };
-  const itemIndex = column('ITEM DESCRIPTION', 0);
-  const linkIndex = column('MARKETING REMARKS (LINKS)', 6);
-  const dateIndex = column('DATE AND TIME', 7);
+  const headers = (values[0] || []).map(headerKey);
+  const find = (test) => headers.findIndex(test);
+  let itemIndex = find((h) => h.startsWith('ITEMDESCRIPTION'));
+  if (itemIndex < 0) itemIndex = 0;
+  // The banner link: MARKETING REMARKS (LINKS), else any header with LINK in it, else the column with the most links.
+  let linkIndex = find((h) => h.startsWith('MARKETINGREMARKS'));
+  if (linkIndex < 0) linkIndex = find((h) => h.includes('LINK'));
+  if (linkIndex < 0) {
+    const links = headers.map((_, i) => values.slice(1).filter((row) => /^https?:\/\//i.test(text((row || [])[i]))).length);
+    linkIndex = links.some(Boolean) ? links.indexOf(Math.max(...links)) : -1;
+  }
+  const dateIndex = find((h) => h === 'DATEANDTIME' || h.startsWith('DATEANDTIME') || h === 'DATE');
+  if (linkIndex < 0) return { collection: 'ageing_banner', columns: ['item_code', 'banner', 'updated_at'], rows: [] };
   const latest = new Map();
   values.slice(1).forEach((row) => {
     const itemCode = text(row[itemIndex]).replace(/\s+/g, ' ');
@@ -45,4 +55,4 @@ function ageingBannerCollection(values = []) {
   };
 }
 
-module.exports = { AGEING_BANNER_SHEET, ageingBannerCollection, parseDate };
+module.exports = { AGEING_BANNER_SHEET, AGEING_BANNER_RANGE, ageingBannerCollection, parseDate };

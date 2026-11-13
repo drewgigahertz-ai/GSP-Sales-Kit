@@ -3,7 +3,7 @@
   "productName": "GigaHertz SalesKit Server",
   "extraMetadata": {
     "name": "saleskit-server",
-    "version": "1.0.43",
+    "version": "1.0.44",
     "main": "server/main.js"
   },
   "directories": {

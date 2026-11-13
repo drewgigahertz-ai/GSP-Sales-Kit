@@ -19,7 +19,7 @@ const DEFAULT_PRICING_SPREADSHEET_ID = '1lUYiVdyuYMBZ0t3m0tkwxb35-2yyojI9Azu6CKJ
 const REQUEST_TIMEOUT_MS = 3 * 60 * 1000;
 const { BANNER_SHEETS, normalizeBannerSheets } = require('./banner-data');
 const { FEATURES_BANNER_SHEET, featuresBannerCollection } = require('./feature-banners');
-const { AGEING_BANNER_SHEET, ageingBannerCollection } = require('./ageing-banners');
+const { AGEING_BANNER_SHEET, AGEING_BANNER_RANGE, ageingBannerCollection } = require('./ageing-banners');
 const { USABILITY_SHEET, USABILITY_DV_SHEET, USABILITY_DV_RANGE, usabilityCollection, isUsabilityHeader } = require('./app-usability');
 const { BRANCH_DETAILS_RANGE, branchDetailsCollection } = require('./branch-details');
 const { RECO_DB_SHEET, RECO_DB_RANGE, recoDbCollection } = require('./reco-db');
@@ -237,7 +237,7 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
   if (ageingBannerTitle) {
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `'${ageingBannerTitle.replace(/'/g, "''")}'!A:H`,
+      range: `'${ageingBannerTitle.replace(/'/g, "''")}'!${AGEING_BANNER_RANGE}`,
       valueRenderOption: 'FORMATTED_VALUE'
     });
     result.ageing_banner = ageingBannerCollection(response.data.values || []);
