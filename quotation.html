@@ -379,6 +379,8 @@
     setImage(el("viberQr"), branchValue("viberQr"), "qr", "Viber QR code", "Viber QR: add it in Branch details");
     setImage(el("fbQr"), branchValue("fbQr"), "qr", "FB page QR code", "FB QR: add it in Branch details");
     setImage(el("branchLogo"), branchValue("logo"), "branch-logo", "Branch logo", "");
+    // The FB page's name (Branch FB/QR → FB LINKS), e.g. "Acer Concept Store - Festival Mall Alabang".
+    el("fbCap").innerHTML = "scan to visit our Official<br><b>" + esc(d.fbName || "Gigahertz") + "</b> FB Page";
     // The panel follows the branch, but never wipes changes that are not saved yet (e.g. on a data refresh).
     if (!dirty) fillInfo();
   }

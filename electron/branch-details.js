@@ -63,16 +63,27 @@ function branchDetailsCollection(values = [], formulas = []) {
   };
 }
 
-// rows: the branch_details table → { BRANCH: { logo, storeName, address, tin, mobile, manager, managerNo,
-// viberQr, fbQr } }, branch codes in capitals.
-function makeBranchDetails(rows, imageUrl = (value) => value) {
+// rows: the branch_details table; qrRows: the branch_qr table (Branch FB/QR tab, see branch-qr.js) →
+// { BRANCH: { logo, storeName, address, tin, mobile, manager, managerNo, viberQr, fbQr, fbName } }, branch codes in
+// capitals. Branch FB/QR comes first; the LOGO sheet's quotation columns fill what it leaves blank.
+function makeBranchDetails(rows, imageUrl = (value) => value, qrRows = []) {
   const details = {};
   const entry = (branch) => {
     const key = text(branch).toUpperCase();
     if (!key) return null;
-    if (!details[key]) details[key] = { logo: '', storeName: '', address: '', tin: '', mobile: '', manager: '', managerNo: '', viberQr: '', fbQr: '' };
+    if (!details[key]) details[key] = { logo: '', storeName: '', address: '', tin: '', mobile: '', manager: '', managerNo: '', viberQr: '', fbQr: '', fbName: '' };
     return details[key];
   };
+  for (const row of qrRows || []) {
+    const byQr = entry(row.branch);
+    if (!byQr) continue;
+    if (row.tin) byQr.tin = text(row.tin);
+    if (row.manager) byQr.manager = text(row.manager);
+    if (row.manager_no) byQr.managerNo = text(row.manager_no);
+    if (row.viber_qr) byQr.viberQr = imageUrl(text(row.viber_qr));
+    if (row.fb_qr) byQr.fbQr = imageUrl(text(row.fb_qr));
+    if (row.fb_name) byQr.fbName = text(row.fb_name);
+  }
   for (const row of rows || []) {
     const byLogo = entry(row.branch);
     if (byLogo && !byLogo.logo && row.logo) byLogo.logo = imageUrl(text(row.logo));

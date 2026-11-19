@@ -19,6 +19,7 @@ const SHEET_TABLES = new Set([
   'ageing_banner',
   'usability',
   'branch_details',
+  'branch_qr',
   'specs',
   'criteria_segment_application',
   'dv_transposed',
@@ -549,7 +550,7 @@ function getInitialData() {
     // Reco Table page: each branch's EXCEED / MEET / BUDGET and their alternatives per segment (DB sheet J–P).
     recoDbData: getRows('reco_db'),
     // Flyers page: each branch's logo, store name and address (LOGO sheet E–I).
-    branchDetails: makeBranchDetails(getRows('branch_details'), normalizeImageUrl),
+    branchDetails: makeBranchDetails(getRows('branch_details'), normalizeImageUrl, getRows('branch_qr')),
     // Flyers page: each laptop's name, part number and specs (LAPTOP DB sheet).
     laptopDatabase,
     ukspPerSkuData,

@@ -25,6 +25,7 @@ const { BRANCH_DETAILS_RANGE, branchDetailsCollection } = require('./branch-deta
 const { RECO_DB_SHEET, RECO_DB_RANGE, recoDbCollection } = require('./reco-db');
 const { readPriceMatrix } = require('./price-matrix');
 const { PROMO_IMAGES_SHEET, readPromoIcons } = require('./promo-icons');
+const { BRANCH_QR_SHEET, BRANCH_QR_RANGE, branchQrCollection } = require('./branch-qr');
 const {
   LAPTOP_DATABASE_SHEET, LAPTOP_DATABASE_RANGE, UKSP_ICON_SHEET, UKSP_ICON_RANGE,
   parseLaptopDb, laptopDatabaseCollection, bannerSpecsCollection, bannerLaptopsCollection
@@ -274,6 +275,21 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
       result.promo_icons = await readPromoIcons(sheets, spreadsheetId, promoImagesTitle, (message) => onProgress({ phase: 'warning', message }));
     } catch (error) {
       onProgress({ phase: 'warning', message: `${error.message}; the last synced promo pictures are kept.` });
+    }
+  }
+
+  // Quotation: each branch's FB / Viber QR links, TIN and manager (see branch-qr.js); skipped when the tab is missing.
+  const branchQrTitle = titles.find((name) => name.trim().toUpperCase() === BRANCH_QR_SHEET);
+  if (branchQrTitle) {
+    try {
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `'${branchQrTitle.replace(/'/g, "''")}'!${BRANCH_QR_RANGE}`,
+        valueRenderOption: 'FORMATTED_VALUE'
+      });
+      result.branch_qr = branchQrCollection(response.data.values || []);
+    } catch (error) {
+      onProgress({ phase: 'warning', message: `${error.message}; the last synced branch QR codes are kept.` });
     }
   }
 
