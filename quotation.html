@@ -39,13 +39,13 @@
     .btn { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 9px; padding: 8px 14px; font: 700 13px inherit; font-family: inherit; cursor: pointer; background: var(--bar); color: #fff; }
     .btn.light { background: #eef2f7; color: #1e293b; }
     .btn:disabled { opacity: .45; cursor: not-allowed; }
-    .quick { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 16px 0; }
+    .quick { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 6px; }
     .quick button { border: 1px dashed #94a3b8; background: #fff; border-radius: 999px; padding: 5px 12px; font: 600 12px inherit; font-family: inherit; cursor: pointer; color: #1e293b; }
     .quick button b { color: var(--bar); }
     #status { font-size: 12.5px; color: var(--muted); margin-left: auto; }
 
     /* ---------- the A4 sheet ---------- */
-    #page { padding: 18px 16px 40px; display: flex; justify-content: center; }
+    #page { padding: 6px 0 40px; display: flex; justify-content: center; }
     #sheet { width: 794px; min-height: 1123px; background: #fff; padding: 34px 40px 30px; box-shadow: 0 10px 30px rgba(15, 23, 42, .15); font-size: 11.5px; line-height: 1.45; }
     .head { text-align: center; }
     .head img.logo { height: 80px; max-width: 360px; object-fit: contain; }
@@ -109,25 +109,39 @@
     .capturing .detail:empty:before, .capturing .is-empty { display: none !important; }
     @media print { .detail:empty:before, .is-empty { display: none !important; } }
 
-    /* Branch details form */
-    .modal { position: fixed; inset: 0; z-index: 20; background: rgba(15, 23, 42, .45); display: none; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow: auto; }
-    .modal.open { display: flex; }
-    .modal .box { width: 640px; max-width: 100%; background: #fff; border-radius: 14px; box-shadow: 0 20px 50px rgba(0,0,0,.3); padding: 22px 24px; font-size: 13px; }
-    .modal h2 { margin: 0 0 4px; font-size: 18px; color: var(--bar); }
-    .modal .sub { color: var(--muted); margin: 0 0 16px; font-size: 12.5px; }
-    .modal .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
-    .modal label.f { display: flex; flex-direction: column; gap: 5px; font-weight: 700; color: #334155; font-size: 12.5px; }
-    .modal label.f input { font: 500 14px inherit; font-family: inherit; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; }
-    .modal .from-sheet { font-weight: 500; color: var(--muted); font-size: 11px; }
-    .modal .pics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 16px; }
-    .modal .pic { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; text-align: center; font-weight: 700; color: #334155; font-size: 12.5px; }
-    .modal .pic .prev { height: 120px; margin: 8px 0; display: flex; align-items: center; justify-content: center; background: #f8fafc; border-radius: 8px; color: #94a3b8; font-weight: 500; font-size: 11.5px; }
-    .modal .pic .prev img { max-width: 100%; max-height: 120px; object-fit: contain; }
-    .modal .pic .acts { display: flex; gap: 6px; justify-content: center; }
-    .modal .pic .acts button { font: 600 12px inherit; font-family: inherit; border: 1px solid #cbd5e1; background: #fff; border-radius: 7px; padding: 4px 10px; cursor: pointer; }
-    .modal .foot { display: flex; align-items: center; gap: 10px; margin-top: 20px; }
-    .modal .foot .grow { flex: 1; color: var(--muted); font-size: 12px; }
-    .modal .msg { color: #b91c1c; font-weight: 600; font-size: 12px; min-height: 16px; margin-top: 8px; }
+    /* LEFT: Branch details, styled like the Reco Table's Customer Profiling sidebar */
+    .layout { display: flex; align-items: flex-start; gap: 14px; padding: 12px 14px 0; }
+    #main { flex: 1; min-width: 0; }
+    #side { flex: 0 0 270px; position: sticky; top: 64px; max-height: calc(100vh - 76px); overflow-y: auto; overflow-x: hidden; }
+    .side-panel { background: #fff; border: 1px solid #d9e3f0; border-radius: 12px; padding: 10px 9px; box-shadow: 0 4px 20px rgba(0, 18, 179, .04); display: flex; flex-direction: column; gap: 6px; }
+    .side-heading { display: flex; align-items: center; gap: 8px; padding-bottom: 7px; border-bottom: 2px solid #eef3fb; margin-bottom: 1px; }
+    .side-heading > .bi { font-size: 1.25rem; color: #0d6efd; }
+    .side-title { font-size: .9rem; font-weight: 800; color: #0012b3; letter-spacing: -.2px; line-height: 1.15; }
+    .side-sub { font-size: .66rem; color: #64748b; font-weight: 500; line-height: 1.25; }
+    .side-sub.unsaved { color: #b45309; font-weight: 700; }
+    .card { display: flex; flex-direction: column; gap: 3px; background: #f4f8fd; border: 1px solid #cfe0f5; border-radius: 8px; padding: 6px 8px 7px; }
+    .card-label { display: flex; align-items: center; gap: 4px; font-size: .62rem; font-weight: 800; color: #334155; letter-spacing: .4px; text-transform: uppercase; }
+    .card-label .bi { font-size: .7rem; color: #475569; }
+    .card input, .card select { width: 100%; font: 600 12.5px inherit; font-family: inherit; color: #0f172a; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 7px; background: #fff; }
+    .card input:focus, .card select:focus { outline: 2px solid rgba(0, 62, 203, .2); border-color: #0033cc; }
+    .card select:disabled { background: #f8fafc; color: #475569; }
+    .from-sheet { font-size: .62rem; color: #64748b; font-weight: 500; }
+    .from-sheet:empty { display: none; }
+    .pics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+    .pic { min-width: 0; background: #fff; border: 1px solid #dbe5f3; border-radius: 7px; padding: 4px; text-align: center; }
+    .pic-name { font-size: .6rem; font-weight: 700; color: #334155; }
+    .pic .prev { height: 62px; margin: 4px 0; display: flex; align-items: center; justify-content: center; background: #f8fafc; border-radius: 5px; color: #94a3b8; font-size: .58rem; }
+    .pic .prev img { max-width: 100%; max-height: 62px; object-fit: contain; }
+    .pic .acts { display: flex; gap: 3px; justify-content: center; }
+    .pic .acts button { font: 600 11px inherit; font-family: inherit; border: 1px solid #cbd5e1; background: #fff; border-radius: 5px; padding: 1px 0; width: 28px; cursor: pointer; }
+    .pic .acts button:disabled { opacity: .4; cursor: default; }
+    .side-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+    .side-actions .btn { padding: 7px 11px; font-size: 12px; }
+    .side-actions #infoSave { flex: 1; justify-content: center; }
+    .side-note { font-size: .64rem; color: #64748b; line-height: 1.3; }
+    .msg { color: #b91c1c; font-weight: 600; font-size: 11.5px; }
+    .msg:empty { display: none; }
+    @media (max-width: 1150px) { #side { flex-basis: 236px; } }
     .capturing .no-print, .capturing .hint, .capturing .rm { display: none !important; }
     /* an empty QR box only reminds staff on screen; on paper the space stays blank */
     .capturing .qr-empty { visibility: hidden; }
@@ -137,6 +151,7 @@
     @media print {
       @page { size: A4; margin: 0; }
       html, body { background: #fff; }
+      .layout { display: block; padding: 0; }
       #bar, .quick, .no-print, .hint, .rm { display: none !important; }
       #page { padding: 0; }
       #sheet { box-shadow: none; }
@@ -147,18 +162,55 @@
 <body>
 <div id="bar" class="no-print">
   <h1><i class="bi bi-file-earmark-text"></i> QUOTATION</h1>
-  <label class="field">Branch <select id="branch" aria-label="Branch"></select></label>
   <div class="add-wrap">
     <i class="bi bi-search" aria-hidden="true"></i>
     <input id="search" type="search" placeholder="Add a laptop: type model, part number or SKU (Ctrl+Shift+L)" autocomplete="off" spellcheck="false" aria-label="Add a laptop">
     <div id="results" role="listbox"></div>
   </div>
-  <button id="branchInfoBtn" type="button" class="btn light" title="TIN, mobile, branch manager, QR codes and logo of this branch"><i class="bi bi-shop"></i> Branch details</button>
   <button id="newQuote" type="button" class="btn light" title="Start a new quotation"><i class="bi bi-file-earmark-plus"></i> New</button>
   <button id="download" type="button" class="btn" title="Save as PDF (Ctrl+D)"><i class="bi bi-download"></i> Download PDF</button>
   <button id="print" type="button" class="btn" title="Print (Ctrl+P)"><i class="bi bi-printer"></i> Print</button>
   <span id="status"></span>
 </div>
+<div class="layout">
+<!-- LEFT: Branch details (like the Reco Table's Customer Profiling), saved on this laptop per branch -->
+<aside id="side" class="no-print">
+  <div class="side-panel">
+    <div class="side-heading">
+      <i class="bi bi-shop"></i>
+      <div>
+        <div class="side-title">Branch Details</div>
+        <div class="side-sub" id="infoSub">Saved on this laptop</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label"><i class="bi bi-geo-alt"></i> BRANCH</div>
+      <select id="branch" aria-label="Branch"></select>
+    </div>
+    <label class="card"><span class="card-label"><i class="bi bi-receipt"></i> TIN</span><input id="f_tin" autocomplete="off" placeholder="e.g. 229-918-217-0004"><span class="from-sheet" data-sheet="tin"></span></label>
+    <label class="card"><span class="card-label"><i class="bi bi-phone"></i> MOBILE</span><input id="f_mobile" autocomplete="off" placeholder="e.g. 09178789511"><span class="from-sheet" data-sheet="mobile"></span></label>
+    <label class="card"><span class="card-label"><i class="bi bi-person-badge"></i> BRANCH MANAGER</span><input id="f_manager" autocomplete="off" placeholder="Name"><span class="from-sheet" data-sheet="manager"></span></label>
+    <label class="card"><span class="card-label"><i class="bi bi-telephone"></i> MANAGER NO.</span><input id="f_managerNo" autocomplete="off" placeholder="e.g. 09665897891"><span class="from-sheet" data-sheet="managerNo"></span></label>
+    <div class="card">
+      <div class="card-label"><i class="bi bi-qr-code"></i> QR CODES &amp; LOGO</div>
+      <div class="pics">
+        <div class="pic" data-pic="viberQr"><div class="pic-name">Viber QR</div><div class="prev"></div><div class="acts"><button type="button" data-choose title="Choose a picture" aria-label="Choose a picture"><i class="bi bi-upload"></i></button><button type="button" data-remove title="Remove the picture" aria-label="Remove">✕</button></div></div>
+        <div class="pic" data-pic="fbQr"><div class="pic-name">FB page QR</div><div class="prev"></div><div class="acts"><button type="button" data-choose title="Choose a picture" aria-label="Choose a picture"><i class="bi bi-upload"></i></button><button type="button" data-remove title="Remove the picture" aria-label="Remove">✕</button></div></div>
+        <div class="pic" data-pic="logo"><div class="pic-name">Branch logo</div><div class="prev"></div><div class="acts"><button type="button" data-choose title="Choose a picture" aria-label="Choose a picture"><i class="bi bi-upload"></i></button><button type="button" data-remove title="Remove the picture" aria-label="Remove">✕</button></div></div>
+      </div>
+    </div>
+    <input id="picFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+    <div class="msg" id="infoMsg"></div>
+    <div class="side-actions">
+      <button type="button" class="btn" id="infoSave"><i class="bi bi-check2"></i> Save</button>
+      <button type="button" class="btn light" id="infoCancel" title="Go back to what is saved">Undo</button>
+      <button type="button" class="btn light" id="infoReset" title="Forget what was saved here and use the LOGO sheet">Use LOGO sheet</button>
+    </div>
+    <div class="side-note">Stays the same on every quotation until someone changes it here and presses Save.</div>
+  </div>
+</aside>
+
+<main id="main">
 <div id="quick" class="quick no-print"></div>
 
 <div id="page">
@@ -217,31 +269,7 @@
     </div>
   </div>
 </div>
-
-<div id="infoModal" class="modal no-print" role="dialog" aria-modal="true" aria-labelledby="infoTitle">
-  <div class="box">
-    <h2 id="infoTitle">Branch details</h2>
-    <p class="sub" id="infoSub"></p>
-    <div class="grid">
-      <label class="f">TIN <input id="f_tin" autocomplete="off"><span class="from-sheet" data-sheet="tin"></span></label>
-      <label class="f">Mobile <input id="f_mobile" autocomplete="off"><span class="from-sheet" data-sheet="mobile"></span></label>
-      <label class="f">Branch manager <input id="f_manager" autocomplete="off"><span class="from-sheet" data-sheet="manager"></span></label>
-      <label class="f">Manager no. <input id="f_managerNo" autocomplete="off"><span class="from-sheet" data-sheet="managerNo"></span></label>
-    </div>
-    <div class="pics">
-      <div class="pic" data-pic="viberQr">Viber QR code<div class="prev"></div><div class="acts"><button type="button" data-choose>Choose picture…</button><button type="button" data-remove>Remove</button></div></div>
-      <div class="pic" data-pic="fbQr">FB page QR code<div class="prev"></div><div class="acts"><button type="button" data-choose>Choose picture…</button><button type="button" data-remove>Remove</button></div></div>
-      <div class="pic" data-pic="logo">Branch logo<div class="prev"></div><div class="acts"><button type="button" data-choose>Choose picture…</button><button type="button" data-remove>Remove</button></div></div>
-    </div>
-    <input id="picFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
-    <div class="msg" id="infoMsg"></div>
-    <div class="foot">
-      <span class="grow">Saved on this laptop. It stays the same until someone changes it here.</span>
-      <button type="button" class="btn light" id="infoReset" title="Forget what was saved here and use the LOGO sheet">Use LOGO sheet</button>
-      <button type="button" class="btn light" id="infoCancel">Cancel</button>
-      <button type="button" class="btn" id="infoSave"><i class="bi bi-check2"></i> Save</button>
-    </div>
-  </div>
+</main>
 </div>
 
 <script>
@@ -351,33 +379,44 @@
     setImage(el("viberQr"), branchValue("viberQr"), "qr", "Viber QR code", "Viber QR: add it in Branch details");
     setImage(el("fbQr"), branchValue("fbQr"), "qr", "FB page QR code", "FB QR: add it in Branch details");
     setImage(el("branchLogo"), branchValue("logo"), "branch-logo", "Branch logo", "");
+    // The panel follows the branch, but never wipes changes that are not saved yet (e.g. on a data refresh).
+    if (!dirty) fillInfo();
   }
 
-  // ---------- the Branch details form ----------
-  var form = null; // the pictures chosen in the open form: { viberQr, fbQr, logo }
-  var choosing = "";
-  function openInfo() {
-    var s = saved(), d = details();
-    el("infoSub").textContent = "Branch " + (branch() || "—") + (s && s.savedAt ? " · saved " + new Date(s.savedAt).toLocaleString() : " · not saved yet: showing the LOGO sheet's details");
-    TEXT_FIELDS.forEach(function (f) { el("f_" + f).value = branchValue(f); });
-    Array.prototype.forEach.call(document.querySelectorAll("[data-sheet]"), function (span) {
-      var v = d[span.getAttribute("data-sheet")];
-      span.textContent = v ? "LOGO sheet: " + v : "";
+  // ---------- the Branch details panel (left) ----------
+  // It always shows the selected branch's details; changes count only after Save.
+  var form = { viberQr: '', fbQr: '', logo: '' }; // the pictures in the panel
+  var dirty = false;
+  var choosing = '';
+  function setDirty(on) {
+    dirty = on;
+    var s = saved();
+    var sub = el('infoSub');
+    sub.classList.toggle('unsaved', on);
+    sub.textContent = on ? 'Not saved yet: press Save'
+      : s && s.savedAt ? 'Saved on this laptop · ' + new Date(s.savedAt).toLocaleString()
+      : 'Not saved yet · from the LOGO sheet';
+    el('infoSave').disabled = !on;
+    el('infoCancel').disabled = !on;
+    el('infoReset').disabled = !s;
+  }
+  function fillInfo() {
+    var d = details();
+    TEXT_FIELDS.forEach(function (f) { el('f_' + f).value = branchValue(f); });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-sheet]'), function (span) {
+      var v = d[span.getAttribute('data-sheet')];
+      span.textContent = saved() && v ? 'LOGO sheet: ' + v : '';
     });
-    form = {};
     PIC_FIELDS.forEach(function (f) { form[f] = branchValue(f); });
     renderPics();
-    el("infoMsg").textContent = "";
-    el("infoReset").disabled = !s;
-    el("infoModal").classList.add("open");
-    el("f_tin").focus();
+    el('infoMsg').textContent = '';
+    setDirty(false);
   }
-  function closeInfo() { el("infoModal").classList.remove("open"); form = null; }
   function renderPics() {
-    Array.prototype.forEach.call(document.querySelectorAll("[data-pic]"), function (box) {
-      var f = box.getAttribute("data-pic"), url = form[f], prev = box.querySelector(".prev");
-      box.querySelector("[data-remove]").disabled = !url;
-      if (!url) { prev.textContent = "No picture"; return; }
+    Array.prototype.forEach.call(document.querySelectorAll('[data-pic]'), function (box) {
+      var f = box.getAttribute('data-pic'), url = form[f], prev = box.querySelector('.prev');
+      box.querySelector('[data-remove]').disabled = !url;
+      if (!url) { prev.textContent = 'No picture'; return; }
       picture(url).then(function (src) { prev.innerHTML = '<img alt="" src="' + esc(src) + '">'; });
     });
   }
@@ -402,51 +441,49 @@
       reader.readAsDataURL(file);
     });
   }
-  el("infoModal").addEventListener("click", function (e) {
-    if (e.target === el("infoModal")) return closeInfo();
-    var box = e.target.closest("[data-pic]");
+  el('side').addEventListener('click', function (e) {
+    var box = e.target.closest('[data-pic]');
     if (!box) return;
-    if (e.target.closest("[data-choose]")) { choosing = box.getAttribute("data-pic"); el("picFile").value = ""; el("picFile").click(); }
-    if (e.target.closest("[data-remove]")) { form[box.getAttribute("data-pic")] = ""; renderPics(); }
+    if (e.target.closest('[data-choose]')) { choosing = box.getAttribute('data-pic'); el('picFile').value = ''; el('picFile').click(); }
+    if (e.target.closest('[data-remove]')) { form[box.getAttribute('data-pic')] = ''; renderPics(); setDirty(true); }
   });
-  el("picFile").addEventListener("change", function () {
-    var file = el("picFile").files[0];
-    if (!file || !choosing || !form) return;
-    if (file.size > 15 * 1024 * 1024) { el("infoMsg").textContent = "That picture is too large (over 15 MB)."; return; }
-    readPicture(file).then(function (url) { form[choosing] = url; el("infoMsg").textContent = ""; renderPics(); })
-      .catch(function (err) { el("infoMsg").textContent = err.message; });
+  TEXT_FIELDS.forEach(function (f) { el('f_' + f).addEventListener('input', function () { setDirty(true); }); });
+  el('picFile').addEventListener('change', function () {
+    var file = el('picFile').files[0];
+    if (!file || !choosing) return;
+    if (file.size > 15 * 1024 * 1024) { el('infoMsg').textContent = 'That picture is too large (over 15 MB).'; return; }
+    readPicture(file).then(function (url) { form[choosing] = url; el('infoMsg').textContent = ''; renderPics(); setDirty(true); })
+      .catch(function (err) { el('infoMsg').textContent = err.message; });
   });
-  el("infoSave").addEventListener("click", function () {
+  el('infoSave').addEventListener('click', function () {
     var entry = { savedAt: new Date().toISOString() };
-    TEXT_FIELDS.forEach(function (f) { entry[f] = el("f_" + f).value.replace(/\s+/g, " ").trim(); });
-    PIC_FIELDS.forEach(function (f) { entry[f] = form[f] || ""; });
+    TEXT_FIELDS.forEach(function (f) { entry[f] = el('f_' + f).value.replace(/\s+/g, ' ').trim(); });
+    PIC_FIELDS.forEach(function (f) { entry[f] = form[f] || ''; });
     var next = Object.assign({}, savedInfo);
     next[branch()] = entry;
     try {
       localStorage.setItem(INFO_KEY, JSON.stringify(next));
     } catch (e) {
-      el("infoMsg").textContent = "Could not save: the pictures are too large. Choose smaller pictures and try again.";
+      el('infoMsg').textContent = 'Could not save: the pictures are too large. Choose smaller pictures and try again.';
       return;
     }
     savedInfo = next;
-    closeInfo();
+    dirty = false;
     renderHeader();
-    el("status").textContent = "Branch details saved";
+    el('status').textContent = 'Branch details saved';
   });
-  el("infoReset").addEventListener("click", function () {
-    if (!confirm("Forget the details saved for " + branch() + " on this laptop and use the LOGO sheet's?")) return;
+  el('infoReset').addEventListener('click', function () {
+    if (!confirm('Forget the details saved for ' + branch() + ' on this laptop and use the LOGO sheet’s?')) return;
     delete savedInfo[branch()];
     try { localStorage.setItem(INFO_KEY, JSON.stringify(savedInfo)); } catch (e) { /* kept in memory */ }
-    closeInfo();
+    dirty = false;
     renderHeader();
-    el("status").textContent = "Using the LOGO sheet's details";
+    el('status').textContent = 'Using the LOGO sheet’s details';
   });
-  el("infoCancel").addEventListener("click", closeInfo);
-  el("branchInfoBtn").addEventListener("click", openInfo);
-  // Enter saves, Esc closes.
-  el("infoModal").addEventListener("keydown", function (e) {
-    if (e.key === "Escape") { e.preventDefault(); closeInfo(); }
-    else if (e.key === "Enter" && e.target instanceof HTMLInputElement) { e.preventDefault(); el("infoSave").click(); }
+  el('infoCancel').addEventListener('click', fillInfo);
+  // Enter in a field saves.
+  el('side').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && e.target instanceof HTMLInputElement && dirty) { e.preventDefault(); el('infoSave').click(); }
   });
 
   // ---------- laptops ----------
@@ -601,6 +638,12 @@
 
   // ---------- toolbar ----------
   el("branch").addEventListener("change", function () {
+    // Unsaved branch details are dropped when another branch is chosen (after asking).
+    if (dirty && !confirm("The branch details of " + branch() + " are not saved. Switch branch without saving them?")) {
+      el("branch").value = branch();
+      return;
+    }
+    dirty = false;
     draft.branch = el("branch").value;
     // Prices and freebies follow the branch (an edited price is replaced too).
     draft.lines.forEach(function (line) {
