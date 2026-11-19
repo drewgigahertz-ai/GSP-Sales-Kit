@@ -388,36 +388,102 @@
       background: var(--bad);
     }
 
-    /* ---------- Tabs ---------- */
+    /* ---------- Tabs: a sidebar on the left, below the top bar ---------- */
+    :root {
+      --topbar-height: 66px;
+      --sidebar-width: 208px;
+    }
+
     .nav-tabs-top {
+      position: fixed;
+      top: var(--topbar-height);
+      left: 0;
+      bottom: 0;
+      z-index: 4;
       display: flex;
-      gap: 4px;
-      padding: 4px;
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.12);
+      flex-direction: column;
+      gap: 3px;
+      width: var(--sidebar-width);
+      padding: 14px 10px;
+      overflow-y: auto;
+      background: linear-gradient(180deg, #000a6b, #00118f);
+      box-shadow: 4px 0 18px rgba(0, 18, 179, 0.18);
     }
 
     .nav-tab {
-      display: inline-flex;
+      display: flex;
       align-items: center;
-      gap: 7px;
-      padding: 7px 14px;
+      gap: 10px;
+      width: 100%;
+      padding: 10px 12px;
       border: 0;
-      border-radius: 9px;
+      border-radius: 10px;
       background: transparent;
-      color: rgba(255, 255, 255, 0.82);
+      color: rgba(255, 255, 255, 0.8);
       font: inherit;
-      font-size: 0.84rem;
+      font-size: 0.86rem;
       font-weight: 700;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    .nav-tab .bi {
+      font-size: 1rem;
+      width: 18px;
+      text-align: center;
     }
 
     .nav-tab:hover {
       color: #fff;
+      background: rgba(255, 255, 255, 0.08);
     }
 
     .nav-tab.active {
       background: #fff;
       color: var(--brand);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+    }
+
+    /* Counts (online laptops, data health, update) sit at the right end of the tab. */
+    .nav-tab .nav-badge {
+      margin-left: auto;
+    }
+
+    /* The pages make room for the sidebar. */
+    body {
+      padding-left: var(--sidebar-width);
+    }
+
+    .topbar {
+      margin-left: calc(-1 * var(--sidebar-width));
+      min-height: var(--topbar-height);
+    }
+
+    /* Narrow windows: icons only. */
+    @media (max-width: 900px) {
+      :root {
+        --sidebar-width: 62px;
+      }
+
+      .nav-tab {
+        justify-content: center;
+        padding: 10px 0;
+        font-size: 0;
+        position: relative;
+      }
+
+      .nav-tab .bi {
+        font-size: 1.1rem;
+      }
+
+      .nav-tab .nav-badge {
+        position: absolute;
+        top: 2px;
+        right: 4px;
+        font-size: 0.6rem;
+        min-width: 16px;
+        padding: 0 4px;
+      }
     }
 
     .nav-badge {
@@ -905,14 +971,14 @@
       </div>
     </div>
     <nav class="nav-tabs-top" role="tablist">
-      <button class="nav-tab active" data-view="overview" role="tab"><i class="bi bi-speedometer2"></i> Overview</button>
-      <button class="nav-tab" data-view="data" role="tab"><i class="bi bi-table"></i> Data</button>
-      <button class="nav-tab" data-view="health" role="tab"><i class="bi bi-clipboard2-pulse"></i> Data health <span class="nav-badge is-alert" id="healthBadge" hidden>0</span></button>
-      <button class="nav-tab" data-view="devices" role="tab"><i class="bi bi-laptop"></i> Devices <span class="nav-badge" id="onlineBadge" hidden>0</span></button>
-      <button class="nav-tab" data-view="users" role="tab"><i class="bi bi-people"></i> Users</button>
-      <button class="nav-tab" data-view="prices" role="tab"><i class="bi bi-tags"></i> Price changes</button>
-      <button class="nav-tab" data-view="backups" role="tab"><i class="bi bi-archive"></i> Backups</button>
-      <button class="nav-tab" data-view="updates" role="tab"><i class="bi bi-cloud-arrow-down"></i> Updates <span class="nav-badge" id="updateBadge" hidden>1</span></button>
+      <button class="nav-tab active" data-view="overview" role="tab" title="Overview"><i class="bi bi-speedometer2"></i> Overview</button>
+      <button class="nav-tab" data-view="data" role="tab" title="Data"><i class="bi bi-table"></i> Data</button>
+      <button class="nav-tab" data-view="health" role="tab" title="Data health"><i class="bi bi-clipboard2-pulse"></i> Data health <span class="nav-badge is-alert" id="healthBadge" hidden>0</span></button>
+      <button class="nav-tab" data-view="devices" role="tab" title="Devices"><i class="bi bi-laptop"></i> Devices <span class="nav-badge" id="onlineBadge" hidden>0</span></button>
+      <button class="nav-tab" data-view="users" role="tab" title="Users"><i class="bi bi-people"></i> Users</button>
+      <button class="nav-tab" data-view="prices" role="tab" title="Price changes"><i class="bi bi-tags"></i> Price changes</button>
+      <button class="nav-tab" data-view="backups" role="tab" title="Backups"><i class="bi bi-archive"></i> Backups</button>
+      <button class="nav-tab" data-view="updates" role="tab" title="Updates"><i class="bi bi-cloud-arrow-down"></i> Updates <span class="nav-badge" id="updateBadge" hidden>1</span></button>
     </nav>
     <div class="status-pill" id="statusPill"><span class="status-dot"></span><span id="statusText">Starting…</span></div>
   </header>
