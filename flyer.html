@@ -1322,7 +1322,7 @@ body.is-loading { overflow: hidden; }
     if (e.key === "?" && !typing && !ctrl && !e.altKey) { e.preventDefault(); toParent({ channel: "saleskit-flyer-help" }); return; }
     if (e.key === "Escape" && el("dlModal").style.display === "flex") { e.preventDefault(); closeModal(); return; }
     if (!ctrl || e.altKey) return;
-    if (!e.shiftKey && /^Digit[1-4]$/.test(e.code)) {
+    if (!e.shiftKey && /^Digit[1-5]$/.test(e.code)) {
       e.preventDefault();
       toParent({ channel: "saleskit-flyer-hotkey", keys: { ctrl: true, shift: false, alt: false, code: e.code } });
     } else if (e.code === "KeyD") { e.preventDefault(); el("download").click(); }

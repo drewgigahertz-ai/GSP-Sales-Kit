@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Quotation</title>
+  <!-- QUOTATION tab, shown in a frame by quotation-bridge.js: the centralized quotation format (one A4 page).
+       Branch header and signature from the LOGO sheet (address, TIN, mobile, branch manager, Viber / FB QR codes);
+       laptop lines from LAPTOP DB (model, part number, specs) and NEW PRICING (the branch's cash price, editable,
+       and its promo / freebie). Customer name from the Reco Table. Saved as PDF or printed. -->
+  <link href="./node_modules/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="./node_modules/@fontsource/plus-jakarta-sans/400.css" rel="stylesheet">
+  <link href="./node_modules/@fontsource/plus-jakarta-sans/500.css" rel="stylesheet">
+  <link href="./node_modules/@fontsource/plus-jakarta-sans/600.css" rel="stylesheet">
+  <link href="./node_modules/@fontsource/plus-jakarta-sans/700.css" rel="stylesheet">
+  <link href="./node_modules/@fontsource/plus-jakarta-sans/800.css" rel="stylesheet">
+  <script src="./node_modules/html2canvas/dist/html2canvas.min.js"></script>
+  <script src="./node_modules/jspdf/dist/jspdf.umd.min.js"></script>
+  <style>
+    :root { --ink: #111827; --muted: #64748b; --blue: #0026e6; --line: #1f2937; --head: #d9d9d9; --bar: #0012b3; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: #e9edf5; color: var(--ink); font-family: "Plus Jakarta Sans", Arial, sans-serif; }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+    /* ---------- toolbar (never printed) ---------- */
+    #bar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 16px; background: #fff; border-bottom: 1px solid #dbe3ee; box-shadow: 0 2px 10px rgba(15, 23, 42, .06); }
+    #bar h1 { margin: 0 8px 0 0; font-size: 16px; font-weight: 800; color: var(--bar); letter-spacing: .3px; }
+    .field { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--muted); }
+    .field select { font: 600 13px inherit; font-family: inherit; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; }
+    .add-wrap { position: relative; flex: 1 1 320px; max-width: 520px; }
+    .add-wrap input { width: 100%; font: 500 13px inherit; font-family: inherit; padding: 8px 10px 8px 32px; border: 1px solid #cbd5e1; border-radius: 9px; }
+    .add-wrap .bi { position: absolute; left: 11px; top: 9px; color: var(--muted); }
+    #results { position: absolute; left: 0; right: 0; top: calc(100% + 4px); max-height: 360px; overflow: auto; background: #fff; border: 1px solid #cbd5e1; border-radius: 10px; box-shadow: 0 12px 30px rgba(0,0,0,.15); display: none; }
+    #results.open { display: block; }
+    #results button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 12px; font: inherit; font-size: 12.5px; cursor: pointer; border-bottom: 1px solid #f1f5f9; }
+    #results button:hover, #results button.active { background: #eef3ff; }
+    #results b { color: var(--bar); }
+    #results small { display: block; color: var(--muted); }
+    #results .none { padding: 10px 12px; color: var(--muted); font-size: 12.5px; }
+    .btn { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 9px; padding: 8px 14px; font: 700 13px inherit; font-family: inherit; cursor: pointer; background: var(--bar); color: #fff; }
+    .btn.light { background: #eef2f7; color: #1e293b; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .quick { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 16px 0; }
+    .quick button { border: 1px dashed #94a3b8; background: #fff; border-radius: 999px; padding: 5px 12px; font: 600 12px inherit; font-family: inherit; cursor: pointer; color: #1e293b; }
+    .quick button b { color: var(--bar); }
+    #status { font-size: 12.5px; color: var(--muted); margin-left: auto; }
+
+    /* ---------- the A4 sheet ---------- */
+    #page { padding: 18px 16px 40px; display: flex; justify-content: center; }
+    #sheet { width: 794px; min-height: 1123px; background: #fff; padding: 34px 40px 30px; box-shadow: 0 10px 30px rgba(15, 23, 42, .15); font-size: 11.5px; line-height: 1.45; }
+    .head { text-align: center; }
+    .head img.logo { height: 80px; max-width: 360px; object-fit: contain; }
+    .head .addr { margin-top: 6px; font-weight: 700; font-size: 11px; white-space: pre-line; }
+    .head .ids { font-weight: 700; font-size: 11px; margin-top: 2px; }
+    .meta { margin-top: 26px; display: grid; grid-template-columns: 120px 1fr 60px 170px; row-gap: 6px; align-items: center; }
+    .meta .lbl { color: #333; }
+    .meta .date { text-align: right; }
+    input.plain, textarea.plain { border: 0; border-bottom: 1px dashed transparent; background: transparent; font: inherit; color: inherit; padding: 1px 2px; width: 100%; outline: none; }
+    input.plain:hover, textarea.plain:hover { border-bottom-color: #cbd5e1; }
+    input.plain:focus, textarea.plain:focus { border-bottom-color: var(--blue); background: #f5f8ff; }
+    .meta .strong input { font-weight: 800; font-size: 13.5px; }
+    .meta .date input { font-weight: 800; font-size: 13.5px; text-align: right; }
+    .intro { margin: 18px 0 10px; }
+
+    table.q { width: 100%; border-collapse: collapse; border: 2px solid var(--line); }
+    table.q th { background: var(--head); border: 2px solid var(--line); padding: 3px 4px; font-weight: 800; font-size: 12px; }
+    table.q td { border: 1px solid var(--line); vertical-align: top; padding: 4px 5px; }
+    table.q td.model { width: 150px; text-align: center; vertical-align: middle; font-weight: 700; font-size: 11px; }
+    table.q td.specs { width: 300px; font-size: 11px; }
+    table.q td.specs ul { margin: 0; padding-left: 12px; }
+    table.q td.specs li { margin: 1px 0 3px; }
+    table.q th.c-price { width: 120px; } table.q th.c-qty { width: 115px; } table.q th.c-total { width: 120px; }
+    table.q td.deal { vertical-align: top; padding: 0 4px 6px; }
+    table.q .deal-row { display: grid; grid-template-columns: 120px 115px 1fr; align-items: center; min-height: 92px; }
+    table.q .deal-row input { text-align: center; font-weight: 800; font-size: 13.5px; }
+    table.q .deal-row .total { text-align: right; font-weight: 800; font-size: 13.5px; padding-right: 2px; }
+    table.q .terms { font-size: 11px; padding-top: 4px; }
+    table.q tr.free td { font-size: 11px; vertical-align: middle; }
+    table.q tr.free td.lbl { text-align: center; font-size: 9.5px; }
+    table.q tr.free td.per { text-align: center; font-style: italic; }
+    .line-tools { position: relative; }
+    .rm { position: absolute; left: -32px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; border-radius: 50%; border: 0; background: #fee2e2; color: #b91c1c; cursor: pointer; font-size: 14px; line-height: 24px; text-align: center; }
+    .empty-line td { text-align: center; color: var(--muted); padding: 22px 6px !important; font-size: 12px; }
+    .grand { display: flex; justify-content: flex-end; align-items: baseline; gap: 18px; margin-top: 4px; }
+    .grand .lbl { font-weight: 800; font-size: 13px; }
+    .grand .amt { min-width: 150px; text-align: right; font-weight: 800; font-size: 14px; border-bottom: 3px double #555; padding: 0 2px 2px; }
+
+    .notes { margin-top: 26px; font-size: 11.5px; }
+    .notes p { margin: 0 0 5px; }
+    .notes .row { display: grid; grid-template-columns: 165px 1fr; }
+    .notes .row b { font-weight: 800; }
+    .notes u b, .notes b u { font-weight: 800; }
+    .gap { height: 6px; }
+
+    .sign { margin-top: 18px; }
+    .sign .name { font-weight: 800; font-size: 13px; }
+    .sign .no { font-weight: 800; font-size: 13px; }
+    .qrs { margin-top: 8px; display: grid; grid-template-columns: 110px 1fr auto 110px 150px; align-items: center; gap: 12px; }
+    .qrs img.qr { width: 104px; height: 104px; object-fit: contain; }
+    .qrs .qr-empty { width: 104px; height: 104px; border: 1px dashed #cbd5e1; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 10px; color: #94a3b8; }
+    .qrs .cap { font-style: italic; font-size: 11.5px; }
+    .qrs img.branch-logo { height: 80px; max-width: 140px; object-fit: contain; }
+
+    /* missing details from the LOGO sheet: shown on screen only */
+    .hint { color: #b45309; background: #fef3c7; border-radius: 6px; padding: 1px 6px; font-weight: 600; font-size: 10.5px; }
+    .capturing .no-print, .capturing .hint, .capturing .rm { display: none !important; }
+    /* an empty QR box only reminds staff on screen; on paper the space stays blank */
+    .capturing .qr-empty { visibility: hidden; }
+    @media print { .qr-empty { visibility: hidden; } }
+    .capturing input.plain { border-bottom-color: transparent !important; background: transparent !important; }
+
+    @media print {
+      @page { size: A4; margin: 0; }
+      html, body { background: #fff; }
+      #bar, .quick, .no-print, .hint, .rm { display: none !important; }
+      #page { padding: 0; }
+      #sheet { box-shadow: none; }
+      input.plain { border-bottom-color: transparent !important; }
+    }
+  </style>
+</head>
+<body>
+<div id="bar" class="no-print">
+  <h1><i class="bi bi-file-earmark-text"></i> QUOTATION</h1>
+  <label class="field">Branch <select id="branch" aria-label="Branch"></select></label>
+  <div class="add-wrap">
+    <i class="bi bi-search" aria-hidden="true"></i>
+    <input id="search" type="search" placeholder="Add a laptop: type model, part number or SKU (Ctrl+Shift+L)" autocomplete="off" spellcheck="false" aria-label="Add a laptop">
+    <div id="results" role="listbox"></div>
+  </div>
+  <button id="newQuote" type="button" class="btn light" title="Start a new quotation"><i class="bi bi-file-earmark-plus"></i> New</button>
+  <button id="download" type="button" class="btn" title="Save as PDF (Ctrl+D)"><i class="bi bi-download"></i> Download PDF</button>
+  <button id="print" type="button" class="btn" title="Print (Ctrl+P)"><i class="bi bi-printer"></i> Print</button>
+  <span id="status"></span>
+</div>
+<div id="quick" class="quick no-print"></div>
+
+<div id="page">
+  <div id="sheet">
+    <div class="head">
+      <img id="logo" class="logo" alt="Gigahertz">
+      <div id="addr" class="addr"></div>
+      <div id="ids" class="ids"></div>
+    </div>
+
+    <div class="meta">
+      <div></div><div></div>
+      <div class="lbl">Date:</div><div class="date"><input id="date" class="plain" aria-label="Date"></div>
+      <div class="lbl">Customer Name:</div><div class="strong"><input id="customer" class="plain" placeholder="Customer name" aria-label="Customer name"></div><div></div><div></div>
+      <div class="lbl">Contact No.:</div><div class="strong"><input id="contact" class="plain" placeholder="Contact number" aria-label="Contact number"></div><div></div><div></div>
+    </div>
+
+    <p class="intro">Please see the quotation below.</p>
+
+    <table class="q">
+      <thead><tr><th>Model</th><th>Specs</th><th class="c-price">Price per Unit</th><th class="c-qty">Quantity</th><th class="c-total">Total Price</th></tr></thead>
+      <tbody id="lines"></tbody>
+    </table>
+    <div class="grand"><span class="lbl">TOTAL</span><span id="grand" class="amt">0.00</span></div>
+
+    <div class="notes">
+      <p>The above prices are VAT-inclusive and are subject to change without prior notice.</p>
+      <p>To proceed with the order, kindly provide a Purchase Order and at least a 30% down payment.</p>
+      <p>Freebies may vary based on availability.</p>
+      <div class="gap"></div>
+      <p>For <b><u>check payments</u></b>, please make checks payable to:</p>
+      <div class="row"><span>Account Name:</span><b>GHERTZ Computer Corp.</b></div>
+      <div class="row"><span>Account Number:</span><b>00402 802 2005</b></div>
+      <p>Clearing: BDO-to-BDO (On-Us) clears same day; other banks (LCK) take 3 business days.</p>
+      <div class="gap"></div>
+      <p>For <b><u>bank transfers</u></b>, please see the details below:</p>
+      <div class="row"><span>Bank:</span><b>BDO</b></div>
+      <div class="row"><span>Account Name:</span><b>GHERTZ Computer Corp.</b></div>
+      <div class="row"><span>Account Number:</span><b>00402 802 2005</b></div>
+      <p><b>Note:</b> Please use <b><u>InstaPay</u></b> for bank transfer transactions to ensure real time processing.</p>
+      <div class="gap"></div>
+      <p>For inquiries, contact our Viber or FB page below.</p>
+      <p>Thank you and have a great day,</p>
+    </div>
+
+    <div class="sign">
+      <div class="name"><span id="manager"></span> - Branch Manager</div>
+      <div class="no" id="managerNo"></div>
+      <div class="qrs">
+        <div id="viberQr"></div>
+        <div class="cap">*Please scan for a direct<br>Viber contact.</div>
+        <div id="branchLogo"></div>
+        <div id="fbQr"></div>
+        <div class="cap" id="fbCap">scan to visit our Official<br><b>Gigahertz</b> FB Page</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var el = function (id) { return document.getElementById(id); };
+  function toParent(message) { window.parent.postMessage(message, "*"); }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function key(v) { return String(v || "").toUpperCase().replace(/\s+/g, " ").trim(); }
+  function money(n) { return (Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function toNumber(v) { var n = Number(String(v == null ? "" : v).replace(/[^\d.\-]/g, "")); return isFinite(n) ? n : 0; }
+  function today() { return new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }); }
+
+  // ---------- state ----------
+  var DRAFT_KEY = "saleskit.quotation.draft";
+  var data = { laptops: [], branchDetails: {}, logos: {}, homeBranch: "", branches: [], lockBranch: false };
+  var byCode = {};
+  var picks = { exceed: "", meet: "", budget: "" };
+  var recoName = "";
+  var draft = loadDraft() || { branch: "", date: today(), customer: "", customerTyped: false, contact: "", lines: [] };
+
+  function loadDraft() { try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || "null"); } catch (e) { return null; } }
+  function saveDraft() { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch (e) { /* not saved */ } }
+
+  // ---------- pictures (saved on this laptop by the app, so they show offline and in the PDF) ----------
+  var imageWaiters = {}, imageSeq = 0, imageCache = {};
+  function picture(url) {
+    if (!url) return Promise.resolve("");
+    if (imageCache[url]) return imageCache[url];
+    imageCache[url] = new Promise(function (resolve) {
+      var id = "q" + (++imageSeq);
+      imageWaiters[id] = resolve;
+      toParent({ channel: "saleskit-quotation-image", requestId: id, url: url });
+      setTimeout(function () { if (imageWaiters[id]) { delete imageWaiters[id]; resolve(url); } }, 8000);
+    });
+    return imageCache[url];
+  }
+  function setImage(holder, url, cls, alt, emptyText) {
+    if (!url) { holder.innerHTML = emptyText ? '<div class="qr-empty">' + esc(emptyText) + "</div>" : ""; return; }
+    picture(url).then(function (src) {
+      holder.innerHTML = '<img class="' + cls + '" alt="' + esc(alt) + '" src="' + esc(src) + '">';
+    });
+  }
+
+  // ---------- the branch ----------
+  function branch() { return key(draft.branch || data.homeBranch); }
+  function details() { return data.branchDetails[branch()] || {}; }
+  function fillBranches() {
+    var list = data.branches.slice();
+    var sel = el("branch");
+    sel.innerHTML = list.map(function (b) { return "<option" + (b === branch() ? " selected" : "") + ">" + esc(b) + "</option>"; }).join("");
+    if (!list.length) sel.innerHTML = "<option>" + esc(branch() || "—") + "</option>";
+    sel.disabled = data.lockBranch && list.length <= 1;
+  }
+  function renderHeader() {
+    var d = details();
+    picture(data.logos.blue || data.logos.header).then(function (src) { if (src) el("logo").src = src; });
+    el("addr").textContent = d.address || "";
+    if (!d.address) el("addr").innerHTML = '<span class="hint">No address for ' + esc(branch() || "this branch") + " in the LOGO sheet</span>";
+    var ids = [d.tin ? "TIN: " + d.tin : "", d.mobile ? "Mobile: " + d.mobile : ""].filter(Boolean).join(" | ");
+    el("ids").innerHTML = ids ? esc(ids) : '<span class="hint">Add TIN and MOBILE for ' + esc(branch()) + " in the LOGO sheet</span>";
+    el("manager").innerHTML = d.manager ? esc(d.manager) : '<span class="hint">BRANCH MANAGER (LOGO sheet)</span>';
+    el("managerNo").innerHTML = d.managerNo ? esc(d.managerNo) : '<span class="hint">MANAGER NO. (LOGO sheet)</span>';
+    setImage(el("viberQr"), d.viberQr, "qr", "Viber QR code", "VIBER QR (LOGO sheet)");
+    setImage(el("fbQr"), d.fbQr, "qr", "FB page QR code", "FB QR (LOGO sheet)");
+    var own = d.logo && d.logo !== data.logos.blue ? d.logo : "";
+    setImage(el("branchLogo"), own, "branch-logo", "Branch logo", "");
+  }
+
+  // ---------- laptops ----------
+  function priceFor(laptop) {
+    var b = branch();
+    if (laptop.branchCash && laptop.branchCash[b] != null) return laptop.branchCash[b];
+    return laptop.cash != null ? laptop.cash : 0;
+  }
+  function freebieFor(laptop) {
+    var b = branch();
+    var promo = (laptop.branchPromo && laptop.branchPromo[b]) || laptop.promo || "";
+    return /^no promo$/i.test(promo) ? "" : promo;
+  }
+  function specLines(laptop) {
+    var s = laptop.specs || {};
+    return ["Processor", "Graphics", "Memory", "Storage", "Resolution", "OS"].filter(function (k) { return s[k]; })
+      .map(function (k) { return k + " - " + s[k]; });
+  }
+
+  function addLine(code) {
+    var laptop = byCode[key(code)];
+    if (!laptop) return;
+    draft.lines.push({ code: laptop.code, price: priceFor(laptop), qty: 1, freebie: freebieFor(laptop) });
+    saveDraft();
+    renderLines();
+  }
+
+  function renderLines() {
+    var body = el("lines");
+    if (!draft.lines.length) {
+      body.innerHTML = '<tr class="empty-line"><td colspan="5">No laptop yet. Add one with the search above' + (picks.exceed || picks.meet || picks.budget ? " or the Reco Table buttons." : ".") + "</td></tr>";
+      renderTotal();
+      return;
+    }
+    body.innerHTML = draft.lines.map(function (line, i) {
+      var laptop = byCode[key(line.code)] || { model: line.code, partNumber: "", specs: {} };
+      var specs = specLines(laptop);
+      var total = toNumber(line.price) * (Number(line.qty) || 0);
+      return '<tr class="line-tools" data-i="' + i + '">'
+        + '<td class="model" style="position:relative"><button class="rm no-print" data-rm="' + i + '" title="Remove this laptop" aria-label="Remove">&times;</button>'
+        + esc(laptop.model) + (laptop.partNumber ? "<br>(" + esc(laptop.partNumber) + ")" : "") + "</td>"
+        + '<td class="specs"><ul>' + (specs.length ? specs.map(function (s) { return "<li>" + esc(s) + "</li>"; }).join("") : "<li>" + esc(line.code) + "</li>") + "</ul></td>"
+        + '<td class="deal" colspan="3"><div class="deal-row">'
+        + '<input class="plain" data-k="price" data-i="' + i + '" value="' + esc(money(line.price)) + '" aria-label="Price per unit">'
+        + '<input class="plain" data-k="qty" data-i="' + i + '" value="' + esc(line.qty) + '" inputmode="numeric" aria-label="Quantity">'
+        + '<span class="total" data-total="' + i + '">' + money(total) + "</span></div>"
+        + '<div class="terms">Exclusive price for:<br><br>Cash on Hand, Bank Transfer or Check Payment only.</div></td></tr>'
+        + '<tr class="free"><td class="lbl">Bundle/worth of freebie:</td><td colspan="2"><input class="plain" data-k="freebie" data-i="' + i + '" value="' + esc(line.freebie) + '" placeholder="None" aria-label="Freebie"></td><td colspan="2" class="per">*per unit.</td></tr>';
+    // (the freebie spans Specs and Price, "*per unit." sits under Quantity and Total, as on the printed form)
+    }).join("");
+    renderTotal();
+  }
+  function renderTotal() {
+    var sum = draft.lines.reduce(function (s, l) { return s + toNumber(l.price) * (Number(l.qty) || 0); }, 0);
+    el("grand").textContent = money(sum);
+    el("download").disabled = !draft.lines.length;
+    el("print").disabled = !draft.lines.length;
+  }
+
+  el("lines").addEventListener("input", function (e) {
+    var t = e.target, i = t.getAttribute("data-i"), k = t.getAttribute("data-k");
+    if (i == null || !draft.lines[i]) return;
+    if (k === "qty") draft.lines[i].qty = Math.max(0, Math.round(toNumber(t.value)));
+    else if (k === "price") draft.lines[i].price = toNumber(t.value);
+    else if (k === "freebie") draft.lines[i].freebie = t.value;
+    var cell = document.querySelector('[data-total="' + i + '"]');
+    if (cell) cell.textContent = money(toNumber(draft.lines[i].price) * (Number(draft.lines[i].qty) || 0));
+    saveDraft();
+    renderTotal();
+  });
+  // The price shows as 54,999.00 again when you leave it.
+  el("lines").addEventListener("focusout", function (e) {
+    var t = e.target;
+    if (t.getAttribute("data-k") === "price") t.value = money(draft.lines[t.getAttribute("data-i")].price);
+  });
+  el("lines").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-rm]");
+    if (!b) return;
+    draft.lines.splice(Number(b.getAttribute("data-rm")), 1);
+    saveDraft();
+    renderLines();
+  });
+
+  // ---------- customer, date, contact ----------
+  ["date", "customer", "contact"].forEach(function (id) {
+    el(id).addEventListener("input", function () {
+      draft[id] = el(id).value;
+      if (id === "customer") draft.customerTyped = true;
+      saveDraft();
+    });
+  });
+  function renderMeta() {
+    el("date").value = draft.date || today();
+    el("customer").value = draft.customerTyped ? draft.customer : (recoName || draft.customer || "");
+    el("contact").value = draft.contact || "";
+  }
+
+  // ---------- search ----------
+  var found = [], active = 0;
+  function search() {
+    var words = el("search").value.toLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length) { el("results").classList.remove("open"); return; }
+    found = data.laptops.filter(function (l) {
+      var hay = (l.code + " " + l.model + " " + l.partNumber).toLowerCase();
+      return words.every(function (w) { return hay.indexOf(w) !== -1; });
+    }).slice(0, 40);
+    active = 0;
+    el("results").innerHTML = found.length ? found.map(function (l, i) {
+      var p = priceFor(l);
+      return '<button type="button" data-pick="' + i + '"' + (i === 0 ? ' class="active"' : "") + "><b>" + esc(l.model) + "</b> " + esc(l.partNumber)
+        + (p ? " · PHP " + money(p) : "") + "<small>" + esc(l.code) + "</small></button>";
+    }).join("") : '<div class="none">No laptop matches.</div>';
+    el("results").classList.add("open");
+  }
+  function pick(i) {
+    if (!found[i]) return;
+    addLine(found[i].code);
+    el("search").value = "";
+    el("results").classList.remove("open");
+    el("status").textContent = "Added " + found[i].model;
+  }
+  el("search").addEventListener("input", search);
+  el("search").addEventListener("keydown", function (e) {
+    var buttons = el("results").querySelectorAll("button");
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!buttons.length) return;
+      active = (active + (e.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
+      buttons.forEach(function (b, i) { b.classList.toggle("active", i === active); });
+      buttons[active].scrollIntoView({ block: "nearest" });
+    } else if (e.key === "Enter") { e.preventDefault(); pick(active); }
+    else if (e.key === "Escape") { el("results").classList.remove("open"); }
+  });
+  el("results").addEventListener("mousedown", function (e) {
+    var b = e.target.closest("[data-pick]");
+    if (b) { e.preventDefault(); pick(Number(b.getAttribute("data-pick"))); }
+  });
+  el("search").addEventListener("blur", function () { setTimeout(function () { el("results").classList.remove("open"); }, 150); });
+
+  // The Reco Table's three laptops, one click each.
+  function renderQuick() {
+    var tiers = [["exceed", "Exceed"], ["meet", "Meet"], ["budget", "Budget"]].filter(function (t) { return picks[t[0]] && byCode[key(picks[t[0]])]; });
+    el("quick").innerHTML = tiers.length ? '<span class="field">From the Reco Table:</span>' + tiers.map(function (t) {
+      var l = byCode[key(picks[t[0]])];
+      return '<button type="button" data-tier="' + t[0] + '">+ <b>' + t[1] + ":</b> " + esc(l.model) + " " + esc(l.partNumber) + "</button>";
+    }).join("") : "";
+  }
+  el("quick").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-tier]");
+    if (b) addLine(picks[b.getAttribute("data-tier")]);
+  });
+
+  // ---------- toolbar ----------
+  el("branch").addEventListener("change", function () {
+    draft.branch = el("branch").value;
+    // Prices and freebies follow the branch (an edited price is replaced too).
+    draft.lines.forEach(function (line) {
+      var laptop = byCode[key(line.code)];
+      if (laptop) { line.price = priceFor(laptop); line.freebie = freebieFor(laptop); }
+    });
+    saveDraft();
+    renderHeader();
+    renderLines();
+    renderQuick();
+  });
+  el("newQuote").addEventListener("click", function () {
+    if (draft.lines.length && !confirm("Start a new quotation? This one is cleared.")) return;
+    draft = { branch: draft.branch, date: today(), customer: "", customerTyped: false, contact: "", lines: [] };
+    saveDraft();
+    renderMeta();
+    renderLines();
+  });
+  el("print").addEventListener("click", function () { if (!el("print").disabled) window.print(); });
+
+  function fileName() {
+    var d = new Date(Date.parse(draft.date || el("date").value) || Date.now());
+    var stamp = String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0") + String(d.getFullYear()).slice(-2);
+    var who = (el("customer").value || "CUSTOMER").toUpperCase().replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim();
+    return "QUOTATION - " + who + " " + stamp;
+  }
+  el("download").addEventListener("click", function () {
+    if (el("download").disabled) return;
+    el("status").textContent = "Preparing the PDF…";
+    el("download").disabled = true;
+    document.body.classList.add("capturing");
+    var sheet = el("sheet");
+    var inputs = Array.prototype.slice.call(sheet.querySelectorAll("input"));
+    html2canvas(sheet, {
+      scale: 2, useCORS: true, backgroundColor: "#ffffff",
+      // html2canvas draws text boxes a little off (text cut at the bottom): the copy it draws gets plain text instead.
+      onclone: function (doc) {
+        Array.prototype.slice.call(doc.getElementById("sheet").querySelectorAll("input")).forEach(function (copy, i) {
+          var original = inputs[i], cs = original ? getComputedStyle(original) : null;
+          var span = doc.createElement("span");
+          span.textContent = copy.value;
+          span.style.cssText = "display:block;white-space:nowrap;overflow:hidden;padding:1px 2px;"
+            + (cs ? "font:" + cs.font + ";text-align:" + cs.textAlign + ";color:" + cs.color + ";" : "");
+          copy.parentNode.replaceChild(span, copy);
+        });
+      }
+    }).then(function (canvas) {
+      var pdf = new window.jspdf.jsPDF({ unit: "mm", format: "a4" });
+      // One A4 page per 1123 px of the sheet (long quotations continue on the next page).
+      var pagePx = Math.round(canvas.width * 297 / 210);
+      for (var y = 0, page = 0; y < canvas.height; y += pagePx, page++) {
+        var h = Math.min(pagePx, canvas.height - y);
+        var slice = document.createElement("canvas");
+        slice.width = canvas.width; slice.height = h;
+        slice.getContext("2d").drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+        if (page > 0) pdf.addPage();
+        pdf.addImage(slice.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, 210, h * 210 / canvas.width);
+      }
+      var dataUrl = pdf.output("datauristring").replace(/^data:application\/pdf;[^,]*,/, "data:application/pdf;base64,");
+      toParent({ channel: "saleskit-quotation-save", files: [{ name: fileName(), dataUrl: dataUrl }] });
+    }).catch(function (e) {
+      el("status").textContent = "Download failed: " + (e.message || e);
+    }).finally(function () {
+      document.body.classList.remove("capturing");
+      if (el("status").textContent === "Preparing the PDF…") el("status").textContent = "";
+      el("download").disabled = !draft.lines.length;
+    });
+  });
+
+  // Ctrl+1–5 switch tabs, ? opens the shortcuts, Ctrl+D downloads, Ctrl+P prints, Ctrl+Shift+L adds a laptop.
+  document.addEventListener("keydown", function (e) {
+    var ctrl = e.ctrlKey || e.metaKey;
+    var typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+    if (e.key === "?" && !typing && !ctrl && !e.altKey) { e.preventDefault(); toParent({ channel: "saleskit-quotation-help" }); return; }
+    if (!ctrl || e.altKey) return;
+    if (!e.shiftKey && /^Digit[1-5]$/.test(e.code)) {
+      e.preventDefault();
+      toParent({ channel: "saleskit-quotation-hotkey", keys: { ctrl: true, shift: false, alt: false, code: e.code } });
+    } else if (!e.shiftKey && e.code === "KeyD") { e.preventDefault(); el("download").click(); }
+    else if (!e.shiftKey && e.code === "KeyP") { e.preventDefault(); el("print").click(); }
+    else if (e.shiftKey && e.code === "KeyL") { e.preventDefault(); el("search").focus(); }
+  });
+
+  // ---------- messages from the app (quotation-bridge.js) ----------
+  window.addEventListener("message", function (event) {
+    if (event.source !== window.parent || !event.data) return;
+    var m = event.data;
+    if (m.channel === "saleskit-quotation-data") {
+      data = { laptops: m.laptops || [], branchDetails: m.branchDetails || {}, logos: m.logos || {}, homeBranch: m.homeBranch || "", branches: m.branches || [], lockBranch: Boolean(m.lockBranch) };
+      byCode = {};
+      data.laptops.forEach(function (l) { byCode[key(l.code)] = l; });
+      if (data.lockBranch) draft.branch = data.homeBranch;
+      else if (!draft.branch || data.branches.indexOf(key(draft.branch)) === -1) draft.branch = data.branches.indexOf(key(data.homeBranch)) !== -1 ? data.homeBranch : (data.branches[0] || "");
+      fillBranches();
+      renderHeader();
+      renderLines();
+      renderQuick();
+    } else if (m.channel === "saleskit-quotation-customer") {
+      var c = m.customer || {};
+      recoName = c.name || "";
+      picks = (c.laptops) || { exceed: "", meet: "", budget: "" };
+      if (!draft.customerTyped) el("customer").value = recoName || draft.customer || "";
+      renderQuick();
+      if (!draft.lines.length) renderLines();
+    } else if (m.channel === "saleskit-quotation-image") {
+      var waiter = imageWaiters[m.requestId];
+      if (waiter) { delete imageWaiters[m.requestId]; waiter(m.url || ""); }
+    } else if (m.channel === "saleskit-quotation-status") {
+      el("status").textContent = m.message || "";
+    }
+  });
+
+  renderMeta();
+  renderLines();
+  toParent({ channel: "saleskit-quotation-ready" });
+})();
+</script>
+</body>
+</html>

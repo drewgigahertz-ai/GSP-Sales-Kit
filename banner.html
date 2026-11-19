@@ -1754,7 +1754,7 @@
         return;
       }
       if (event.shiftKey) return;
-      if (!/^Digit[1-4]$/.test(event.code)) return;
+      if (!/^Digit[1-5]$/.test(event.code)) return;
       event.preventDefault();
       toParent({ channel: 'saleskit-banner-hotkey', keys: { ctrl: true, shift: false, alt: false, code: event.code } });
     });

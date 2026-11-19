@@ -1,6 +1,6 @@
 {
   "name": "saleskit-desktop",
-  "version": "1.0.36",
+  "version": "1.0.37",
   "private": true,
   "description": "Gigahertz Sales Tools desktop application",
   "main": "electron/main.js",
@@ -59,6 +59,8 @@
       "banner.html",
       "flyer.html",
       "flyer-bridge.js",
+      "quotation.html",
+      "quotation-bridge.js",
       "flyer-promos.js",
       "flyer-customer.js",
       "reco-customer.js",

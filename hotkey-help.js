@@ -3,7 +3,7 @@
 // that work everywhere. The Banner page sends its ? here (banner-hotkeys.js → banner-bridge.js).
 (function () {
   const EVERYWHERE = [
-    ['Ctrl + 1 / 2 / 3 / 4', 'Reco Table / Sales Kit / Banner / Flyers'],
+    ['Ctrl + 1 / 2 / 3 / 4 / 5', 'Reco Table / Sales Kit / Banner / Flyers / Quotation'],
     ['↑ ↓ then Enter', 'Choose an option in any open list'],
     ['Esc', 'Close the open list or window'],
     ['Ctrl + Plus / Minus', 'Zoom in / out (Ctrl + 0: 100%)'],
@@ -62,6 +62,14 @@
         ['Ctrl + D', 'Download (PDF or PNG)'],
         ['Ctrl + P', 'Print'],
         ['Ctrl + R', 'Refresh data']
+      ]
+    },
+    quotation: {
+      title: 'Quotation',
+      keys: [
+        ['Ctrl + Shift + L', 'Add a laptop'],
+        ['Ctrl + D', 'Download PDF'],
+        ['Ctrl + P', 'Print']
       ]
     },
     presentation: {

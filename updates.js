@@ -6,6 +6,13 @@
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
+      version: '1.0.37',
+      date: 'November 19, 2026',
+      changes: [
+        'New QUOTATION tab (Ctrl+5): the company quotation form, ready to save as PDF or print. The customer name comes from the Reco Table; add laptops with the search box or the Reco Table buttons, and each one fills in its specs, cash price and freebie. You can change the price, quantity and freebie before saving.'
+      ]
+    },
+    {
       version: '1.0.36',
       date: 'November 13, 2026',
       changes: [

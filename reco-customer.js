@@ -105,6 +105,7 @@
     clearTimeout(timer);
     timer = setTimeout(() => {
       if (typeof window.updateFlyerCustomer === 'function') window.updateFlyerCustomer(current());
+      if (typeof window.updateQuotationCustomer === 'function') window.updateQuotationCustomer(current());
     }, 150);
   }
 
