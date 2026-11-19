@@ -102,6 +102,14 @@
 
     /* missing details from the LOGO sheet: shown on screen only */
     .hint { color: #b45309; background: #fef3c7; border-radius: 6px; padding: 1px 6px; font-weight: 600; font-size: 10.5px; }
+    /* TIN, mobile and branch manager: typed on the quotation (click to edit). */
+    .edit { outline: none; border-bottom: 1px dashed transparent; padding: 0 2px; min-width: 40px; display: inline-block; }
+    .edit:hover { border-bottom-color: #cbd5e1; }
+    .edit:focus { border-bottom-color: var(--blue); background: #f5f8ff; }
+    .edit:empty:before { content: attr(data-ph); color: #b45309; background: #fef3c7; border-radius: 6px; padding: 0 6px; font-weight: 600; font-size: 10.5px; }
+    .capturing .edit:empty:before, .capturing .is-empty { display: none !important; }
+    .capturing .edit { border-bottom-color: transparent !important; background: transparent !important; }
+    @media print { .edit:empty:before, .is-empty { display: none !important; } .edit { border-bottom-color: transparent !important; } }
     .capturing .no-print, .capturing .hint, .capturing .rm { display: none !important; }
     /* an empty QR box only reminds staff on screen; on paper the space stays blank */
     .capturing .qr-empty { visibility: hidden; }
@@ -139,7 +147,7 @@
     <div class="head">
       <img id="logo" class="logo" alt="Gigahertz">
       <div id="addr" class="addr"></div>
-      <div id="ids" class="ids"></div>
+      <div id="ids" class="ids"><span class="idpart" data-part="tin">TIN: <span class="edit" contenteditable="plaintext-only" spellcheck="false" data-f="tin" data-ph="type the TIN"></span></span><span class="sep"> | </span><span class="idpart" data-part="mobile">Mobile: <span class="edit" contenteditable="plaintext-only" spellcheck="false" data-f="mobile" data-ph="type the mobile no."></span></span></div>
     </div>
 
     <div class="meta">
@@ -178,8 +186,8 @@
     </div>
 
     <div class="sign">
-      <div class="name"><span id="manager"></span> - Branch Manager</div>
-      <div class="no" id="managerNo"></div>
+      <div class="name"><span class="edit" contenteditable="plaintext-only" spellcheck="false" data-f="manager" data-ph="type the branch manager's name"></span> - Branch Manager</div>
+      <div class="no"><span class="edit" contenteditable="plaintext-only" spellcheck="false" data-f="managerNo" data-ph="type the manager's number"></span></div>
       <div class="qrs">
         <div id="viberQr"></div>
         <div class="cap">*Please scan for a direct<br>Viber contact.</div>
@@ -247,15 +255,56 @@
     if (!list.length) sel.innerHTML = "<option>" + esc(branch() || "—") + "</option>";
     sel.disabled = data.lockBranch && list.length <= 1;
   }
+  // Branch details typed on the quotation, remembered on this laptop per branch: { BRANCH: { tin, mobile, … } }.
+  // A field emptied here goes back to the LOGO sheet's value.
+  function branchEdits() {
+    draft.branchEdits = draft.branchEdits || {};
+    return draft.branchEdits[branch()] || {};
+  }
+  function branchValue(field) {
+    var edits = branchEdits();
+    return Object.prototype.hasOwnProperty.call(edits, field) ? edits[field] : (details()[field] || "");
+  }
+  // Empty TIN / mobile parts (and the "|" between them) are left out of the PDF and print.
+  function markEmpty() {
+    var empty = {};
+    Array.prototype.forEach.call(document.querySelectorAll(".idpart"), function (part) {
+      var isEmpty = !part.querySelector(".edit").textContent.trim();
+      empty[part.getAttribute("data-part")] = isEmpty;
+      part.classList.toggle("is-empty", isEmpty);
+    });
+    document.querySelector("#ids .sep").classList.toggle("is-empty", empty.tin || empty.mobile);
+  }
+  document.addEventListener("input", function (e) {
+    var span = e.target.closest && e.target.closest(".edit[data-f]");
+    if (!span) return;
+    var field = span.getAttribute("data-f"), text = span.textContent.replace(/\s+/g, " ").trim();
+    draft.branchEdits = draft.branchEdits || {};
+    var edits = draft.branchEdits[branch()] = draft.branchEdits[branch()] || {};
+    if (text) edits[field] = text; else delete edits[field];
+    saveDraft();
+    markEmpty();
+  });
+  // One line each: Enter finishes the field.
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && e.target.closest && e.target.closest(".edit[data-f]")) { e.preventDefault(); e.target.blur(); }
+  });
+  // Leaving an emptied field shows the LOGO sheet's value again (if it has one).
+  document.addEventListener("focusout", function (e) {
+    var span = e.target.closest && e.target.closest(".edit[data-f]");
+    if (span && !span.textContent.trim()) { span.textContent = branchValue(span.getAttribute("data-f")); markEmpty(); }
+  });
+
   function renderHeader() {
     var d = details();
     picture(data.logos.blue || data.logos.header).then(function (src) { if (src) el("logo").src = src; });
     el("addr").textContent = d.address || "";
     if (!d.address) el("addr").innerHTML = '<span class="hint">No address for ' + esc(branch() || "this branch") + " in the LOGO sheet</span>";
-    var ids = [d.tin ? "TIN: " + d.tin : "", d.mobile ? "Mobile: " + d.mobile : ""].filter(Boolean).join(" | ");
-    el("ids").innerHTML = ids ? esc(ids) : '<span class="hint">Add TIN and MOBILE for ' + esc(branch()) + " in the LOGO sheet</span>";
-    el("manager").innerHTML = d.manager ? esc(d.manager) : '<span class="hint">BRANCH MANAGER (LOGO sheet)</span>';
-    el("managerNo").innerHTML = d.managerNo ? esc(d.managerNo) : '<span class="hint">MANAGER NO. (LOGO sheet)</span>';
+    // TIN, mobile and the branch manager: the LOGO sheet's, or what was typed here for this branch.
+    Array.prototype.forEach.call(document.querySelectorAll(".edit[data-f]"), function (span) {
+      span.textContent = branchValue(span.getAttribute("data-f"));
+    });
+    markEmpty();
     setImage(el("viberQr"), d.viberQr, "qr", "Viber QR code", "VIBER QR (LOGO sheet)");
     setImage(el("fbQr"), d.fbQr, "qr", "FB page QR code", "FB QR (LOGO sheet)");
     var own = d.logo && d.logo !== data.logos.blue ? d.logo : "";
@@ -427,7 +476,8 @@
   });
   el("newQuote").addEventListener("click", function () {
     if (draft.lines.length && !confirm("Start a new quotation? This one is cleared.")) return;
-    draft = { branch: draft.branch, date: today(), customer: "", customerTyped: false, contact: "", lines: [] };
+    // The branch details typed here (TIN, mobile, manager) stay for the next quotation.
+    draft = { branch: draft.branch, branchEdits: draft.branchEdits || {}, date: today(), customer: "", customerTyped: false, contact: "", lines: [] };
     saveDraft();
     renderMeta();
     renderLines();
@@ -486,7 +536,7 @@
   // Ctrl+1–5 switch tabs, ? opens the shortcuts, Ctrl+D downloads, Ctrl+P prints, Ctrl+Shift+L adds a laptop.
   document.addEventListener("keydown", function (e) {
     var ctrl = e.ctrlKey || e.metaKey;
-    var typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+    var typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || Boolean(e.target && e.target.isContentEditable);
     if (e.key === "?" && !typing && !ctrl && !e.altKey) { e.preventDefault(); toParent({ channel: "saleskit-quotation-help" }); return; }
     if (!ctrl || e.altKey) return;
     if (!e.shiftKey && /^Digit[1-5]$/.test(e.code)) {

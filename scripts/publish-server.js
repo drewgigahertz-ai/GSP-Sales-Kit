@@ -40,6 +40,12 @@ async function github(url, options = {}, attempts = 3) {
     try {
       const response = await fetch(url, { ...options, headers: { ...headers, ...options.headers } });
       const body = await response.json().catch(() => ({}));
+      // A refused token: GitHub names the permission the request needed, which says what to give the token.
+      if (!response.ok && body && body.message) {
+        const needed = response.headers.get('x-accepted-github-permissions');
+        if (needed) body.message += `; the token needs: ${needed}`;
+        if (response.status === 401 || response.status === 403) body.message += ` (HTTP ${response.status})`;
+      }
       return { status: response.status, ok: response.ok, body };
     } catch (error) {
       if (attempt >= attempts) throw error;
@@ -83,7 +89,8 @@ async function github(url, options = {}, attempts = 3) {
   const existing = new Map((release.body.assets || []).map((asset) => [asset.name, asset]));
   for (const asset of release.body.assets || []) {
     if (!wanted.has(asset.name)) {
-      await github(`${api}/releases/assets/${asset.id}`, { method: 'DELETE' });
+      const removed = await github(`${api}/releases/assets/${asset.id}`, { method: 'DELETE' });
+      if (!removed.ok && removed.status !== 404) fail(`removing the older ${asset.name} failed (${removed.body.message || removed.status})`);
       console.log(`  − ${asset.name} (older version)`);
     }
   }
