@@ -102,14 +102,32 @@
 
     /* missing details from the LOGO sheet: shown on screen only */
     .hint { color: #b45309; background: #fef3c7; border-radius: 6px; padding: 1px 6px; font-weight: 600; font-size: 10.5px; }
-    /* TIN, mobile and branch manager: typed on the quotation (click to edit). */
-    .edit { outline: none; border-bottom: 1px dashed transparent; padding: 0 2px; min-width: 40px; display: inline-block; }
-    .edit:hover { border-bottom-color: #cbd5e1; }
-    .edit:focus { border-bottom-color: var(--blue); background: #f5f8ff; }
-    .edit:empty:before { content: attr(data-ph); color: #b45309; background: #fef3c7; border-radius: 6px; padding: 0 6px; font-weight: 600; font-size: 10.5px; }
-    .capturing .edit:empty:before, .capturing .is-empty { display: none !important; }
-    .capturing .edit { border-bottom-color: transparent !important; background: transparent !important; }
-    @media print { .edit:empty:before, .is-empty { display: none !important; } .edit { border-bottom-color: transparent !important; } }
+    /* TIN, mobile and branch manager: from Branch details (read-only on the quotation). An empty one shows a
+       reminder on screen; in the PDF and print it is left out with its label. */
+    .detail:empty:before { content: attr(data-ph); color: #b45309; background: #fef3c7; border-radius: 6px; padding: 0 6px; font-weight: 600; font-size: 10.5px; }
+    .idpart.is-empty > .lbl-text { display: none; }
+    .capturing .detail:empty:before, .capturing .is-empty { display: none !important; }
+    @media print { .detail:empty:before, .is-empty { display: none !important; } }
+
+    /* Branch details form */
+    .modal { position: fixed; inset: 0; z-index: 20; background: rgba(15, 23, 42, .45); display: none; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow: auto; }
+    .modal.open { display: flex; }
+    .modal .box { width: 640px; max-width: 100%; background: #fff; border-radius: 14px; box-shadow: 0 20px 50px rgba(0,0,0,.3); padding: 22px 24px; font-size: 13px; }
+    .modal h2 { margin: 0 0 4px; font-size: 18px; color: var(--bar); }
+    .modal .sub { color: var(--muted); margin: 0 0 16px; font-size: 12.5px; }
+    .modal .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+    .modal label.f { display: flex; flex-direction: column; gap: 5px; font-weight: 700; color: #334155; font-size: 12.5px; }
+    .modal label.f input { font: 500 14px inherit; font-family: inherit; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; }
+    .modal .from-sheet { font-weight: 500; color: var(--muted); font-size: 11px; }
+    .modal .pics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 16px; }
+    .modal .pic { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; text-align: center; font-weight: 700; color: #334155; font-size: 12.5px; }
+    .modal .pic .prev { height: 120px; margin: 8px 0; display: flex; align-items: center; justify-content: center; background: #f8fafc; border-radius: 8px; color: #94a3b8; font-weight: 500; font-size: 11.5px; }
+    .modal .pic .prev img { max-width: 100%; max-height: 120px; object-fit: contain; }
+    .modal .pic .acts { display: flex; gap: 6px; justify-content: center; }
+    .modal .pic .acts button { font: 600 12px inherit; font-family: inherit; border: 1px solid #cbd5e1; background: #fff; border-radius: 7px; padding: 4px 10px; cursor: pointer; }
+    .modal .foot { display: flex; align-items: center; gap: 10px; margin-top: 20px; }
+    .modal .foot .grow { flex: 1; color: var(--muted); font-size: 12px; }
+    .modal .msg { color: #b91c1c; font-weight: 600; font-size: 12px; min-height: 16px; margin-top: 8px; }
     .capturing .no-print, .capturing .hint, .capturing .rm { display: none !important; }
     /* an empty QR box only reminds staff on screen; on paper the space stays blank */
     .capturing .qr-empty { visibility: hidden; }
@@ -135,6 +153,7 @@
     <input id="search" type="search" placeholder="Add a laptop: type model, part number or SKU (Ctrl+Shift+L)" autocomplete="off" spellcheck="false" aria-label="Add a laptop">
     <div id="results" role="listbox"></div>
   </div>
+  <button id="branchInfoBtn" type="button" class="btn light" title="TIN, mobile, branch manager, QR codes and logo of this branch"><i class="bi bi-shop"></i> Branch details</button>
   <button id="newQuote" type="button" class="btn light" title="Start a new quotation"><i class="bi bi-file-earmark-plus"></i> New</button>
   <button id="download" type="button" class="btn" title="Save as PDF (Ctrl+D)"><i class="bi bi-download"></i> Download PDF</button>
   <button id="print" type="button" class="btn" title="Print (Ctrl+P)"><i class="bi bi-printer"></i> Print</button>
@@ -147,7 +166,7 @@
     <div class="head">
       <img id="logo" class="logo" alt="Gigahertz">
       <div id="addr" class="addr"></div>
-      <div id="ids" class="ids"><span class="idpart" data-part="tin">TIN: <span class="edit" contenteditable="plaintext-only" spellcheck="false" data-f="tin" data-ph="type the TIN"></span></span><span class="sep"> | </span><span class="idpart" data-part="mobile">Mobile: <span class="edit" contenteditable="plaintext-only" spellcheck="false" data-f="mobile" data-ph="type the mobile no."></span></span></div>
+      <div id="ids" class="ids"><span class="idpart" data-part="tin"><span class="lbl-text">TIN: </span><span class="detail" data-f="tin" data-ph="TIN: set in Branch details"></span></span><span class="sep"> | </span><span class="idpart" data-part="mobile"><span class="lbl-text">Mobile: </span><span class="detail" data-f="mobile" data-ph="Mobile: set in Branch details"></span></span></div>
     </div>
 
     <div class="meta">
@@ -186,8 +205,8 @@
     </div>
 
     <div class="sign">
-      <div class="name"><span class="edit" contenteditable="plaintext-only" spellcheck="false" data-f="manager" data-ph="type the branch manager's name"></span> - Branch Manager</div>
-      <div class="no"><span class="edit" contenteditable="plaintext-only" spellcheck="false" data-f="managerNo" data-ph="type the manager's number"></span></div>
+      <div class="name"><span class="detail" data-f="manager" data-ph="Branch manager: set in Branch details"></span> - Branch Manager</div>
+      <div class="no"><span class="detail" data-f="managerNo" data-ph="Manager no.: set in Branch details"></span></div>
       <div class="qrs">
         <div id="viberQr"></div>
         <div class="cap">*Please scan for a direct<br>Viber contact.</div>
@@ -195,6 +214,32 @@
         <div id="fbQr"></div>
         <div class="cap" id="fbCap">scan to visit our Official<br><b>Gigahertz</b> FB Page</div>
       </div>
+    </div>
+  </div>
+</div>
+
+<div id="infoModal" class="modal no-print" role="dialog" aria-modal="true" aria-labelledby="infoTitle">
+  <div class="box">
+    <h2 id="infoTitle">Branch details</h2>
+    <p class="sub" id="infoSub"></p>
+    <div class="grid">
+      <label class="f">TIN <input id="f_tin" autocomplete="off"><span class="from-sheet" data-sheet="tin"></span></label>
+      <label class="f">Mobile <input id="f_mobile" autocomplete="off"><span class="from-sheet" data-sheet="mobile"></span></label>
+      <label class="f">Branch manager <input id="f_manager" autocomplete="off"><span class="from-sheet" data-sheet="manager"></span></label>
+      <label class="f">Manager no. <input id="f_managerNo" autocomplete="off"><span class="from-sheet" data-sheet="managerNo"></span></label>
+    </div>
+    <div class="pics">
+      <div class="pic" data-pic="viberQr">Viber QR code<div class="prev"></div><div class="acts"><button type="button" data-choose>Choose picture…</button><button type="button" data-remove>Remove</button></div></div>
+      <div class="pic" data-pic="fbQr">FB page QR code<div class="prev"></div><div class="acts"><button type="button" data-choose>Choose picture…</button><button type="button" data-remove>Remove</button></div></div>
+      <div class="pic" data-pic="logo">Branch logo<div class="prev"></div><div class="acts"><button type="button" data-choose>Choose picture…</button><button type="button" data-remove>Remove</button></div></div>
+    </div>
+    <input id="picFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+    <div class="msg" id="infoMsg"></div>
+    <div class="foot">
+      <span class="grow">Saved on this laptop. It stays the same until someone changes it here.</span>
+      <button type="button" class="btn light" id="infoReset" title="Forget what was saved here and use the LOGO sheet">Use LOGO sheet</button>
+      <button type="button" class="btn light" id="infoCancel">Cancel</button>
+      <button type="button" class="btn" id="infoSave"><i class="bi bi-check2"></i> Save</button>
     </div>
   </div>
 </div>
@@ -229,6 +274,8 @@
   var imageWaiters = {}, imageSeq = 0, imageCache = {};
   function picture(url) {
     if (!url) return Promise.resolve("");
+    // Pictures chosen in Branch details are already on this laptop.
+    if (/^data:/i.test(url)) return Promise.resolve(url);
     if (imageCache[url]) return imageCache[url];
     imageCache[url] = new Promise(function (resolve) {
       var id = "q" + (++imageSeq);
@@ -255,61 +302,152 @@
     if (!list.length) sel.innerHTML = "<option>" + esc(branch() || "—") + "</option>";
     sel.disabled = data.lockBranch && list.length <= 1;
   }
-  // Branch details typed on the quotation, remembered on this laptop per branch: { BRANCH: { tin, mobile, … } }.
-  // A field emptied here goes back to the LOGO sheet's value.
-  function branchEdits() {
-    draft.branchEdits = draft.branchEdits || {};
-    return draft.branchEdits[branch()] || {};
+  // ---------- Branch details: saved on this laptop per branch ----------
+  // { BRANCH: { tin, mobile, manager, managerNo, viberQr, fbQr, logo (pictures as data: addresses), savedAt } }.
+  // A saved branch keeps its details until someone changes them in the form; a branch never saved uses the LOGO
+  // sheet's. Text and pictures are kept apart from the quotation draft, so New never touches them.
+  var INFO_KEY = "saleskit.quotation.branchInfo";
+  var TEXT_FIELDS = ["tin", "mobile", "manager", "managerNo"];
+  var PIC_FIELDS = ["viberQr", "fbQr", "logo"];
+  function loadInfo() { try { return JSON.parse(localStorage.getItem(INFO_KEY) || "{}") || {}; } catch (e) { return {}; } }
+  var savedInfo = loadInfo();
+  // Details typed on the quotation by the earlier version (draft.branchEdits) become saved details once.
+  if (draft.branchEdits) {
+    Object.keys(draft.branchEdits).forEach(function (b) {
+      if (!savedInfo[b]) savedInfo[b] = Object.assign({ savedAt: new Date().toISOString() }, draft.branchEdits[b]);
+    });
+    delete draft.branchEdits;
+    try { localStorage.setItem(INFO_KEY, JSON.stringify(savedInfo)); } catch (e) { /* kept in memory */ }
+    saveDraft();
   }
+  function saved() { return savedInfo[branch()] || null; }
+  // A saved branch uses exactly what was saved (blank stays blank); otherwise the LOGO sheet's value.
   function branchValue(field) {
-    var edits = branchEdits();
-    return Object.prototype.hasOwnProperty.call(edits, field) ? edits[field] : (details()[field] || "");
+    var s = saved();
+    if (s) return s[field] || "";
+    var d = details();
+    return field === "logo" ? (d.logo && d.logo !== data.logos.blue ? d.logo : "") : (d[field] || "");
   }
   // Empty TIN / mobile parts (and the "|" between them) are left out of the PDF and print.
   function markEmpty() {
     var empty = {};
     Array.prototype.forEach.call(document.querySelectorAll(".idpart"), function (part) {
-      var isEmpty = !part.querySelector(".edit").textContent.trim();
+      var isEmpty = !part.querySelector(".detail").textContent.trim();
       empty[part.getAttribute("data-part")] = isEmpty;
       part.classList.toggle("is-empty", isEmpty);
     });
     document.querySelector("#ids .sep").classList.toggle("is-empty", empty.tin || empty.mobile);
   }
-  document.addEventListener("input", function (e) {
-    var span = e.target.closest && e.target.closest(".edit[data-f]");
-    if (!span) return;
-    var field = span.getAttribute("data-f"), text = span.textContent.replace(/\s+/g, " ").trim();
-    draft.branchEdits = draft.branchEdits || {};
-    var edits = draft.branchEdits[branch()] = draft.branchEdits[branch()] || {};
-    if (text) edits[field] = text; else delete edits[field];
-    saveDraft();
-    markEmpty();
-  });
-  // One line each: Enter finishes the field.
-  document.addEventListener("keydown", function (e) {
-    if (e.key === "Enter" && e.target.closest && e.target.closest(".edit[data-f]")) { e.preventDefault(); e.target.blur(); }
-  });
-  // Leaving an emptied field shows the LOGO sheet's value again (if it has one).
-  document.addEventListener("focusout", function (e) {
-    var span = e.target.closest && e.target.closest(".edit[data-f]");
-    if (span && !span.textContent.trim()) { span.textContent = branchValue(span.getAttribute("data-f")); markEmpty(); }
-  });
 
   function renderHeader() {
     var d = details();
     picture(data.logos.blue || data.logos.header).then(function (src) { if (src) el("logo").src = src; });
     el("addr").textContent = d.address || "";
     if (!d.address) el("addr").innerHTML = '<span class="hint">No address for ' + esc(branch() || "this branch") + " in the LOGO sheet</span>";
-    // TIN, mobile and the branch manager: the LOGO sheet's, or what was typed here for this branch.
-    Array.prototype.forEach.call(document.querySelectorAll(".edit[data-f]"), function (span) {
+    Array.prototype.forEach.call(document.querySelectorAll(".detail[data-f]"), function (span) {
       span.textContent = branchValue(span.getAttribute("data-f"));
     });
     markEmpty();
-    setImage(el("viberQr"), d.viberQr, "qr", "Viber QR code", "VIBER QR (LOGO sheet)");
-    setImage(el("fbQr"), d.fbQr, "qr", "FB page QR code", "FB QR (LOGO sheet)");
-    var own = d.logo && d.logo !== data.logos.blue ? d.logo : "";
-    setImage(el("branchLogo"), own, "branch-logo", "Branch logo", "");
+    setImage(el("viberQr"), branchValue("viberQr"), "qr", "Viber QR code", "Viber QR: add it in Branch details");
+    setImage(el("fbQr"), branchValue("fbQr"), "qr", "FB page QR code", "FB QR: add it in Branch details");
+    setImage(el("branchLogo"), branchValue("logo"), "branch-logo", "Branch logo", "");
   }
+
+  // ---------- the Branch details form ----------
+  var form = null; // the pictures chosen in the open form: { viberQr, fbQr, logo }
+  var choosing = "";
+  function openInfo() {
+    var s = saved(), d = details();
+    el("infoSub").textContent = "Branch " + (branch() || "—") + (s && s.savedAt ? " · saved " + new Date(s.savedAt).toLocaleString() : " · not saved yet: showing the LOGO sheet's details");
+    TEXT_FIELDS.forEach(function (f) { el("f_" + f).value = branchValue(f); });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-sheet]"), function (span) {
+      var v = d[span.getAttribute("data-sheet")];
+      span.textContent = v ? "LOGO sheet: " + v : "";
+    });
+    form = {};
+    PIC_FIELDS.forEach(function (f) { form[f] = branchValue(f); });
+    renderPics();
+    el("infoMsg").textContent = "";
+    el("infoReset").disabled = !s;
+    el("infoModal").classList.add("open");
+    el("f_tin").focus();
+  }
+  function closeInfo() { el("infoModal").classList.remove("open"); form = null; }
+  function renderPics() {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-pic]"), function (box) {
+      var f = box.getAttribute("data-pic"), url = form[f], prev = box.querySelector(".prev");
+      box.querySelector("[data-remove]").disabled = !url;
+      if (!url) { prev.textContent = "No picture"; return; }
+      picture(url).then(function (src) { prev.innerHTML = '<img alt="" src="' + esc(src) + '">'; });
+    });
+  }
+  // A chosen picture, made at most 600 px wide or tall, as a data: address (small enough to keep on the laptop).
+  function readPicture(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onerror = function () { reject(new Error("The picture could not be read.")); };
+      reader.onload = function () {
+        var img = new Image();
+        img.onerror = function () { reject(new Error("That file is not a picture.")); };
+        img.onload = function () {
+          var scale = Math.min(1, 600 / Math.max(img.naturalWidth, img.naturalHeight));
+          var canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+          canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+          canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL("image/png"));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  el("infoModal").addEventListener("click", function (e) {
+    if (e.target === el("infoModal")) return closeInfo();
+    var box = e.target.closest("[data-pic]");
+    if (!box) return;
+    if (e.target.closest("[data-choose]")) { choosing = box.getAttribute("data-pic"); el("picFile").value = ""; el("picFile").click(); }
+    if (e.target.closest("[data-remove]")) { form[box.getAttribute("data-pic")] = ""; renderPics(); }
+  });
+  el("picFile").addEventListener("change", function () {
+    var file = el("picFile").files[0];
+    if (!file || !choosing || !form) return;
+    if (file.size > 15 * 1024 * 1024) { el("infoMsg").textContent = "That picture is too large (over 15 MB)."; return; }
+    readPicture(file).then(function (url) { form[choosing] = url; el("infoMsg").textContent = ""; renderPics(); })
+      .catch(function (err) { el("infoMsg").textContent = err.message; });
+  });
+  el("infoSave").addEventListener("click", function () {
+    var entry = { savedAt: new Date().toISOString() };
+    TEXT_FIELDS.forEach(function (f) { entry[f] = el("f_" + f).value.replace(/\s+/g, " ").trim(); });
+    PIC_FIELDS.forEach(function (f) { entry[f] = form[f] || ""; });
+    var next = Object.assign({}, savedInfo);
+    next[branch()] = entry;
+    try {
+      localStorage.setItem(INFO_KEY, JSON.stringify(next));
+    } catch (e) {
+      el("infoMsg").textContent = "Could not save: the pictures are too large. Choose smaller pictures and try again.";
+      return;
+    }
+    savedInfo = next;
+    closeInfo();
+    renderHeader();
+    el("status").textContent = "Branch details saved";
+  });
+  el("infoReset").addEventListener("click", function () {
+    if (!confirm("Forget the details saved for " + branch() + " on this laptop and use the LOGO sheet's?")) return;
+    delete savedInfo[branch()];
+    try { localStorage.setItem(INFO_KEY, JSON.stringify(savedInfo)); } catch (e) { /* kept in memory */ }
+    closeInfo();
+    renderHeader();
+    el("status").textContent = "Using the LOGO sheet's details";
+  });
+  el("infoCancel").addEventListener("click", closeInfo);
+  el("branchInfoBtn").addEventListener("click", openInfo);
+  // Enter saves, Esc closes.
+  el("infoModal").addEventListener("keydown", function (e) {
+    if (e.key === "Escape") { e.preventDefault(); closeInfo(); }
+    else if (e.key === "Enter" && e.target instanceof HTMLInputElement) { e.preventDefault(); el("infoSave").click(); }
+  });
 
   // ---------- laptops ----------
   function priceFor(laptop) {
@@ -476,8 +614,8 @@
   });
   el("newQuote").addEventListener("click", function () {
     if (draft.lines.length && !confirm("Start a new quotation? This one is cleared.")) return;
-    // The branch details typed here (TIN, mobile, manager) stay for the next quotation.
-    draft = { branch: draft.branch, branchEdits: draft.branchEdits || {}, date: today(), customer: "", customerTyped: false, contact: "", lines: [] };
+    // Branch details are kept apart (Branch details form), so they stay as they are.
+    draft = { branch: draft.branch, date: today(), customer: "", customerTyped: false, contact: "", lines: [] };
     saveDraft();
     renderMeta();
     renderLines();
