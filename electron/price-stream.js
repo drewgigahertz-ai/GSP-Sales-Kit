@@ -12,7 +12,8 @@ const RETRY_MAX_MS = 60 * 1000;
 
 // getConnection(): { urls, headers } for the server, or null while nobody is signed in.
 // requestServer(pathname): a JSON request to the server (main.js).
-function createPriceStream({ filePath, getConnection, requestServer, onEvents }) {
+// onData(event) (optional): the server synced a change to the Reco Table's sheets ("data" event); reload the data.
+function createPriceStream({ filePath, getConnection, requestServer, onEvents, onData = null }) {
   let lastSeenId = null;
   try {
     lastSeenId = JSON.parse(fs.readFileSync(filePath, 'utf8')).lastSeenId ?? null;
@@ -75,6 +76,7 @@ function createPriceStream({ filePath, getConnection, requestServer, onEvents })
         }
         if (type === 'hello') await catchUp(Number(value.latestId) || 0).catch(() => {});
         else if (type === 'prices') deliver([value]);
+        else if (type === 'data' && onData) onData(value);
       }
     }
   }

@@ -239,7 +239,9 @@ function startPriceStream() {
     filePath: path.join(app.getPath('userData'), 'price-changes-seen.json'),
     getConnection: async () => (session && !onLoginPage && getConfig().serverUrls.length ? serverConnection() : null),
     requestServer: (pathname) => requestServer(pathname),
-    onEvents: showPriceChanges
+    onEvents: showPriceChanges,
+    // The Reco Table's sheets changed on the server: reload the data now, quietly (no notice).
+    onData: () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('data:changed'); }
   });
   priceStream.start();
 }

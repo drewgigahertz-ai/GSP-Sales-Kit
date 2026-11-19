@@ -5,7 +5,10 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const database = require('../electron/database');
-const { DEFAULT_SPREADSHEET_ID, DEFAULT_PRICING_SPREADSHEET_ID, fetchSpreadsheetData, fetchSheetValues, fetchPriceMatrixValues } = require('../electron/sheets-sync');
+const { DEFAULT_SPREADSHEET_ID, DEFAULT_PRICING_SPREADSHEET_ID, fetchSpreadsheetData, fetchSheetValues, fetchPriceMatrixValues, fetchRangesValues, fetchSheetTitles } = require('../electron/sheets-sync');
+const { RECO_DB_SHEET, RECO_DB_RANGE } = require('../electron/reco-db');
+const { LAPTOP_DATABASE_SHEET, LAPTOP_DATABASE_RANGE } = require('../electron/laptop-database');
+const { createRecoWatch } = require('./reco-watch');
 const { DEFAULT_PRICE_MATRIX_SPREADSHEET_ID } = require('../electron/price-matrix');
 const { createLocalApi } = require('../electron/local-api');
 const { createDeviceRegistry, deviceKey } = require('./devices');
@@ -19,6 +22,7 @@ const { createPriceWatch } = require('./price-watch');
 const { createServerUpdater } = require('./updater');
 const { buildDataHealth } = require('./data-health');
 const { createAppCheck } = require('./app-check');
+const { createWebAdmin } = require('./web-admin');
 const { skuChoices, skuKey } = require('../electron/laptop-sku');
 const { version: APP_VERSION } = require('../package.json');
 
@@ -53,6 +57,8 @@ let backups;
 let users;
 let devicesPushTimer = null;
 let headerLogo = '';
+// The web version of this window (server/web-admin.js), at /server on the API port.
+let webAdmin = null;
 let clientRelease;
 let serverUpdater;
 // Data health tab: sheet problems found in the synced data (server/data-health.js), checked after each sync.
@@ -72,6 +78,9 @@ function currentSkuIndex() {
 }
 // Laptops listening on /api/events for price changes.
 const priceListeners = new Set();
+// The same laptops, told when the Reco Table's sheets changed and were synced (server/reco-watch.js).
+const dataListeners = new Set();
+let recoWatch = null;
 const logs = [];
 
 // ---------- Settings ----------
@@ -126,8 +135,10 @@ function writeSettings(value = settings) {
 
 // ---------- Activity log & state ----------
 
+// Live updates for the window and for the web version's open pages (server/web-admin.js).
 function send(channel, payload) {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
+  if (webAdmin) webAdmin.broadcast(channel, payload);
 }
 
 function log(level, message) {
@@ -331,6 +342,13 @@ async function startApi() {
     },
     getLatestClientVersion: () => clientRelease.get().version,
     appCheck,
+    webAdmin,
+    dataChanges: {
+      subscribe: (listener) => {
+        dataListeners.add(listener);
+        return () => dataListeners.delete(listener);
+      }
+    },
     priceChanges: {
       latestId: () => (priceWatch ? priceWatch.latestId() : 0),
       since: (id) => (priceWatch ? priceWatch.since(id) : []),
@@ -489,6 +507,37 @@ function announcePriceChange(event) {
 // The every-minute NEW PRICING check behind the price-change notices (see PRICE_NOTICES in electron/main.js).
 const PRICE_WATCH = true;
 
+// The Reco Table live: its sheets are checked every 30 seconds; a change is synced at once and the laptops are told
+// to reload their data (no notice is shown). Laptops before 1.0.37 still get it at their 2-minute data check.
+const RECO_WATCH = true;
+const RECO_SHEETS = ['RECO TABLE', RECO_DB_SHEET, LAPTOP_DATABASE_SHEET];
+const RECO_RANGES = { 'RECO TABLE': 'A:ZZ', [RECO_DB_SHEET]: RECO_DB_RANGE, [LAPTOP_DATABASE_SHEET]: LAPTOP_DATABASE_RANGE };
+let recoTitles = { at: 0, titles: [] };
+
+function startRecoWatch() {
+  recoWatch = createRecoWatch({
+    readSheets: async () => {
+      if (!settings.serviceAccountPath || !fs.existsSync(settings.serviceAccountPath)) return {};
+      const connection = { credentialsPath: settings.serviceAccountPath, spreadsheetId: settings.spreadsheetId };
+      // The tab names are looked up every 30 minutes (a tab that is not there would fail the whole read).
+      if (Date.now() - recoTitles.at > 30 * 60 * 1000) recoTitles = { at: Date.now(), titles: await fetchSheetTitles(connection) };
+      const present = RECO_SHEETS.map((name) => [name, recoTitles.titles.find((title) => title.trim().toUpperCase() === name)]).filter(([, title]) => title);
+      if (!present.length) return {};
+      const values = await fetchRangesValues(connection, present.map(([name, title]) => `'${title.replace(/'/g, "''")}'!${RECO_RANGES[name]}`));
+      return Object.fromEntries(present.map(([name], index) => [name, values[index]]));
+    },
+    onChange: async (sheets) => {
+      await (activeSync ? activeSync.then(() => syncNow('reco')) : syncNow('reco')).catch(() => {});
+      const event = { at: new Date().toISOString(), sheets, dataVersion: settings.dataVersion };
+      for (const listener of dataListeners) {
+        try { listener(event); } catch {}
+      }
+    },
+    log
+  });
+  recoWatch.start();
+}
+
 function startPriceWatch() {
   priceWatch = createPriceWatch({
     filePath: path.join(app.getPath('userData'), 'price-changes.json'),
@@ -632,16 +681,23 @@ function openServerDatabase() {
 }
 
 // ---------- Dashboard requests ----------
+// Each action is registered once, for this window (IPC) and for the web version (/server, server/web-admin.js),
+// so both always do the same thing. Actions get (event, ...args); the web passes { web: true, user } as event.
+const adminActions = new Map();
+function handle(channel, action) {
+  adminActions.set(channel, action);
+  ipcMain.handle(channel, action);
+}
 
-ipcMain.handle('server:get-state', () => getState());
-ipcMain.handle('server:get-logs', () => logs);
-ipcMain.handle('server:get-logos', () => ({ header: headerLogo }));
-ipcMain.handle('server:check-client-release', async () => {
+handle('server:get-state', () => getState());
+handle('server:get-logs', () => logs);
+handle('server:get-logos', () => ({ header: headerLogo }));
+handle('server:check-client-release', async () => {
   await clientRelease.checkNow();
   return getState();
 });
 // Data health tab: the last report, or a fresh check.
-ipcMain.handle('server:data-health', (_event, recheck) => {
+handle('server:data-health', (_event, recheck) => {
   if (recheck || !dataHealth) {
     checkDataHealth();
     pushState();
@@ -649,18 +705,18 @@ ipcMain.handle('server:data-health', (_event, recheck) => {
   return dataHealth;
 });
 // Updates tab: look for a new server version now, or install the downloaded one.
-ipcMain.handle('server:check-server-update', () => {
+handle('server:check-server-update', () => {
   serverUpdater.checkNow();
   return getState();
 });
-ipcMain.handle('server:install-server-update', () => {
+handle('server:install-server-update', () => {
   if (activeSync) return { ok: false, error: 'A sync is running. Try again when it finishes.' };
   return { ok: serverUpdater.installNow() };
 });
 // Price changes tab: every kept change, and deleting chosen ones (laptops' Price changes lists read them from here).
-ipcMain.handle('server:price-changes', async () => (priceWatch ? priceWatch.all() : []));
+handle('server:price-changes', async () => (priceWatch ? priceWatch.all() : []));
 
-ipcMain.handle('server:delete-price-changes', async (_event, items = []) => {
+handle('server:delete-price-changes', async (_event, items = []) => {
   const removed = priceWatch ? priceWatch.remove(items) : 0;
   log('info', `Deleted ${removed} price change${removed === 1 ? '' : 's'}`);
   pushState();
@@ -668,19 +724,19 @@ ipcMain.handle('server:delete-price-changes', async (_event, items = []) => {
 });
 
 // Clears the price-change history on every laptop (their Price changes list reads it from here).
-ipcMain.handle('server:clear-price-changes', async () => {
+handle('server:clear-price-changes', async () => {
   if (priceWatch) priceWatch.clear();
   log('info', 'Price-change history cleared');
   pushState();
   return getState();
 });
 
-ipcMain.handle('server:sync-now', async () => {
+handle('server:sync-now', async () => {
   await syncNow();
   return getState();
 });
 
-ipcMain.handle('server:choose-key', async () => {
+handle('server:choose-key', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: 'Choose the Google service-account key',
     properties: ['openFile'],
@@ -705,6 +761,26 @@ ipcMain.handle('server:choose-key', async () => {
   return getState();
 });
 
+// Web version: the key file's contents, chosen on the admin's computer, saved on this server.
+handle('server:set-key-file', async (_event, text) => {
+  let key;
+  try {
+    key = JSON.parse(String(text || ''));
+  } catch {
+    throw new Error('That file is not a valid JSON key file.');
+  }
+  if (key.type !== 'service_account' || !key.client_email || !key.private_key) {
+    throw new Error('That file is not a Google service-account key.');
+  }
+  const keyPath = path.join(app.getPath('userData'), 'google-service-account.json');
+  fs.writeFileSync(keyPath, JSON.stringify(key, null, 2));
+  settings.serviceAccountPath = keyPath;
+  writeSettings();
+  log('info', `Google key set from the web: ${key.client_email}`);
+  pushState();
+  return getState();
+});
+
 // A pasted Google Sheets link or a bare ID → the ID.
 function spreadsheetIdFrom(value) {
   const text = String(value || '').trim();
@@ -712,7 +788,7 @@ function spreadsheetIdFrom(value) {
   return match ? match[1] : text;
 }
 
-ipcMain.handle('server:update-settings', async (_event, changes = {}) => {
+handle('server:update-settings', async (_event, changes = {}) => {
   const previous = { ...settings };
   if (changes.spreadsheetId !== undefined) {
     const id = spreadsheetIdFrom(changes.spreadsheetId);
@@ -761,33 +837,39 @@ ipcMain.handle('server:update-settings', async (_event, changes = {}) => {
   return getState();
 });
 
-ipcMain.handle('server:copy-token', () => {
+handle('server:copy-token', () => {
   clipboard.writeText(settings.token);
   return true;
 });
 
-ipcMain.handle('server:copy-text', (_event, text) => {
+handle('server:copy-text', (_event, text) => {
   clipboard.writeText(String(text || ''));
   return true;
 });
 
 // The JSON for the client's electron/embedded-config.json. Clients try each address in order.
-ipcMain.handle('server:copy-client-config', (_event, address) => {
+function clientConfigText(address) {
   const addresses = getState().addresses;
   const preferred = typeof address === 'string' && address ? address : addresses[0] || `http://SERVER-IP:${settings.port}`;
   const serverUrls = [...new Set([preferred, ...addresses, `http://${os.hostname()}:${settings.port}`])];
-  clipboard.writeText(JSON.stringify({ serverUrl: preferred, serverUrls, serverToken: settings.token }, null, 2));
+  return JSON.stringify({ serverUrl: preferred, serverUrls, serverToken: settings.token }, null, 2);
+}
+handle('server:copy-client-config', (_event, address) => {
+  clipboard.writeText(clientConfigText(address));
   return true;
 });
+// Web version: the copy buttons copy on the admin's own computer, so they get the text instead.
+handle('server:get-token', () => settings.token);
+handle('server:client-config-text', (_event, address) => clientConfigText(address));
 
 // ---------- Data viewer, devices & backups ----------
 
-ipcMain.handle('server:table-data', (_event, tableName, options = {}) => database.getTableData(tableName, options));
+handle('server:table-data', (_event, tableName, options = {}) => database.getTableData(tableName, options));
 
-ipcMain.handle('server:get-devices', () => devicesWithActivity());
-ipcMain.handle('server:get-activity-summary', (_event, days) => (activity ? activity.summary(Number(days) || 30) : null));
-ipcMain.handle('server:get-rejected', () => devices.rejectedList());
-ipcMain.handle('server:clear-rejected', () => {
+handle('server:get-devices', () => devicesWithActivity());
+handle('server:get-activity-summary', (_event, days) => (activity ? activity.summary(Number(days) || 30) : null));
+handle('server:get-rejected', () => devices.rejectedList());
+handle('server:clear-rejected', () => {
   devices.clearRejected();
   pushState();
   return [];
@@ -801,49 +883,53 @@ function userAction(action) {
   return result === undefined ? users.list() : result;
 }
 
-ipcMain.handle('server:get-users', () => users.list());
-ipcMain.handle('server:get-branches', () => database.listBranches());
-ipcMain.handle('server:create-user', (_event, details) => userAction(() => {
+handle('server:get-users', () => users.list());
+handle('server:get-branches', () => database.listBranches());
+handle('server:create-user', (_event, details) => userAction(() => {
   const user = users.create(details || {});
   log('success', `User added: ${user.displayName} (${user.username}, ${user.branch})`);
   return users.list();
 }));
-ipcMain.handle('server:update-user', (_event, username, changes) => userAction(() => {
+handle('server:update-user', (_event, username, changes) => userAction(() => {
   const user = users.update(username, changes || {});
   if (changes && changes.disabled !== undefined) log('warning', `User ${user.username} ${user.disabled ? 'disabled and signed out' : 'enabled'}`);
+  if (changes && changes.serverAdmin !== undefined) {
+    log('warning', `${user.username} ${user.serverAdmin ? 'can now open this server on the web (server admin)' : 'is no longer a server admin'}`);
+    if (!user.serverAdmin && webAdmin) webAdmin.signOut(user.username);
+  }
   return users.list();
 }));
 // Users tab: a user's current password (null when it was set before copies were kept; reset it to view it).
-ipcMain.handle('server:reveal-password', (_event, username) => users.revealPassword(username));
-ipcMain.handle('server:set-user-password', (_event, username, password) => userAction(() => {
+handle('server:reveal-password', (_event, username) => users.revealPassword(username));
+handle('server:set-user-password', (_event, username, password) => userAction(() => {
   users.setPassword(username, password);
   log('info', `Password changed for ${username}; their SalesKit asks them to log in again`);
   return users.list();
 }));
-ipcMain.handle('server:sign-out-user', (_event, username) => userAction(() => {
+handle('server:sign-out-user', (_event, username) => userAction(() => {
   users.signOut(String(username));
   log('info', `${username} was signed out`);
   return users.list();
 }));
-ipcMain.handle('server:remove-user', (_event, username) => userAction(() => {
+handle('server:remove-user', (_event, username) => userAction(() => {
   users.remove(username);
   log('warning', `User removed: ${username}`);
   return users.list();
 }));
 
-ipcMain.handle('server:forget-device', (_event, key) => {
+handle('server:forget-device', (_event, key) => {
   devices.forget(String(key));
   return devicesWithActivity();
 });
 
-ipcMain.handle('server:backup-now', async () => {
+handle('server:backup-now', async () => {
   const name = await backups.create('manual');
   log('success', `Backup saved: ${name}`);
   pushState();
   return getState();
 });
 
-ipcMain.handle('server:restore-backup', async (_event, name) => {
+handle('server:restore-backup', async (_event, name) => {
   if (activeSync) throw new Error('Wait for the current sync to finish.');
   const source = backups.filePath(name);
   const databasePath = database.getStatus().path;
@@ -861,13 +947,15 @@ ipcMain.handle('server:restore-backup', async (_event, name) => {
   return getState();
 });
 
-ipcMain.handle('server:open-backups-folder', () => {
+handle('server:open-backups-folder', () => {
   const folder = path.join(app.getPath('userData'), 'backups');
   fs.mkdirSync(folder, { recursive: true });
   return shell.openPath(folder);
 });
+// Web version: a folder on the server cannot be opened from a browser, so its path is shown instead.
+handle('server:backups-folder-path', () => path.join(app.getPath('userData'), 'backups'));
 
-ipcMain.handle('server:new-token', async () => {
+handle('server:new-token', async () => {
   settings.token = crypto.randomBytes(24).toString('hex');
   writeSettings();
   log('warning', 'New token created. Existing clients are locked out until they are rebuilt with it.');
@@ -918,6 +1006,8 @@ if (!app.requestSingleInstanceLock()) {
           decrypt: (stored) => safeStorage.decryptString(Buffer.from(stored, 'base64'))
         }
       });
+      // This window on the web (/server), for accounts ticked "Server admin" in the Users tab.
+      webAdmin = createWebAdmin({ accounts: users, actions: adminActions, log });
       appCheck = createAppCheck({
         dataDir: path.join(app.getPath('userData'), 'app-check'),
         accounts: users,
@@ -949,6 +1039,7 @@ if (!app.requestSingleInstanceLock()) {
     scheduleSync();
     if (settings.serviceAccountPath) syncNow('startup');
     if (PRICE_WATCH) startPriceWatch();
+    if (RECO_WATCH) startRecoWatch();
     serverUpdater.start();
     pushState();
   });
@@ -957,6 +1048,7 @@ if (!app.requestSingleInstanceLock()) {
     quitting = true;
     clearInterval(syncTimer);
     if (priceWatch) priceWatch.stop();
+    if (recoWatch) recoWatch.stop();
     if (clientRelease) clientRelease.stop();
     if (serverUpdater) serverUpdater.stop();
     if (activity) activity.close();

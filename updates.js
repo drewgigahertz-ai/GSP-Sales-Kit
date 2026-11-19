@@ -9,7 +9,8 @@
       version: '1.0.37',
       date: 'November 19, 2026',
       changes: [
-        'New QUOTATION tab (Ctrl+5): the company quotation form, ready to save as PDF or print. The customer name comes from the Reco Table; add laptops with the search box or the Reco Table buttons, and each one fills in its specs, cash price and freebie. You can change the price, quantity and freebie before saving.'
+        'New QUOTATION tab (Ctrl+5): the company quotation form, ready to save as PDF or print. The customer name comes from the Reco Table; add laptops with the search box or the Reco Table buttons, and each one fills in its specs, cash price and freebie. You can change the price, quantity and freebie before saving.',
+        'Reco Table: changes to the recommended laptops and stock now show within about a minute, like price changes. The laptops you picked stay, and a presentation is not interrupted.'
       ]
     },
     {

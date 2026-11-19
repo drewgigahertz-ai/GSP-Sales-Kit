@@ -311,4 +311,23 @@ async function fetchSheetValues({ credentialsPath, spreadsheetId = DEFAULT_SPREA
   return response.data.values || [];
 }
 
-module.exports = { DEFAULT_SPREADSHEET_ID, DEFAULT_PRICING_SPREADSHEET_ID, SHEETS, fetchSpreadsheetData, fetchSheetValues, fetchPriceMatrixValues, normalizeSheetValues };
+// Several ranges of one spreadsheet in a single request ("'RECO TABLE'!A:ZZ", …) → [values, …] in the same order.
+// A tab that does not exist makes the whole request fail, so callers pass only tabs they know are there.
+async function fetchRangesValues({ credentialsPath, spreadsheetId = DEFAULT_SPREADSHEET_ID }, ranges) {
+  const { google } = require('googleapis');
+  const auth = new google.auth.GoogleAuth({ keyFile: credentialsPath, scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'] });
+  const sheets = google.sheets({ version: 'v4', auth, timeout: REQUEST_TIMEOUT_MS });
+  const response = await sheets.spreadsheets.values.batchGet({ spreadsheetId, ranges, valueRenderOption: 'FORMATTED_VALUE' });
+  return (response.data.valueRanges || []).map((range) => range.values || []);
+}
+
+// The tab names of a spreadsheet.
+async function fetchSheetTitles({ credentialsPath, spreadsheetId = DEFAULT_SPREADSHEET_ID }) {
+  const { google } = require('googleapis');
+  const auth = new google.auth.GoogleAuth({ keyFile: credentialsPath, scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'] });
+  const sheets = google.sheets({ version: 'v4', auth, timeout: REQUEST_TIMEOUT_MS });
+  const response = await sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets.properties.title' });
+  return (response.data.sheets || []).map((sheet) => sheet.properties.title);
+}
+
+module.exports = { DEFAULT_SPREADSHEET_ID, DEFAULT_PRICING_SPREADSHEET_ID, SHEETS, fetchSpreadsheetData, fetchSheetValues, fetchPriceMatrixValues, normalizeSheetValues, fetchRangesValues, fetchSheetTitles };

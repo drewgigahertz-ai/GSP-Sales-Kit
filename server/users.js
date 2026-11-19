@@ -133,6 +133,8 @@ function createUserStore(database, { legacyFile = '', secrets = null } = {}) {
       user.disabled = Boolean(changes.disabled);
       if (user.disabled) signOut(user.username);
     }
+    // Server admin: may sign in to the SalesKit Server's web page (/server).
+    if (changes.serverAdmin !== undefined) user.serverAdmin = Boolean(changes.serverAdmin);
     save(user);
     return publicUser(user);
   }

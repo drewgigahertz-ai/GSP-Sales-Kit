@@ -214,7 +214,7 @@ function renderClientRelease() {
 function renderServerUpdate() {
   const update = state.serverUpdate || { state: 'disabled' };
   const ready = update.state === 'ready';
-  $('serverVersion').textContent = `SalesKit Server ${state.version}`;
+  $('serverVersion').textContent = `Sales Tools Server ${state.version}`;
   $('updateBadge').hidden = !ready;
   $('installServerUpdate').hidden = !ready;
   $('installServerUpdate').disabled = state.syncing;
@@ -755,7 +755,18 @@ function renderUsers(list) {
     const badge = document.createElement('span');
     badge.className = `state-badge ${user.disabled ? 'state-rejected' : 'state-online'}`;
     badge.textContent = user.disabled ? 'Disabled' : 'Active';
-    tr.insertCell().appendChild(badge);
+    const stateCell = tr.insertCell();
+    stateCell.appendChild(badge);
+    // Server admins may also open this server on the web (http://<server>:<port>/server).
+    if (user.serverAdmin) {
+      const admin = document.createElement('span');
+      admin.className = 'state-badge state-online ms-1';
+      admin.style.background = '#e0e7ff';
+      admin.style.color = '#1e3a8a';
+      admin.title = 'Can open this server on the web';
+      admin.innerHTML = '<i class="bi bi-shield-lock"></i> Server admin';
+      stateCell.appendChild(admin);
+    }
     const addCell = (value, className = '') => {
       const cell = tr.insertCell();
       cell.textContent = value || '—';
@@ -789,6 +800,14 @@ function renderUsers(list) {
       button('<i class="bi bi-box-arrow-right"></i>', 'btn-light', 'Sign out now', (element) =>
         run(element, () => api.signOutUser(user.username), `${user.displayName} signed out`).then((next) => next && renderUsers(next)));
     }
+    button(user.serverAdmin ? '<i class="bi bi-shield-fill-check"></i>' : '<i class="bi bi-shield-lock"></i>',
+      user.serverAdmin ? 'btn-primary' : 'btn-light',
+      user.serverAdmin ? 'Server admin: can open this server on the web. Click to remove.' : 'Make server admin: can open this server on the web',
+      (element) => {
+        if (!user.serverAdmin && !confirm(`Let ${user.displayName} (${user.username}) open and manage this server on the web? They can change settings, users and passwords.`)) return;
+        run(element, () => api.updateUser(user.username, { serverAdmin: !user.serverAdmin }),
+          user.serverAdmin ? 'No longer a server admin' : 'Now a server admin').then((next) => next && renderUsers(next));
+      });
     button(user.disabled ? '<i class="bi bi-person-check"></i> Enable' : '<i class="bi bi-person-slash"></i> Disable',
       user.disabled ? 'btn-outline-success' : 'btn-outline-secondary',
       user.disabled ? 'Allow this user to log in again' : 'Block this user and sign them out',

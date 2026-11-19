@@ -62,12 +62,21 @@ function readJsonBody(request, limit = 10 * 1024) {
 //   each new price change the moment it happens (Server-Sent Events).
 // appCheck (optional): server/app-check.js. Its web page (/app-check) has its own sign-in instead of the app token;
 //   laptops send POST /api/app-check/<route> with the app token, also from the sign-in page (no user needed).
-function createLocalApi({ database, token = '', onRequest = null, getDataVersion = () => null, getLatestClientVersion = () => null, getInitialPayload = null, onActivity = null, accounts = null, priceChanges = null, appCheck = null }) {
+// webAdmin (optional): server/web-admin.js, the SalesKit Server window on the web (/server), with its own sign-in.
+function createLocalApi({ database, token = '', onRequest = null, getDataVersion = () => null, getLatestClientVersion = () => null, getInitialPayload = null, onActivity = null, accounts = null, priceChanges = null, appCheck = null, webAdmin = null, dataChanges = null }) {
   return http.createServer(async (request, response) => {
     const url = new URL(request.url, 'http://localhost');
     const address = request.socket.remoteAddress || '';
     let user = null;
     let denied = null; // 'token' (wrong app key) or 'login' (not signed in)
+    if (webAdmin && (url.pathname === '/server' || url.pathname.startsWith('/server/'))) {
+      try {
+        await webAdmin.handle(request, response, url, address);
+      } catch (error) {
+        if (!response.headersSent) sendJson(response, 500, { error: error.message || 'Server request failed.' });
+      }
+      return;
+    }
     if (appCheck && (url.pathname === '/app-check' || url.pathname.startsWith('/app-check/'))) {
       try {
         await appCheck.handleAdmin(request, response, url, address);
@@ -150,7 +159,7 @@ function createLocalApi({ database, token = '', onRequest = null, getDataVersion
       } else if (request.method === 'GET' && url.pathname === '/api/price-changes' && priceChanges) {
         sendJson(response, 200, { latestId: priceChanges.latestId(), events: priceChanges.since(url.searchParams.get('since')) });
       } else if (request.method === 'GET' && url.pathname === '/api/events' && priceChanges) {
-        openEventStream(request, response, priceChanges);
+        openEventStream(request, response, priceChanges, dataChanges);
       } else if (request.method === 'GET' && url.pathname === '/api/status') {
         const status = database.getStatus();
         sendJson(response, 200, { connected: status.connected, tableCount: status.tableCount });
@@ -187,7 +196,9 @@ function createLocalApi({ database, token = '', onRequest = null, getDataVersion
 
 // Keeps the response open and writes each price change as an event; a comment every 25 seconds keeps
 // proxies and firewalls from closing an idle connection.
-function openEventStream(request, response, priceChanges) {
+// dataChanges (optional): { subscribe(listener) → unsubscribe }: the Reco Table's sheets changed and were synced
+// (server/reco-watch.js); each one is sent as a "data" event, so the laptop reloads its data at once.
+function openEventStream(request, response, priceChanges, dataChanges = null) {
   response.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -198,10 +209,15 @@ function openEventStream(request, response, priceChanges) {
   const unsubscribe = priceChanges.subscribe((event) => {
     response.write(`event: prices\ndata: ${JSON.stringify(event)}\n\n`);
   });
+  // Laptops before 1.0.37 skip events they do not know, so "data" is safe to send to every laptop.
+  const unsubscribeData = dataChanges ? dataChanges.subscribe((event) => {
+    response.write(`event: data\ndata: ${JSON.stringify(event)}\n\n`);
+  }) : () => {};
   const keepAlive = setInterval(() => response.write(': ping\n\n'), 25 * 1000);
   const close = () => {
     clearInterval(keepAlive);
     unsubscribe();
+    unsubscribeData();
   };
   request.on('close', close);
   response.on('error', close);
