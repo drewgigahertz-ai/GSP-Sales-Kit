@@ -26,6 +26,7 @@ const { RECO_DB_SHEET, RECO_DB_RANGE, recoDbCollection } = require('./reco-db');
 const { readPriceMatrix } = require('./price-matrix');
 const { PROMO_IMAGES_SHEET, readPromoIcons } = require('./promo-icons');
 const { BRANCH_QR_SHEET, BRANCH_QR_RANGE, branchQrCollection } = require('./branch-qr');
+const { readAgeingMonitoring } = require('./ageing-monitoring');
 const {
   LAPTOP_DATABASE_SHEET, LAPTOP_DATABASE_RANGE, UKSP_ICON_SHEET, UKSP_ICON_RANGE,
   parseLaptopDb, laptopDatabaseCollection, bannerSpecsCollection, bannerLaptopsCollection
@@ -242,6 +243,14 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
       valueRenderOption: 'FORMATTED_VALUE'
     });
     result.ageing_banner = ageingBannerCollection(response.data.values || []);
+  }
+
+  // Clearance banners for ageing laptops (see ageing-monitoring.js): AGEING BANNER MONITORING in PROMO MONITORING,
+  // freebie pictures from PERIPHEALS. When it cannot be read, the last synced ones stay.
+  try {
+    result.ageing_monitoring = await readAgeingMonitoring(sheets, { mainSpreadsheetId: spreadsheetId, mainTitles: titles });
+  } catch (error) {
+    onProgress({ phase: 'warning', message: `AGEING BANNER MONITORING: ${error.message}; the last synced clearance banners are kept.` });
   }
 
   // Who each application is for (see app-usability.js): DV columns I–K, else the USABILITY tab; skipped when

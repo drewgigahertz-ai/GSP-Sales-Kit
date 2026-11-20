@@ -19,6 +19,7 @@
     "electron/banner-data.js",
     "electron/feature-banners.js",
     "electron/ageing-banners.js",
+    "electron/ageing-monitoring.js",
     "electron/app-usability.js",
     "electron/branch-details.js",
     "electron/branch-qr.js",

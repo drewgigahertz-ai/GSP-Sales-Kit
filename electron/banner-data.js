@@ -45,6 +45,7 @@ const TERM_PRICE_COLUMNS = {
 };
 
 const { promoKey } = require('./promo-icons');
+const { clearanceByItem } = require('./ageing-monitoring');
 
 // 'A' → 0, 'CG' → 84.
 function columnIndex(letters) {
@@ -277,6 +278,8 @@ function buildBannerData(rows, imageUrl = (value) => value, now = new Date()) {
   }
   // Ready-made ageing banner per item code (AGEING BANNER sheet), shown instead of the generated banner.
   const ageingByItem = new Map((rows.ageing || []).map((row) => [matchKey(row.item_code), row.banner]));
+  // Clearance banner details per item code (AGEING BANNER MONITORING, see ageing-monitoring.js), drawn by the Banner page.
+  const clearanceByKey = new Map([...clearanceByItem(rows.ageingMonitoring || [], imageUrl)].map(([key, value]) => [matchKey(key), value]));
   // RECO TABLE: a laptop listed under several target markets takes the one it appears in most often
   // (the first listed on a tie).
   // A laptop can be in different segments at different branches: segmentByBranch keeps each branch's
@@ -444,6 +447,7 @@ function buildBannerData(rows, imageUrl = (value) => value, now = new Date()) {
       branchPrices: byBranch,
       promoRows: (pricesByItem.get(key) || []).map(promoRow),
       ageingBanner: ageingByItem.has(key) ? imageUrl(text(ageingByItem.get(key))) : '',
+      clearance: clearanceByKey.get(key) || null,
       features: [1, 2, 3, 4]
         .map((n) => ({ name: text(laptop[`uksp${n}`]), picture: picture(laptop[`uksp${n}_pic`], 'spec', laptop[`uksp${n}`]) }))
         .filter((feature) => feature.name)
@@ -467,6 +471,7 @@ function buildBannerData(rows, imageUrl = (value) => value, now = new Date()) {
       priceDetails: [],
       promo: null,
       ageingBanner: imageUrl(text(row.banner)),
+      clearance: clearanceByKey.get(key) || null,
       ageingOnly: true,
       features: []
     });

@@ -11,6 +11,7 @@
   <script src="./node_modules/html2canvas/dist/html2canvas.min.js"></script>
   <script src="./banner-color.js"></script>
   <script src="./banner-hotkeys.js"></script>
+  <script src="./banner-clearance.js"></script>
   <link href="./node_modules/@fontsource/outfit/400.css" rel="stylesheet">
   <link href="./node_modules/@fontsource/outfit/500.css" rel="stylesheet">
   <link href="./node_modules/@fontsource/outfit/600.css" rel="stylesheet">
@@ -317,6 +318,21 @@
     }
 
     #wrap.show-ageing #ageingBanner {
+      display: block;
+    }
+
+    /* The clearance banner (banner-clearance.js) for an ageing laptop in AGEING BANNER MONITORING: drawn over the stage,
+       so it fits the window and fullscreen like the generated banner. */
+    #clearanceCanvas {
+      position: absolute;
+      inset: 0;
+      z-index: 40;
+      display: none;
+      width: 100%;
+      height: 100%;
+    }
+
+    #wrap.show-clearance #clearanceCanvas {
       display: block;
     }
 
@@ -1071,6 +1087,7 @@
           <div class="abs feature" style="left:1327px" id="feature4"><img class="picture-slot" alt="" hidden><span></span></div>
 
           <div class="abs price-details" id="priceDetails" aria-label="Price details"></div>
+          <canvas id="clearanceCanvas" aria-label="Clearance banner"></canvas>
         </div>
         <img id="ageingBanner" alt="">
       </div>
@@ -1344,13 +1361,40 @@
       });
     }
 
+    // Draws the laptop's clearance banner (banner-clearance.js) on the stage; options as BannerClearance.draw.
+    let clearanceDrawing = 0;
+    async function clearanceUrls(item) {
+      const logo = !$('gigaLogoImage').hidden && $('gigaLogoImage').getAttribute('src') ? $('gigaLogoImage').src : '';
+      const freebies = await Promise.all((item.clearance.freebies || []).map((f) => pictureUrl(f.picture)));
+      return { logo, freebies };
+    }
+    async function drawClearance(item, canvas = $('clearanceCanvas'), options = {}) {
+      if (!window.BannerClearance || !item || !item.clearance) return null;
+      const drawing = canvas === $('clearanceCanvas') ? ++clearanceDrawing : 0;
+      const urls = await clearanceUrls(item);
+      if (drawing && drawing !== clearanceDrawing) return null;
+      const target = drawing ? document.createElement('canvas') : canvas;
+      await BannerClearance.draw(target, item.clearance, urls, options);
+      if (drawing) {
+        if (drawing !== clearanceDrawing) return null;
+        canvas.width = target.width; canvas.height = target.height;
+        canvas.getContext('2d').drawImage(target, 0, 0);
+      }
+      return canvas;
+    }
+
     function showBannerView(item, view) {
       // AGEING promo laptops (and ageing laptops not in LAPTOP RAW) only have the clearance banner.
       const ageingOnly = Boolean(item.ageingOnly || priceFor(item).ageingOnly);
-      bannerView = ageingOnly || (item.ageingBanner && view === 'ageing') ? 'ageing' : 'generated';
-      $('wrap').classList.toggle('show-ageing', bannerView === 'ageing');
+      // The ageing view is the clearance banner (AGEING BANNER MONITORING) when the laptop has one, else the
+      // ready-made AGEING BANNER picture.
+      const hasAgeing = Boolean(item.clearance || item.ageingBanner);
+      bannerView = ageingOnly || (hasAgeing && view === 'ageing') ? 'ageing' : 'generated';
+      $('wrap').classList.toggle('show-ageing', bannerView === 'ageing' && !item.clearance);
+      $('wrap').classList.toggle('show-clearance', bannerView === 'ageing' && Boolean(item.clearance));
+      if (bannerView === 'ageing' && item.clearance) drawClearance(item);
       const choose = $('bannerViewSwitch');
-      choose.hidden = !item.ageingBanner || ageingOnly;
+      choose.hidden = !hasAgeing || ageingOnly;
       choose.querySelectorAll('button').forEach((button) => {
         const active = button.dataset.view === bannerView;
         button.classList.toggle('is-active', active);
@@ -1596,7 +1640,11 @@
       $('bannerStatus').textContent = 'Preparing the banner…';
       try {
         let url;
-        if (bannerView === 'ageing' && item.ageingBanner) {
+        if (bannerView === 'ageing' && item.clearance) {
+          // 3840×2160, drawn again leaving out any picture the canvas may not save.
+          const canvas = await drawClearance(item, document.createElement('canvas'), { readableOnly: true });
+          url = canvas.toDataURL('image/png');
+        } else if (bannerView === 'ageing' && item.ageingBanner) {
           url = item.ageingBanner;
         } else {
           const shapes = markSlantedShapes($('stage'));

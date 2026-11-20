@@ -17,6 +17,7 @@ const SHEET_TABLES = new Set([
   'banner_prices',
   'features_banner',
   'ageing_banner',
+  'ageing_monitoring',
   'usability',
   'branch_details',
   'branch_qr',
@@ -306,6 +307,31 @@ function makeCriteriaData(rows, specsBySku, appHierarchyMap) {
 // Banner page branch filter: each laptop's stock per branch: LAPTOP DB's inventory columns; for a laptop not in
 // LAPTOP DB (or while it has no inventory at all), Criteria Segment-Application, then RECO TABLE's BR STOCK.
 // item.stock lists only branches with stock; bannerData.stockBranches lists every branch.
+// The clearance banner's model, part number and specs (banner-clearance.js): from LAPTOP DB, by the item's name, or
+// for a demo unit ("… - D", often not in LAPTOP DB) by its part number.
+function attachClearanceLaptops(bannerData, laptopDatabase = []) {
+  const key = (value) => String(value || '').toUpperCase().replace(/\s+/g, ' ').trim();
+  const byItem = new Map(laptopDatabase.map((laptop) => [key(laptop.item), laptop]));
+  const byPart = new Map(laptopDatabase.filter((laptop) => laptop.partNumber).map((laptop) => [key(laptop.partNumber), laptop]));
+  for (const item of bannerData.items || []) {
+    if (!item.clearance) continue;
+    const part = (key(item.itemCode).match(/^LAP-\S+\s+(\S+)/) || [])[1] || '';
+    const laptop = byItem.get(key(item.itemCode)) || byPart.get(part);
+    if (!laptop) continue;
+    const specs = laptop.specs || {};
+    // "HP HP 14S-DQ3036TU" with part number 14S-DQ3036TU → "HP 14S"
+    const brand = key(laptop.brand), partNumber = key(laptop.partNumber);
+    let model = key([laptop.brand, laptop.model].filter(Boolean).join(' ')).replace(/^(\S+)\s+\1(?=\s|$)/, '$1');
+    if (partNumber && model.includes(partNumber)) {
+      model = model.replace(partNumber, '').replace(/(\s+-)+\s*$/, '').replace(/\s+/g, ' ').trim();
+      if (!model || model === brand) model = `${brand} ${partNumber.split('-')[0]}`.trim();
+    }
+    item.clearance.model = model;
+    item.clearance.partNumber = laptop.partNumber || '';
+    item.clearance.specs = { PROCESSOR: specs.Processor || '', STORAGE: specs.Storage || '', GRAPHICS: specs.Graphics || '', RESOLUTION: specs.Resolution || '', MEMORY: specs.Memory || '', OS: specs.OS || '' };
+  }
+}
+
 function attachBranchStock(bannerData, criteriaSegmentData, recoRows, laptopDatabase = []) {
   const stockByItem = new Map();
   for (const laptop of criteriaSegmentData.laptops) {
@@ -494,6 +520,7 @@ function getInitialData() {
     photos: getRows('banner_photos'),
     prices: getRows('banner_prices'),
     ageing: getRows('ageing_banner'),
+    ageingMonitoring: getRows('ageing_monitoring'),
     promoIcons: getRows('promo_icons'),
     reco: recoTableData,
     // Laptops on the Flyers page that are not in LAPTOP RAW still get their NEW PRICING prices (extraPrices).
@@ -512,6 +539,7 @@ function getInitialData() {
   );
   const laptopDatabase = makeLaptopDatabase(getRows('laptop_database'));
   attachBranchStock(bannerData, criteriaSegmentData, recoTableData, laptopDatabase);
+  attachClearanceLaptops(bannerData, laptopDatabase);
   const ukspBannerData = makeUkspBannerData(getRows('uksp_banner'), getRows('features_banner'));
   const modelBySku = Object.fromEntries(Object.entries(specsBySku).map(([sku, spec]) => [sku, spec.title]));
   ukspBannerData.skus.forEach(({ sku, model }) => {

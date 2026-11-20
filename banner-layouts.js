@@ -348,7 +348,7 @@
   }
 
   function isClearance() {
-    return $('wrap').classList.contains('show-ageing');
+    return $('wrap').classList.contains('show-ageing') || $('wrap').classList.contains('show-clearance');
   }
 
   function play() {

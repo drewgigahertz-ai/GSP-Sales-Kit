@@ -14,6 +14,7 @@
         'Quotation pages: a long quotation shows as separate A4 pages, broken exactly as in the PDF, so you can see how many pages it will be.',
         'Quotation payment terms: each laptop has Promo, Bundle and Payment term choices (Cash, 3, 6, 9, 12, 18 and 24 months, Home Credit). The price fills in for your choice, with bundle the freebie shows what it is worth, and the quotation names the banks for that term.',
         'Quotation position: type the position shown after the name under the signature (e.g. Branch Personnel) in Branch details. Blank shows Branch Manager.',
+        'Banner: ageing laptops now show a CLEARANCE SALE banner with their discounted cash price, the price before, their specs and their freebies with pictures. Download saves it as a picture.',
         'Reco Table: changes to the recommended laptops and stock now show within about a minute, like price changes. The laptops you picked stay, and a presentation is not interrupted.'
       ]
     },
