@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <title>Quotation</title>
   <!-- QUOTATION tab, shown in a frame by quotation-bridge.js: the centralized quotation format (one A4 page).
-       Branch header and signature from the LOGO sheet (address, TIN, mobile, branch manager, Viber / FB QR codes);
+       Branch header and signature from the sheets (LOGO: address; Branch FB/QR: TIN, branch manager, Viber / FB QR
+       codes; each can be replaced per laptop in the Branch details panel);
        laptop lines from LAPTOP DB (model, part number, specs) and NEW PRICING (the branch's cash price, editable,
        and its promo / freebie). Customer name from the Reco Table. Saved as PDF or printed. -->
   <link href="./node_modules/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
@@ -131,7 +132,9 @@
     .pic { min-width: 0; background: #fff; border: 1px solid #dbe5f3; border-radius: 7px; padding: 4px; text-align: center; }
     .pic-name { font-size: .6rem; font-weight: 700; color: #334155; }
     .pic .prev { height: 62px; margin: 4px 0; display: flex; align-items: center; justify-content: center; background: #f8fafc; border-radius: 5px; color: #94a3b8; font-size: .58rem; }
+    .pic .prev { position: relative; }
     .pic .prev img { max-width: 100%; max-height: 62px; object-fit: contain; }
+    .pic .pic-src { position: absolute; left: 0; right: 0; bottom: 0; font-size: .5rem; color: #475569; background: rgba(255,255,255,.85); }
     .pic .acts { display: flex; gap: 3px; justify-content: center; }
     .pic .acts button { font: 600 11px inherit; font-family: inherit; border: 1px solid #cbd5e1; background: #fff; border-radius: 5px; padding: 1px 0; width: 28px; cursor: pointer; }
     .pic .acts button:disabled { opacity: .4; cursor: default; }
@@ -156,6 +159,8 @@
       #page { padding: 0; }
       #sheet { box-shadow: none; }
       input.plain { border-bottom-color: transparent !important; }
+      /* printing a long quotation: pages break between rows and lines, never through them */
+      tr, .notes p, .notes .row, .grand, .sign { break-inside: avoid; }
     }
   </style>
 </head>
@@ -204,7 +209,7 @@
     <div class="side-actions">
       <button type="button" class="btn" id="infoSave"><i class="bi bi-check2"></i> Save</button>
       <button type="button" class="btn light" id="infoCancel" title="Go back to what is saved">Undo</button>
-      <button type="button" class="btn light" id="infoReset" title="Forget what was saved here and use the LOGO sheet">Use LOGO sheet</button>
+      <button type="button" class="btn light" id="infoReset" title="Forget what was saved on this laptop and use the sheets (Branch FB/QR, LOGO)">Use sheet details</button>
     </div>
     <div class="side-note">Stays the same on every quotation until someone changes it here and presses Save.</div>
   </div>
@@ -313,6 +318,16 @@
     });
     return imageCache[url];
   }
+  // The FB page's name for the caption. The sheet's FB LINKS column may hold the page's web address instead of its
+  // name: then the store name is used ("GIGAHERTZ" → "Gigahertz", "G-GADGETS" → "G-Gadgets").
+  function fbPageName(d) {
+    var name = String(d.fbName || "").trim();
+    if (name && !/^(https?:\/\/|www\.|(?:[\w-]+\.)*facebook\.com|fb\.com)/i.test(name)) return name;
+    var store = String(d.storeName || "").trim();
+    if (!store) return "Gigahertz";
+    if (/^(ASUS|ROG)$/i.test(store)) return store.toUpperCase();
+    return store.toLowerCase().replace(/(^|[\s-])([a-z])/g, function (m, sep, ch) { return sep + ch.toUpperCase(); });
+  }
   function setImage(holder, url, cls, alt, emptyText) {
     if (!url) { holder.innerHTML = emptyText ? '<div class="qr-empty">' + esc(emptyText) + "</div>" : ""; return; }
     picture(url).then(function (src) {
@@ -349,12 +364,19 @@
     saveDraft();
   }
   function saved() { return savedInfo[branch()] || null; }
-  // A saved branch uses exactly what was saved (blank stays blank); otherwise the LOGO sheet's value.
-  function branchValue(field) {
-    var s = saved();
-    if (s) return s[field] || "";
+  // The sheets' value (Branch FB/QR, else the LOGO sheet) and the one saved on this laptop. A field saved here is
+  // used when it is filled in; an empty one falls back to the sheets, so a branch saved with blanks still gets
+  // what head office puts in the sheets.
+  function sheetValue(field) {
     var d = details();
     return field === "logo" ? (d.logo && d.logo !== data.logos.blue ? d.logo : "") : (d[field] || "");
+  }
+  function savedValue(field) {
+    var s = saved();
+    return (s && s[field]) || "";
+  }
+  function branchValue(field) {
+    return savedValue(field) || sheetValue(field);
   }
   // Empty TIN / mobile parts (and the "|" between them) are left out of the PDF and print.
   function markEmpty() {
@@ -380,7 +402,7 @@
     setImage(el("fbQr"), branchValue("fbQr"), "qr", "FB page QR code", "FB QR: add it in Branch details");
     setImage(el("branchLogo"), branchValue("logo"), "branch-logo", "Branch logo", "");
     // The FB page's name (Branch FB/QR → FB LINKS), e.g. "Acer Concept Store - Festival Mall Alabang".
-    el("fbCap").innerHTML = "scan to visit our Official<br><b>" + esc(d.fbName || "Gigahertz") + "</b> FB Page";
+    el("fbCap").innerHTML = "scan to visit our Official<br><b>" + esc(fbPageName(d)) + "</b> FB Page";
     // The panel follows the branch, but never wipes changes that are not saved yet (e.g. on a data refresh).
     if (!dirty) fillInfo();
   }
@@ -397,29 +419,38 @@
     sub.classList.toggle('unsaved', on);
     sub.textContent = on ? 'Not saved yet: press Save'
       : s && s.savedAt ? 'Saved on this laptop · ' + new Date(s.savedAt).toLocaleString()
-      : 'Not saved yet · from the LOGO sheet';
+      : 'Nothing saved here · from the sheets';
     el('infoSave').disabled = !on;
     el('infoCancel').disabled = !on;
     el('infoReset').disabled = !s;
   }
+  // The fields hold only what is saved on this laptop; the sheets' value shows in grey (and is used) when blank.
   function fillInfo() {
-    var d = details();
-    TEXT_FIELDS.forEach(function (f) { el('f_' + f).value = branchValue(f); });
-    Array.prototype.forEach.call(document.querySelectorAll('[data-sheet]'), function (span) {
-      var v = d[span.getAttribute('data-sheet')];
-      span.textContent = saved() && v ? 'LOGO sheet: ' + v : '';
+    TEXT_FIELDS.forEach(function (f) {
+      var input = el('f_' + f);
+      if (!input.dataset.example) input.dataset.example = input.placeholder;
+      input.value = savedValue(f);
+      input.placeholder = sheetValue(f) || input.dataset.example;
     });
-    PIC_FIELDS.forEach(function (f) { form[f] = branchValue(f); });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-sheet]'), function (span) {
+      var f = span.getAttribute('data-sheet'), v = sheetValue(f);
+      span.textContent = !v ? 'Not in the sheets' : savedValue(f) ? 'Sheet: ' + v + ' · this laptop’s is used' : 'From the sheet · type to replace it';
+    });
+    PIC_FIELDS.forEach(function (f) { form[f] = savedValue(f); });
     renderPics();
     el('infoMsg').textContent = '';
     setDirty(false);
   }
+  // Each picture: the one chosen on this laptop, else the sheets' (marked "from the sheet").
   function renderPics() {
     Array.prototype.forEach.call(document.querySelectorAll('[data-pic]'), function (box) {
-      var f = box.getAttribute('data-pic'), url = form[f], prev = box.querySelector('.prev');
-      box.querySelector('[data-remove]').disabled = !url;
+      var f = box.getAttribute('data-pic'), own = form[f], url = own || sheetValue(f), prev = box.querySelector('.prev');
+      box.querySelector('[data-remove]').disabled = !own;
+      box.querySelector('[data-remove]').title = own ? 'Remove this laptop’s picture (the sheet’s is used again)' : 'No picture chosen on this laptop';
       if (!url) { prev.textContent = 'No picture'; return; }
-      picture(url).then(function (src) { prev.innerHTML = '<img alt="" src="' + esc(src) + '">'; });
+      picture(url).then(function (src) {
+        prev.innerHTML = '<img alt="" src="' + esc(src) + '">' + (own ? '' : '<span class="pic-src">from the sheet</span>');
+      });
     });
   }
   // A chosen picture, made at most 600 px wide or tall, as a data: address (small enough to keep on the laptop).
@@ -462,7 +493,9 @@
     TEXT_FIELDS.forEach(function (f) { entry[f] = el('f_' + f).value.replace(/\s+/g, ' ').trim(); });
     PIC_FIELDS.forEach(function (f) { entry[f] = form[f] || ''; });
     var next = Object.assign({}, savedInfo);
-    next[branch()] = entry;
+    // Nothing typed or chosen: nothing to keep (the branch uses the sheets).
+    var anything = TEXT_FIELDS.concat(PIC_FIELDS).some(function (f) { return entry[f]; });
+    if (anything) next[branch()] = entry; else delete next[branch()];
     try {
       localStorage.setItem(INFO_KEY, JSON.stringify(next));
     } catch (e) {
@@ -475,12 +508,12 @@
     el('status').textContent = 'Branch details saved';
   });
   el('infoReset').addEventListener('click', function () {
-    if (!confirm('Forget the details saved for ' + branch() + ' on this laptop and use the LOGO sheet’s?')) return;
+    if (!confirm('Forget the details saved for ' + branch() + ' on this laptop and use the sheets’ details (Branch FB/QR, LOGO)?')) return;
     delete savedInfo[branch()];
     try { localStorage.setItem(INFO_KEY, JSON.stringify(savedInfo)); } catch (e) { /* kept in memory */ }
     dirty = false;
     renderHeader();
-    el('status').textContent = 'Using the LOGO sheet’s details';
+    el('status').textContent = 'Using the sheets’ details';
   });
   el('infoCancel').addEventListener('click', fillInfo);
   // Enter in a field saves.
@@ -673,6 +706,54 @@
     var who = (el("customer").value || "CUSTOMER").toUpperCase().replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim();
     return "QUOTATION - " + who + " " + stamp;
   }
+  // PDF pages: the copy of the sheet that is drawn gets blank space before the block that would run past the end of
+  // an A4 page, so that block starts the next page (below a top margin) and every page is cut in blank space. A page
+  // ends before a laptop, the total, a payment block or the signature ("good"), else before a line of the notes or a
+  // table row ("ok"); a block taller than a page is cut where it falls. Returns the height of the content (sheet px).
+  var PAGE_PX = 794 * 297 / 210, PAGE_TOP = 34, PAGE_BOTTOM = 30;
+  function paginate(sheet) {
+    var doc = sheet.ownerDocument;
+    var list = function (sel) { return Array.prototype.slice.call(sheet.querySelectorAll(sel)); };
+    var topOf = function (node) {
+      var base = sheet.getBoundingClientRect().top, top = node.getBoundingClientRect().top, prev = node.previousElementSibling;
+      if (prev) top = Math.min(top, prev.getBoundingClientRect().bottom);
+      return top - base;
+    };
+    var bottom = function () { var sign = sheet.querySelector(".sign"); return (sign ? sign.getBoundingClientRect().bottom - sheet.getBoundingClientRect().top : sheet.scrollHeight) + PAGE_BOTTOM; };
+    for (var page = 0; page < 30; page++) {
+      var pageEnd = (page + 1) * PAGE_PX;
+      if (bottom() <= pageEnd) break;
+      var from = page * PAGE_PX + (pageEnd - page * PAGE_PX) * 0.4, to = pageEnd - PAGE_BOTTOM;
+      var notFirst = function (n) { return n.previousElementSibling; }; // never before a table's first row
+      var good = list("table.q tbody tr.line-tools").filter(notFirst).concat([".grand", ".notes", ".sign"].map(function (q) { return sheet.querySelector(q); }).filter(Boolean),
+        list(".notes > .gap").map(function (g) { return g.nextElementSibling; }).filter(Boolean));
+      var ok = list(".notes > p, .notes > .row").concat(list("table.q tbody tr").filter(notFirst));
+      var pick = function (nodes) {
+        var best = null, bestTop = -1;
+        nodes.forEach(function (n) { var t = topOf(n); if (t > from && t <= to && t > bestTop) { best = n; bestTop = t; } });
+        return best ? { node: best, top: bestTop } : null;
+      };
+      var cut = pick(good) || pick(ok);
+      if (!cut) continue;
+      var spacer = doc.createElement("div");
+      spacer.style.height = (pageEnd + PAGE_TOP - cut.top) + "px";
+      if (cut.node.tagName === "TR") {
+        // A break inside the laptops: the rows from there go into a new table (with the header row again) on the next
+        // page, so the first table closes with its border instead of running on into the blank space.
+        var table = cut.node.closest("table"), rest = table.cloneNode(false), body = doc.createElement("tbody");
+        var head = table.querySelector("thead");
+        if (head) rest.appendChild(head.cloneNode(true));
+        rest.appendChild(body);
+        var row = cut.node;
+        while (row) { var next = row.nextElementSibling; body.appendChild(row); row = next; }
+        table.parentNode.insertBefore(rest, table.nextSibling);
+        table.parentNode.insertBefore(spacer, rest);
+      } else {
+        cut.node.parentNode.insertBefore(spacer, cut.node);
+      }
+    }
+    return bottom();
+  }
   el("download").addEventListener("click", function () {
     if (el("download").disabled) return;
     el("status").textContent = "Preparing the PDF…";
@@ -680,6 +761,8 @@
     document.body.classList.add("capturing");
     var sheet = el("sheet");
     var inputs = Array.prototype.slice.call(sheet.querySelectorAll("input"));
+    var images = Array.prototype.slice.call(sheet.querySelectorAll("img"));
+    var contentPx = 0;
     html2canvas(sheet, {
       scale: 2, useCORS: true, backgroundColor: "#ffffff",
       // html2canvas draws text boxes a little off (text cut at the bottom): the copy it draws gets plain text instead.
@@ -692,18 +775,36 @@
             + (cs ? "font:" + cs.font + ";text-align:" + cs.textAlign + ";color:" + cs.color + ";" : "");
           copy.parentNode.replaceChild(span, copy);
         });
+        // html2canvas ignores object-fit (the logo came out squashed): each picture gets its fitted size instead.
+        Array.prototype.slice.call(doc.getElementById("sheet").querySelectorAll("img")).forEach(function (copy, i) {
+          var original = images[i];
+          if (!original || !original.naturalWidth || !original.naturalHeight) return;
+          var w = original.clientWidth, h = original.clientHeight;
+          if (!w || !h) return;
+          var scale = Math.min(w / original.naturalWidth, h / original.naturalHeight);
+          var fw = original.naturalWidth * scale, fh = original.naturalHeight * scale;
+          copy.style.width = fw + "px"; copy.style.height = fh + "px"; copy.style.maxWidth = "none";
+          copy.style.objectFit = "fill";
+          copy.style.margin = ((h - fh) / 2) + "px " + ((w - fw) / 2) + "px";
+        });
+        contentPx = paginate(doc.getElementById("sheet"));
       }
     }).then(function (canvas) {
       var pdf = new window.jspdf.jsPDF({ unit: "mm", format: "a4" });
-      // One A4 page per 1123 px of the sheet (long quotations continue on the next page).
-      var pagePx = Math.round(canvas.width * 297 / 210);
-      for (var y = 0, page = 0; y < canvas.height; y += pagePx, page++) {
-        var h = Math.min(pagePx, canvas.height - y);
+      // A4 pages; a long quotation continues on the next page, broken between blocks (a laptop, a payment block,
+      // the signature) rather than through a line of text, with a top margin on the pages after the first.
+      var k = canvas.width / sheet.offsetWidth; // canvas px per sheet px
+      var pagePx = Math.round(PAGE_PX * k);
+      var pages = Math.max(1, Math.ceil((contentPx || canvas.height / k) / PAGE_PX - 0.001));
+      for (var page = 0; page < pages; page++) {
+        var y = page * pagePx, h = Math.max(0, Math.min(pagePx, canvas.height - y));
         var slice = document.createElement("canvas");
-        slice.width = canvas.width; slice.height = h;
-        slice.getContext("2d").drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+        slice.width = canvas.width; slice.height = pagePx;
+        var g = slice.getContext("2d");
+        g.fillStyle = "#ffffff"; g.fillRect(0, 0, slice.width, slice.height);
+        if (h) g.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
         if (page > 0) pdf.addPage();
-        pdf.addImage(slice.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, 210, h * 210 / canvas.width);
+        pdf.addImage(slice.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, 210, 297);
       }
       var dataUrl = pdf.output("datauristring").replace(/^data:application\/pdf;[^,]*,/, "data:application/pdf;base64,");
       toParent({ channel: "saleskit-quotation-save", files: [{ name: fileName(), dataUrl: dataUrl }] });
