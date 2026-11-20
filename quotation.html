@@ -27,6 +27,10 @@
     /* ---------- toolbar (never printed) ---------- */
     #bar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 16px; background: #fff; border-bottom: 1px solid #dbe3ee; box-shadow: 0 2px 10px rgba(15, 23, 42, .06); }
     #bar h1 { margin: 0 8px 0 0; font-size: 16px; font-weight: 800; color: var(--bar); letter-spacing: .3px; }
+    /* Under development: the tab is out for testing and feedback (screen only, never on the PDF or print). */
+    .dev-badge { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: #f59e0b; color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .6px; vertical-align: 3px; }
+    .dev-note { flex-basis: 100%; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 8px; background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; font-size: 12px; }
+    .dev-note i { font-size: 15px; }
     .field { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--muted); }
     .field select { font: 600 13px inherit; font-family: inherit; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; }
     .add-wrap { position: relative; flex: 1 1 320px; max-width: 520px; }
@@ -220,7 +224,7 @@
 </head>
 <body>
 <div id="bar" class="no-print">
-  <h1><i class="bi bi-file-earmark-text"></i> QUOTATION</h1>
+  <h1><i class="bi bi-file-earmark-text"></i> QUOTATION<span class="dev-badge">UNDER DEVELOPMENT</span></h1>
   <div class="add-wrap">
     <i class="bi bi-search" aria-hidden="true"></i>
     <input id="search" type="search" placeholder="Add a laptop: type model, part number or SKU (Ctrl+Shift+L)" autocomplete="off" spellcheck="false" aria-label="Add a laptop">
@@ -230,6 +234,7 @@
   <button id="download" type="button" class="btn" title="Save as PDF (Ctrl+D)"><i class="bi bi-download"></i> Download PDF</button>
   <button id="print" type="button" class="btn" title="Print (Ctrl+P)"><i class="bi bi-printer"></i> Print</button>
   <span id="status"></span>
+  <div class="dev-note"><i class="bi bi-cone-striped" aria-hidden="true"></i><span><b>Under development:</b> this tab is still being tested. Check the prices and details before giving a quotation to a customer, and send your feedback to Process Improvement.</span></div>
 </div>
 <div class="layout">
 <!-- LEFT: Branch details (like the Reco Table's Customer Profiling), saved on this laptop per branch -->
@@ -681,8 +686,8 @@
         + '<input class="plain" data-k="qty" data-i="' + i + '" value="' + esc(line.qty) + '" inputmode="numeric" aria-label="Quantity">'
         + '<span class="total" data-total="' + i + '">' + money(total) + "</span></div>"
         + '<div class="terms">Exclusive price for:' + lineOptions(line, laptop, i) + esc((window.QuotationTerms ? QuotationTerms.get(line.term) : { text: "Cash on Hand, Bank Transfer or Check Payment only." }).text) + "</div></td></tr>"
-        + '<tr class="free"><td class="lbl">Bundle/worth of freebie:</td><td colspan="2"><input class="plain" data-k="freebie" data-i="' + i + '" value="' + esc(line.freebie) + '" placeholder="None" aria-label="Freebie"></td><td colspan="2" class="per">*per unit.</td></tr>';
-    // (the freebie spans Specs and Price, "*per unit." sits under Quantity and Total, as on the printed form)
+        + '<tr class="free"><td class="lbl">Bundle/worth of freebie:</td><td colspan="4"><input class="plain" data-k="freebie" data-i="' + i + '" value="' + esc(line.freebie) + '" placeholder="None" aria-label="Freebie"></td></tr>';
+    // (the freebie spans the rest of the row)
     }).join("");
     renderTotal();
   }
