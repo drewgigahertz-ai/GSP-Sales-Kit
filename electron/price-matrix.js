@@ -7,7 +7,8 @@
 // The result is laid out like GST PRICING's NEW PRICING (banner-data.js pricesCollection reads it unchanged):
 //   A BRANCH (blank: the matrix has none), B ITEM DESCRIPTION, C PROMO TITLE,
 //   D–G no bundle: CASH PRICE, SRP 3 months, 12MOS, HOME CREDIT, H–K with bundle: the same,
-//   L BUNDLE CODE, M TOTAL BUNDLE COST, N TOTAL BUNDLE SRP, O–Q vendor freebies 1–3, R TOTAL PROMO (C & O & P & Q).
+//   L BUNDLE CODE, M TOTAL BUNDLE COST, N TOTAL BUNDLE SRP, O–Q vendor freebies 1–3, R TOTAL PROMO (C & O & P & Q),
+//   then (not in NEW PRICING) the other payment terms: S–X no bundle, Y–AD with bundle, see TERM_COLUMNS.
 
 const PRICE_MATRIX_SHEET = 'NEW PRICING MATRIX V3';
 const DEFAULT_PRICE_MATRIX_SPREADSHEET_ID = '1y4IQ4B1HyrK6kmBZcxMy-t3z7FxZX8bp6aIeKTWl4D8';
@@ -49,6 +50,26 @@ const OUTPUT_HEADER = ['BRANCH', 'ITEM DESCRIPTION', 'PROMO TITLE', 'CASH PRICE'
   'CASH PRICE', 'SRP', '12MOS', 'HOME CREDIT', 'BUNDLE CODE', 'TOTAL BUNDLE COST', 'TOTAL BUNDLE SRP',
   'FREEBIE 1', 'FREEBIE 2', 'FREEBIE 3', 'TOTAL PROMO'];
 
+// The other payment terms (the Quotation's Payment term dropdown), no bundle and with bundle: selling prices only.
+// They are optional: a term whose column is not found is left blank (the prices above still load). They are added
+// after R, in this order: S–X no bundle, Y–AD with bundle.
+const TERM_COLUMNS = [
+  ['m6', 'SRP6MONTHS'],
+  ['m9', 'SRP9MONTHS'],
+  ['m24', '24MOSHSBC'],
+  ['m18', '18MOS'],
+  ['bdo24', 'BDO24MOS'],
+  ['m24b', '24MOSRCBC']
+];
+const EXTRA = [
+  ...TERM_COLUMNS.map(([name, start]) => [`${name}NoBundle`, 'NOBUNDLE', start]),
+  ...TERM_COLUMNS.map(([name, start]) => [`${name}Bundle`, 'WITHBUNDLE', start])
+];
+const EXTRA_HEADER = [
+  ...TERM_COLUMNS.map(([name]) => `${name.toUpperCase()} NO BUNDLE`),
+  ...TERM_COLUMNS.map(([name]) => `${name.toUpperCase()} WITH BUNDLE`)
+];
+
 const headerKey = (value) => String(value ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
 // 0 → 'A', 26 → 'AA'.
@@ -60,7 +81,7 @@ function columnLetters(index) {
 
 // Header rows (row 1: groups, filled to the right like merged cells; row 2: columns) → { name: column index }, and
 // the names not found.
-function locateColumns(groupRow = [], columnRow = []) {
+function locateColumns(groupRow = [], columnRow = [], columns = COLUMNS) {
   const width = Math.max(groupRow.length, columnRow.length);
   const groups = [];
   let group = '';
@@ -69,7 +90,7 @@ function locateColumns(groupRow = [], columnRow = []) {
     groups.push(group);
   }
   const found = {};
-  for (const [name, wanted, start] of COLUMNS) {
+  for (const [name, wanted, start] of columns) {
     for (let i = 0; i < width; i++) {
       if (wanted && !groups[i].includes(wanted)) continue;
       if (headerKey(columnRow[i]).startsWith(start)) {
@@ -78,7 +99,7 @@ function locateColumns(groupRow = [], columnRow = []) {
       }
     }
   }
-  return { found, missing: COLUMNS.map(([name]) => name).filter((name) => found[name] === undefined) };
+  return { found, missing: columns.map(([name]) => name).filter((name) => found[name] === undefined) };
 }
 
 // Reads the matrix with the Sheets client: only the header rows, then only the needed columns. Returns values laid
@@ -89,23 +110,30 @@ async function readPriceMatrix(sheets, spreadsheetId) {
   const [groupRow = [], columnRow = []] = head.data.values || [];
   const { found, missing } = locateColumns(groupRow, columnRow);
   if (missing.length) throw new Error(`Price matrix: ${missing.map((name) => LABELS[name]).join(', ')} not found`);
+  const extra = locateColumns(groupRow, columnRow, EXTRA).found;
+  const extraNames = EXTRA.map(([name]) => name).filter((name) => extra[name] !== undefined);
 
   const response = await sheets.spreadsheets.values.batchGet({
     spreadsheetId,
-    ranges: OUTPUT.map((name) => `${tab}!${columnLetters(found[name])}3:${columnLetters(found[name])}`),
+    ranges: [...OUTPUT.map((name) => found[name]), ...extraNames.map((name) => extra[name])]
+      .map((index) => `${tab}!${columnLetters(index)}3:${columnLetters(index)}`),
     majorDimension: 'COLUMNS',
     valueRenderOption: 'UNFORMATTED_VALUE'
   });
-  const columns = (response.data.valueRanges || []).map((range) => (range.values && range.values[0]) || []);
-  const length = Math.max(0, ...columns.map((column) => column.length));
-  const rows = [OUTPUT_HEADER];
+  const all = (response.data.valueRanges || []).map((range) => (range.values && range.values[0]) || []);
+  const columns = all.slice(0, OUTPUT.length);
+  const extraColumns = Object.fromEntries(extraNames.map((name, i) => [name, all[OUTPUT.length + i]]));
+  const length = Math.max(0, ...all.map((column) => column.length));
+  const rows = [[...OUTPUT_HEADER, ...EXTRA_HEADER]];
+  const cell = (column, r) => (!column || column[r] === undefined ? '' : column[r]);
   for (let r = 0; r < length; r++) {
-    const cells = columns.map((column) => (column[r] === undefined ? '' : column[r]));
+    const cells = columns.map((column) => cell(column, r));
     const [, promoTitle] = cells;
     const freebies = cells.slice(-3);
-    rows.push(['', ...cells, [promoTitle, ...freebies].map((value) => String(value ?? '')).join('')]);
+    rows.push(['', ...cells, [promoTitle, ...freebies].map((value) => String(value ?? '')).join(''),
+      ...EXTRA.map(([name]) => cell(extraColumns[name], r))]);
   }
   return rows;
 }
 
-module.exports = { PRICE_MATRIX_SHEET, DEFAULT_PRICE_MATRIX_SPREADSHEET_ID, readPriceMatrix, locateColumns, columnLetters };
+module.exports = { TERM_COLUMNS, PRICE_MATRIX_SHEET, DEFAULT_PRICE_MATRIX_SPREADSHEET_ID, readPriceMatrix, locateColumns, columnLetters };

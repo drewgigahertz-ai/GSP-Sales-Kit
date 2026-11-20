@@ -23,6 +23,33 @@
   const modelName = (value) => clean(value).replace(/^(\S+)\s+\1(?=\s|$)/i, '$1');
   const FULL_ACCESS = ['HO', 'ALL', 'ALL BRANCHES'];
 
+  // A price row's term prices: { noBundle: { cash, m3, … }, withBundle: { … }, bundleWorth }. A server older than
+  // 1.0.48 sends no terms: then the ones it does send (cash, 3 months, Home Credit; 12 months with bundle).
+  function termsOf(view) {
+    if (view && view.terms && (view.terms.noBundle || view.terms.withBundle)) return view.terms;
+    const detail = {};
+    ((view && view.priceDetails) || []).forEach((d) => { if (d.isPrice && d.value != null) detail[d.title] = d.value; });
+    const pick = (pairs) => Object.fromEntries(pairs.filter(([, value]) => value != null));
+    return {
+      noBundle: pick([['cash', detail.CNB], ['m3', detail['3NB']], ['hc', detail.HCNB]]),
+      withBundle: pick([['cash', view && view.cash != null ? view.cash : detail.CWB], ['m3', detail['3WB']], ['m12', view && view.twelveMonths], ['hc', detail.HCB]]),
+      bundleWorth: detail.B2 != null ? detail.B2 : undefined
+    };
+  }
+  // The laptop's promos for the Promo dropdown: every NEW PRICING row (title, the branches it is for, its freebie
+  // and term prices). A laptop with a price but no rows gets one from its regular price.
+  function promoChoices(item) {
+    if (!item) return [];
+    const rows = (item.promoRows || []).filter((row) => row && row.hasPrice);
+    const list = rows.length ? rows : (item.hasPrice ? [Object.assign({ title: (item.promo && item.promo.name) || 'NO PROMO', branch: '' }, item)] : []);
+    return list.map((row) => ({
+      title: clean(row.title) || 'NO PROMO',
+      freebie: (row.promo && row.promo.name) || '',
+      branches: String(row.branch || '').split(',').map(key).filter(Boolean),
+      terms: termsOf(row)
+    }));
+  }
+
   function build(data) {
     const bannerData = data.bannerData || {};
     const items = new Map((bannerData.items || []).map((item) => [key(item.itemCode), item]));
@@ -57,7 +84,8 @@
         cash: item && item.hasPrice ? item.cash : null,
         promo: (item && item.promo && item.promo.name) || '',
         branchCash,
-        branchPromo
+        branchPromo,
+        promos: promoChoices(item)
       };
     }).sort((a, b) => a.model.localeCompare(b.model));
 

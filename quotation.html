@@ -17,6 +17,7 @@
   <script src="./node_modules/html2canvas/dist/html2canvas.min.js"></script>
   <script src="./node_modules/jspdf/dist/jspdf.umd.min.js"></script>
   <script src="./quotation-discount.js"></script>
+  <script src="./quotation-terms.js"></script>
   <style>
     :root { --ink: #111827; --muted: #64748b; --blue: #0026e6; --line: #1f2937; --head: #d9d9d9; --bar: #0012b3; }
     * { box-sizing: border-box; }
@@ -124,6 +125,18 @@
     .disc-clear:hover { color: #b91c1c; }
     .disc-hint { font-size: 9px; color: #64748b; margin-top: 1px; }
     .grand .disc-box .disc-wrap { flex-direction: row; gap: 6px; margin: 0; }
+    /* Promo, bundle and payment term of a laptop (screen only): in the blank line after "Exclusive price for:". The
+       PDF and print keep the line blank, as before. */
+    /* width 0 + min-width 100%: the dropdowns take the cell's width and never make the table wider */
+    .line-opts { display: flex; gap: 4px; margin: 3px 0 4px; width: 0; min-width: 100%; }
+    .line-opts select { width: 0; min-width: 0; font-size: 10.5px; padding: 2px 3px; border: 1px solid #93c5fd; border-radius: 6px; background: #eff6ff; color: #1e3a8a; font-weight: 600; font-family: inherit; }
+    .line-opts select:focus { outline: 2px solid #3b82f6; outline-offset: 0; background: #fff; }
+    .line-opts select[data-k="promo"] { flex: 1.3 1 0; }
+    .line-opts select[data-k="bundle"] { flex: 0 0 92px; }
+    .line-opts select[data-k="term"] { flex: 1.7 1 0; }
+    .line-opts .opt-none { font-size: 10px; color: #94a3b8; }
+    body.capturing #sheet .line-opts { display: flex !important; visibility: hidden; }
+    @media print { #sheet .line-opts { display: flex !important; visibility: hidden; } }
 
     .notes { margin-top: 26px; font-size: 11.5px; }
     .notes p { margin: 0 0 5px; }
@@ -236,6 +249,7 @@
     <label class="card"><span class="card-label"><i class="bi bi-receipt"></i> TIN</span><input id="f_tin" autocomplete="off" placeholder="e.g. 229-918-217-0004"><span class="from-sheet" data-sheet="tin"></span></label>
     <label class="card"><span class="card-label"><i class="bi bi-phone"></i> MOBILE</span><input id="f_mobile" autocomplete="off" placeholder="e.g. 09178789511"><span class="from-sheet" data-sheet="mobile"></span></label>
     <label class="card"><span class="card-label"><i class="bi bi-person-badge"></i> BRANCH MANAGER</span><input id="f_manager" autocomplete="off" placeholder="Name"><span class="from-sheet" data-sheet="manager"></span></label>
+    <label class="card"><span class="card-label"><i class="bi bi-person-vcard"></i> POSITION</span><input id="f_position" autocomplete="off" placeholder="Branch Manager"><span class="from-sheet">Shown after the name · blank = Branch Manager</span></label>
     <label class="card"><span class="card-label"><i class="bi bi-telephone"></i> MANAGER NO.</span><input id="f_managerNo" autocomplete="off" placeholder="e.g. 09665897891"><span class="from-sheet" data-sheet="managerNo"></span></label>
     <div class="card">
       <div class="card-label"><i class="bi bi-qr-code"></i> QR CODES &amp; LOGO</div>
@@ -305,7 +319,7 @@
     </div>
 
     <div class="sign">
-      <div class="name"><span class="detail" data-f="manager" data-ph="Branch manager: set in Branch details"></span> - Branch Manager</div>
+      <div class="name"><span class="detail" data-f="manager" data-ph="Branch manager: set in Branch details"></span> - <span class="detail" data-f="position" data-ph="Branch Manager"></span></div>
       <div class="no"><span class="detail" data-f="managerNo" data-ph="Manager no.: set in Branch details"></span></div>
       <div class="qrs">
         <div id="viberQr"></div>
@@ -396,7 +410,7 @@
   // A saved branch keeps its details until someone changes them in the form; a branch never saved uses the LOGO
   // sheet's. Text and pictures are kept apart from the quotation draft, so New never touches them.
   var INFO_KEY = "saleskit.quotation.branchInfo";
-  var TEXT_FIELDS = ["tin", "mobile", "manager", "managerNo"];
+  var TEXT_FIELDS = ["tin", "mobile", "manager", "position", "managerNo"];
   var PIC_FIELDS = ["viberQr", "fbQr", "logo"];
   function loadInfo() { try { return JSON.parse(localStorage.getItem(INFO_KEY) || "{}") || {}; } catch (e) { return {}; } }
   var savedInfo = loadInfo();
@@ -421,8 +435,9 @@
     var s = saved();
     return (s && s[field]) || "";
   }
+  // The position under the signature is "Branch Manager" unless one is typed in Branch details.
   function branchValue(field) {
-    return savedValue(field) || sheetValue(field);
+    return savedValue(field) || sheetValue(field) || (field === "position" ? "Branch Manager" : "");
   }
   // Empty TIN / mobile parts (and the "|" between them) are left out of the PDF and print.
   function markEmpty() {
@@ -584,10 +599,55 @@
       .map(function (k) { return k + " - " + s[k]; });
   }
 
+  // ---------- promo, bundle and payment term (quotation-terms.js) ----------
+  // The laptop's promos for this branch: the ones for every branch and the ones for this branch.
+  function promosFor(laptop) {
+    var b = branch();
+    return (laptop.promos || []).filter(function (p) { return !p.branches.length || p.branches.indexOf(b) !== -1; });
+  }
+  function promoId(p) { return p.title + "|" + p.branches.join(","); }
+  function defaultPromo(laptop) {
+    var list = promosFor(laptop), b = branch();
+    return list.filter(function (p) { return p.branches.indexOf(b) !== -1; })[0] || list[0] || null;
+  }
+  function linePromo(line, laptop) {
+    return promosFor(laptop).filter(function (p) { return promoId(p) === line.promo; })[0] || defaultPromo(laptop);
+  }
+  function termPrice(p, bundle, term) {
+    var group = p && p.terms && p.terms[bundle === "no" ? "noBundle" : "withBundle"];
+    return group && group[term] != null ? group[term] : null;
+  }
+  // The freebie line: with bundle, the promo's freebie and what it is worth; no bundle, none.
+  function bundleFreebie(p, bundle) {
+    if (!p || bundle === "no") return "";
+    var name = [p.freebie, p.title].filter(function (n) { return n && !/^no promo$/i.test(n); })[0] || "";
+    var worth = p.terms && p.terms.bundleWorth;
+    return name + (name && worth > 0 ? " – worth " + money(worth) : "");
+  }
+  function lineOptions(line, laptop, i) {
+    var list = promosFor(laptop);
+    if (!list.length) return '<div class="line-opts no-print"><span class="opt-none">No promo prices for this laptop in the data</span></div>';
+    var p = linePromo(line, laptop), bundle = line.bundle === "no" ? "no" : "with", term = line.term || "cash";
+    var select = function (k, title, options) { return '<select data-k="' + k + '" data-i="' + i + '" title="' + title + '" aria-label="' + title + '">' + options + "</select>"; };
+    return '<div class="line-opts no-print">'
+      + select("promo", "Promo", list.map(function (x) {
+        var id = promoId(x);
+        return '<option value="' + esc(id) + '"' + (p && id === promoId(p) ? " selected" : "") + ">" + esc(x.title) + (x.branches.length ? " · " + esc(branch()) : "") + "</option>";
+      }).join(""))
+      + select("bundle", "Bundle", '<option value="with"' + (bundle === "with" ? " selected" : "") + '>With bundle</option><option value="no"' + (bundle === "no" ? " selected" : "") + ">No bundle</option>")
+      + select("term", "Payment term", QuotationTerms.list.map(function (t) {
+        var v = termPrice(p, bundle, t.key);
+        return '<option value="' + t.key + '"' + (t.key === term ? " selected" : "") + (v == null && t.key !== term ? " disabled" : "") + ">" + esc(t.label) + (v == null ? " — no price" : " — " + money(v)) + "</option>";
+      }).join(""))
+      + "</div>";
+  }
   function addLine(code) {
     var laptop = byCode[key(code)];
     if (!laptop) return;
-    draft.lines.push({ code: laptop.code, price: priceFor(laptop), qty: 1, freebie: freebieFor(laptop) });
+    // The branch's promo (else the regular one), with bundle, cash: the price the Banner shows.
+    var p = defaultPromo(laptop), price = termPrice(p, "with", "cash");
+    draft.lines.push({ code: laptop.code, price: price != null ? price : priceFor(laptop), qty: 1, freebie: p ? bundleFreebie(p, "with") : freebieFor(laptop),
+      promo: p ? promoId(p) : "", bundle: "with", term: "cash" });
     saveDraft();
     renderLines();
   }
@@ -620,7 +680,7 @@
         + '<span class="disc-wrap no-print"><span class="disc-field"><label for="disc' + i + '">Discount</label><span class="disc-input"><input id="disc' + i + '" class="disc" data-k="discount" data-i="' + i + '" value="' + esc(line.discount || "") + '" placeholder="0" title="Discount on this laptop: type 2000 for ₱2,000 off, or 5% for five percent off"><button type="button" class="disc-clear" data-clear="' + i + '" title="Remove the discount" aria-label="Remove the discount">✕</button></span></span><span class="disc-hint">2000 or 5%</span></span></div>'
         + '<input class="plain" data-k="qty" data-i="' + i + '" value="' + esc(line.qty) + '" inputmode="numeric" aria-label="Quantity">'
         + '<span class="total" data-total="' + i + '">' + money(total) + "</span></div>"
-        + '<div class="terms">Exclusive price for:<br><br>Cash on Hand, Bank Transfer or Check Payment only.</div></td></tr>'
+        + '<div class="terms">Exclusive price for:' + lineOptions(line, laptop, i) + esc((window.QuotationTerms ? QuotationTerms.get(line.term) : { text: "Cash on Hand, Bank Transfer or Check Payment only." }).text) + "</div></td></tr>"
         + '<tr class="free"><td class="lbl">Bundle/worth of freebie:</td><td colspan="2"><input class="plain" data-k="freebie" data-i="' + i + '" value="' + esc(line.freebie) + '" placeholder="None" aria-label="Freebie"></td><td colspan="2" class="per">*per unit.</td></tr>';
     // (the freebie spans Specs and Price, "*per unit." sits under Quantity and Total, as on the printed form)
     }).join("");
@@ -667,7 +727,7 @@
 
   el("lines").addEventListener("input", function (e) {
     var t = e.target, i = t.getAttribute("data-i"), k = t.getAttribute("data-k");
-    if (i == null || !draft.lines[i]) return;
+    if (i == null || !draft.lines[i] || t.tagName === "SELECT") return;
     if (k === "qty") draft.lines[i].qty = Math.max(0, Math.round(toNumber(t.value)));
     else if (k === "price") draft.lines[i].price = toNumber(t.value);
     else if (k === "freebie") draft.lines[i].freebie = t.value;
@@ -675,6 +735,25 @@
     updateLine(i);
     saveDraft();
     renderTotal();
+  });
+  // Promo, bundle or payment term chosen: the price from the sheet for them (and, for promo and bundle, the
+  // freebie). A term with no price for that promo and bundle goes back to cash.
+  el("lines").addEventListener("change", function (e) {
+    var t = e.target, k = t.getAttribute("data-k"), i = t.getAttribute("data-i");
+    if (t.tagName !== "SELECT" || !draft.lines[i]) return;
+    var line = draft.lines[i], laptop = byCode[key(line.code)];
+    if (!laptop) return;
+    if (k === "promo") line.promo = t.value; else if (k === "bundle") line.bundle = t.value; else if (k === "term") line.term = t.value; else return;
+    var p = linePromo(line, laptop);
+    line.promo = p ? promoId(p) : "";
+    line.bundle = line.bundle === "no" ? "no" : "with";
+    line.term = line.term || "cash";
+    var price = termPrice(p, line.bundle, line.term);
+    if (price == null) { line.term = "cash"; price = termPrice(p, line.bundle, "cash"); }
+    if (price != null) line.price = price;
+    if (k !== "term") line.freebie = bundleFreebie(p, line.bundle);
+    saveDraft();
+    renderLines();
   });
   // The price shows as 54,999.00 again when you leave it.
   el("lines").addEventListener("focusout", function (e) {

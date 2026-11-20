@@ -12,6 +12,8 @@
         'New QUOTATION tab (Ctrl+5): the company quotation form, ready to save as PDF or print. The customer name comes from the Reco Table; add laptops with the search box or the Reco Table buttons, and each one fills in its specs, cash price and freebie. You can change the price, quantity and freebie before saving.',
         'Quotation discounts: type a discount under a laptop’s price or beside TOTAL, as an amount (2000) or a percent (5%). The quotation shows the regular price crossed out, the discount, and the price to pay.',
         'Quotation pages: a long quotation shows as separate A4 pages, broken exactly as in the PDF, so you can see how many pages it will be.',
+        'Quotation payment terms: each laptop has Promo, Bundle and Payment term choices (Cash, 3, 6, 9, 12, 18 and 24 months, Home Credit). The price fills in for your choice, with bundle the freebie shows what it is worth, and the quotation names the banks for that term.',
+        'Quotation position: type the position shown after the name under the signature (e.g. Branch Personnel) in Branch details. Blank shows Branch Manager.',
         'Reco Table: changes to the recommended laptops and stock now show within about a minute, like price changes. The laptops you picked stay, and a presentation is not interrupted.'
       ]
     },

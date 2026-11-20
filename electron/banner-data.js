@@ -37,6 +37,13 @@ const PRICE_COLUMNS = {
   freebies: ['O', 'P', 'Q']
 };
 
+// Every payment term's price, no bundle and with bundle (the Quotation's Payment term dropdown). D–G and H–K are in
+// NEW PRICING too; the others (S–AD) only come from NEW PRICING MATRIX V3 (price-matrix.js TERM_COLUMNS).
+const TERM_PRICE_COLUMNS = {
+  noBundle: { cash: 'D', m3: 'E', m6: 'S', m9: 'T', m12: 'F', m24: 'U', hc: 'G', m18: 'V', bdo24: 'W', m24b: 'X' },
+  withBundle: { cash: 'H', m3: 'I', m6: 'Y', m9: 'Z', m12: 'J', m24: 'AA', hc: 'K', m18: 'AB', bdo24: 'AC', m24b: 'AD' }
+};
+
 const { promoKey } = require('./promo-icons');
 
 // 'A' → 0, 'CG' → 84.
@@ -176,6 +183,22 @@ function photosCollection(values) {
 
 // Every priced row is kept, with its branches (column A: one or more, comma-separated; blank = every branch);
 // which one applies is decided when the banner data is built.
+// { noBundle: { cash, m3, … }, withBundle: { … }, bundleWorth } as JSON, with only the terms that have a price.
+function termPrices(row, at) {
+  const result = {};
+  for (const [group, columns] of Object.entries(TERM_PRICE_COLUMNS)) {
+    const prices = {};
+    for (const [term, letters] of Object.entries(columns)) {
+      const value = number(at(row, letters));
+      if (value !== null) prices[term] = value;
+    }
+    if (Object.keys(prices).length) result[group] = prices;
+  }
+  const worth = number(at(row, 'N'));
+  if (worth !== null) result.bundleWorth = worth;
+  return JSON.stringify(result);
+}
+
 function pricesCollection(values) {
   const headerRow = values.slice(0, PRICE_HEADER_SEARCH_ROWS)
     .findIndex((row) => (row || []).some((cell) => header(cell) === 'ITEM DESCRIPTION'));
@@ -199,10 +222,11 @@ function pricesCollection(values) {
       cash: cash === null ? '' : String(cash),
       srp: srp === null ? '' : String(srp),
       twelve_months: twelveMonths === null ? '' : String(twelveMonths),
+      terms: termPrices(row, at),
       ...Object.fromEntries(PRICE_DETAILS.map(([title, letters]) => [detailColumn(title), text(at(row, letters))]))
     });
   }
-  return collection('banner_prices', ['item_code', 'branch', 'promo_title', 'promo', 'freebies', 'start', 'end', 'cash', 'srp', 'twelve_months',
+  return collection('banner_prices', ['item_code', 'branch', 'promo_title', 'promo', 'freebies', 'start', 'end', 'cash', 'srp', 'twelve_months', 'terms',
     ...PRICE_DETAILS.map(([title]) => detailColumn(title))], rows);
 }
 
@@ -357,6 +381,8 @@ function buildBannerData(rows, imageUrl = (value) => value, now = new Date()) {
       cash: number(price.cash),
       srp: number(price.srp),
       twelveMonths: number(price.twelve_months),
+      // Every payment term's price (see termPrices); {} from data saved before the terms were read.
+      terms: (() => { try { return JSON.parse(price.terms || '{}') || {}; } catch { return {}; } })(),
       hasPrice: true,
       promo: match
         ? {
