@@ -16,6 +16,7 @@
   <link href="./node_modules/@fontsource/plus-jakarta-sans/800.css" rel="stylesheet">
   <script src="./node_modules/html2canvas/dist/html2canvas.min.js"></script>
   <script src="./node_modules/jspdf/dist/jspdf.umd.min.js"></script>
+  <script src="./quotation-discount.js"></script>
   <style>
     :root { --ink: #111827; --muted: #64748b; --blue: #0026e6; --line: #1f2937; --head: #d9d9d9; --bar: #0012b3; }
     * { box-sizing: border-box; }
@@ -47,6 +48,13 @@
 
     /* ---------- the A4 sheet ---------- */
     #page { padding: 6px 0 40px; display: flex; justify-content: center; }
+    /* On screen the quotation shows as its A4 pages, broken where the PDF breaks them (showPages). */
+    #sheet { position: relative; }
+    .page-gap-band { position: absolute; left: -2px; right: -2px; height: 24px; background: #e9edf5; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; letter-spacing: .4px; color: #64748b; text-transform: uppercase; box-shadow: inset 0 7px 7px -7px rgba(15, 23, 42, .35), inset 0 -7px 7px -7px rgba(15, 23, 42, .35); pointer-events: none; z-index: 2; }
+    .capturing .page-gap-band { display: none; }
+    /* The discount boxes are not in the PDF, but their space is kept, so the PDF breaks into the same pages as the screen. */
+    body.capturing #sheet .disc-wrap { display: flex !important; visibility: hidden; }
+    body.capturing #sheet .disc-box { display: block !important; visibility: hidden; }
     #sheet { width: 794px; min-height: 1123px; background: #fff; padding: 34px 40px 30px; box-shadow: 0 10px 30px rgba(15, 23, 42, .15); font-size: 11.5px; line-height: 1.45; }
     .head { text-align: center; }
     .head img.logo { height: 80px; max-width: 360px; object-fit: contain; }
@@ -84,6 +92,38 @@
     .grand { display: flex; justify-content: flex-end; align-items: baseline; gap: 18px; margin-top: 4px; }
     .grand .lbl { font-weight: 800; font-size: 13px; }
     .grand .amt { min-width: 150px; text-align: right; font-weight: 800; font-size: 14px; border-bottom: 3px double #555; padding: 0 2px 2px; }
+    /* discounts (quotation-discount.js): the regular price struck out, the discount, then the price to pay */
+    .grand[hidden] { display: none !important; }
+    .grand.sub, .grand.less { margin-top: 2px; }
+    .grand.sub .lbl, .grand.less .lbl { font-weight: 600; font-size: 12px; }
+    .grand.sub .amt, .grand.less .amt { border-bottom: 0; font-size: 12.5px; font-weight: 700; }
+    .grand.sub .amt { text-decoration: line-through; color: #64748b; }
+    .grand.less .amt { color: #b91c1c; }
+    .grand .disc-box { margin-right: auto; }
+    /* A discounted price: labeled rows (Regular price, Discount, Discounted price); without a discount only the price. */
+    table.q .price-cell { display: flex; flex-direction: column; align-items: stretch; text-align: center; }
+    table.q .price-cell .only-disc { display: none; }
+    table.q .price-cell.has-disc .only-disc { display: block; }
+    table.q .price-cell.has-disc { margin-bottom: 8px; }
+    table.q .price-cell .pc-lbl { font-size: 9px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: #64748b; line-height: 1.2; }
+    table.q .price-cell .pc-lbl.first { margin-top: 2px; }
+    table.q .price-cell .pc-lbl.red, table.q .price-cell .pc-off { color: #b91c1c; }
+    table.q .price-cell .pc-off { font-size: 12px; font-weight: 700; line-height: 1.3; }
+    table.q .price-cell .pc-line { border-top: 1px solid #cbd5e1; margin: 3px 10px 2px; }
+    table.q .price-cell .pc-net { font-size: 13.5px; font-weight: 800; line-height: 1.3; }
+    table.q .deal-row input.struck { text-decoration: line-through; color: #64748b; font-size: 12px; font-weight: 700; }
+    /* the discount boxes (screen only) */
+    .disc-wrap { display: flex; flex-direction: column; align-items: center; margin: 5px 0 2px; }
+    .disc-field { display: flex; align-items: center; gap: 3px; }
+    .disc-field label { font-size: 9.5px; font-weight: 700; color: #1e3a8a; }
+    .disc-input { position: relative; display: inline-flex; }
+    input.disc, table.q .deal-row input.disc { width: 64px; font-size: 11px; padding: 2px 15px 2px 4px; border: 1px solid #93c5fd; border-radius: 6px; background: #eff6ff; color: #1e3a8a; text-align: center; font-weight: 700; }
+    input.disc:focus { outline: 2px solid #3b82f6; outline-offset: 0; background: #fff; }
+    input.disc::placeholder { color: #93c5fd; font-weight: 500; }
+    .disc-clear { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); border: 0; background: none; color: #64748b; font-size: 11px; line-height: 1; padding: 2px; cursor: pointer; }
+    .disc-clear:hover { color: #b91c1c; }
+    .disc-hint { font-size: 9px; color: #64748b; margin-top: 1px; }
+    .grand .disc-box .disc-wrap { flex-direction: row; gap: 6px; margin: 0; }
 
     .notes { margin-top: 26px; font-size: 11.5px; }
     .notes p { margin: 0 0 5px; }
@@ -107,7 +147,8 @@
        reminder on screen; in the PDF and print it is left out with its label. */
     .detail:empty:before { content: attr(data-ph); color: #b45309; background: #fef3c7; border-radius: 6px; padding: 0 6px; font-weight: 600; font-size: 10.5px; }
     .idpart.is-empty > .lbl-text { display: none; }
-    .capturing .detail:empty:before, .capturing .is-empty { display: none !important; }
+    /* hidden in the PDF but keeping their space, so the PDF breaks into the same pages as the screen */
+    .capturing .detail:empty:before, .capturing .is-empty { visibility: hidden !important; }
     @media print { .detail:empty:before, .is-empty { display: none !important; } }
 
     /* LEFT: Branch details, styled like the Reco Table's Customer Profiling sidebar */
@@ -239,7 +280,9 @@
       <thead><tr><th>Model</th><th>Specs</th><th class="c-price">Price per Unit</th><th class="c-qty">Quantity</th><th class="c-total">Total Price</th></tr></thead>
       <tbody id="lines"></tbody>
     </table>
-    <div class="grand"><span class="lbl">TOTAL</span><span id="grand" class="amt">0.00</span></div>
+    <div class="grand sub" id="subRow" hidden><span class="lbl">Subtotal</span><span id="subtotal" class="amt"></span></div>
+    <div class="grand less" id="lessRow" hidden><span class="lbl" id="lessLabel">Discount</span><span id="lessAmt" class="amt"></span></div>
+    <div class="grand"><span class="disc-box no-print"><span class="disc-wrap"><span class="disc-field"><label for="allDiscount">Discount on total</label><span class="disc-input"><input id="allDiscount" class="disc" placeholder="0" title="Discount on the whole quotation: type 2000 for ₱2,000 off, or 5% for five percent off"><button type="button" class="disc-clear" data-clear="all" title="Remove the discount" aria-label="Remove the discount">✕</button></span></span><span class="disc-hint">2000 or 5%</span></span></span><span class="lbl">TOTAL</span><span id="grand" class="amt">0.00</span></div>
 
     <div class="notes">
       <p>The above prices are VAT-inclusive and are subject to change without prior notice.</p>
@@ -332,6 +375,9 @@
     if (!url) { holder.innerHTML = emptyText ? '<div class="qr-empty">' + esc(emptyText) + "</div>" : ""; return; }
     picture(url).then(function (src) {
       holder.innerHTML = '<img class="' + cls + '" alt="' + esc(alt) + '" src="' + esc(src) + '">';
+      var shown = holder.querySelector("img");
+      if (shown) { shown.addEventListener("load", showPages); shown.addEventListener("error", showPages); }
+      showPages();
     });
   }
 
@@ -547,6 +593,7 @@
   }
 
   function renderLines() {
+    unpaginate(el("sheet"));
     var body = el("lines");
     if (!draft.lines.length) {
       body.innerHTML = '<tr class="empty-line"><td colspan="5">No laptop yet. Add one with the search above' + (picks.exceed || picks.meet || picks.budget ? " or the Reco Table buttons." : ".") + "</td></tr>";
@@ -556,13 +603,21 @@
     body.innerHTML = draft.lines.map(function (line, i) {
       var laptop = byCode[key(line.code)] || { model: line.code, partNumber: "", specs: {} };
       var specs = specLines(laptop);
-      var total = toNumber(line.price) * (Number(line.qty) || 0);
+      var deal = lineDeal(line), total = deal.net * (Number(line.qty) || 0);
       return '<tr class="line-tools" data-i="' + i + '">'
         + '<td class="model" style="position:relative"><button class="rm no-print" data-rm="' + i + '" title="Remove this laptop" aria-label="Remove">&times;</button>'
         + esc(laptop.model) + (laptop.partNumber ? "<br>(" + esc(laptop.partNumber) + ")" : "") + "</td>"
         + '<td class="specs"><ul>' + (specs.length ? specs.map(function (s) { return "<li>" + esc(s) + "</li>"; }).join("") : "<li>" + esc(line.code) + "</li>") + "</ul></td>"
         + '<td class="deal" colspan="3"><div class="deal-row">'
-        + '<input class="plain" data-k="price" data-i="' + i + '" value="' + esc(money(line.price)) + '" aria-label="Price per unit">'
+        + '<div class="price-cell' + (deal.off ? " has-disc" : "") + '" data-cell="' + i + '">'
+        + '<span class="pc-lbl first only-disc">Regular price</span>'
+        + '<input class="plain' + (deal.off ? " struck" : "") + '" data-k="price" data-i="' + i + '" value="' + esc(money(line.price)) + '" aria-label="Price per unit">'
+        + '<span class="pc-lbl red only-disc" data-dname>' + esc(discountName(line.discount)) + "</span>"
+        + '<span class="pc-off only-disc" data-doff>-' + money(deal.off) + "</span>"
+        + '<span class="pc-line only-disc"></span>'
+        + '<span class="pc-lbl only-disc">Discounted price</span>'
+        + '<span class="pc-net only-disc" data-dnet>' + money(deal.net) + "</span>"
+        + '<span class="disc-wrap no-print"><span class="disc-field"><label for="disc' + i + '">Discount</label><span class="disc-input"><input id="disc' + i + '" class="disc" data-k="discount" data-i="' + i + '" value="' + esc(line.discount || "") + '" placeholder="0" title="Discount on this laptop: type 2000 for ₱2,000 off, or 5% for five percent off"><button type="button" class="disc-clear" data-clear="' + i + '" title="Remove the discount" aria-label="Remove the discount">✕</button></span></span><span class="disc-hint">2000 or 5%</span></span></div>'
         + '<input class="plain" data-k="qty" data-i="' + i + '" value="' + esc(line.qty) + '" inputmode="numeric" aria-label="Quantity">'
         + '<span class="total" data-total="' + i + '">' + money(total) + "</span></div>"
         + '<div class="terms">Exclusive price for:<br><br>Cash on Hand, Bank Transfer or Check Payment only.</div></td></tr>'
@@ -571,9 +626,41 @@
     }).join("");
     renderTotal();
   }
+  // A laptop's price after its own discount: { off, net, label } (quotation-discount.js).
+  function lineDeal(line) {
+    var price = toNumber(line.price);
+    return window.QuotationDiscount ? QuotationDiscount.apply(price, line.discount) : { off: 0, net: price, label: "" };
+  }
+  // The price cell and line total of laptop i, after its price, quantity or discount changed (the inputs stay).
+  // "Discount 10%" for a percent, "Discount" for an amount.
+  function discountName(text) {
+    var d = window.QuotationDiscount && QuotationDiscount.parse(text);
+    return d && d.percent !== undefined ? "Discount " + (+d.percent.toFixed(2)) + "%" : "Discount";
+  }
+  function updateLine(i) {
+    var line = draft.lines[i], deal = lineDeal(line);
+    var box = document.querySelector('[data-cell="' + i + '"]');
+    if (box) {
+      box.classList.toggle("has-disc", deal.off > 0);
+      box.querySelector('input[data-k="price"]').classList.toggle("struck", deal.off > 0);
+      box.querySelector("[data-dname]").textContent = discountName(line.discount);
+      box.querySelector("[data-doff]").textContent = "-" + money(deal.off);
+      box.querySelector("[data-dnet]").textContent = money(deal.net);
+    }
+    var cell = document.querySelector('[data-total="' + i + '"]');
+    if (cell) cell.textContent = money(deal.net * (Number(line.qty) || 0));
+  }
   function renderTotal() {
-    var sum = draft.lines.reduce(function (s, l) { return s + toNumber(l.price) * (Number(l.qty) || 0); }, 0);
-    el("grand").textContent = money(sum);
+    var sum = draft.lines.reduce(function (s, l) { return s + lineDeal(l).net * (Number(l.qty) || 0); }, 0);
+    var all = window.QuotationDiscount ? QuotationDiscount.apply(sum, draft.discount) : { off: 0, net: sum, label: "" };
+    var pct = window.QuotationDiscount && QuotationDiscount.parse(draft.discount);
+    el("subRow").hidden = el("lessRow").hidden = !all.off;
+    el("subtotal").textContent = money(sum);
+    el("lessLabel").textContent = pct && pct.percent !== undefined ? "Discount (" + (+pct.percent.toFixed(2)) + "%)" : "Discount";
+    el("lessAmt").textContent = "-" + money(all.off);
+    if (document.activeElement !== el("allDiscount")) el("allDiscount").value = draft.discount || "";
+    el("grand").textContent = money(all.net);
+    showPages();
     el("download").disabled = !draft.lines.length;
     el("print").disabled = !draft.lines.length;
   }
@@ -584,8 +671,8 @@
     if (k === "qty") draft.lines[i].qty = Math.max(0, Math.round(toNumber(t.value)));
     else if (k === "price") draft.lines[i].price = toNumber(t.value);
     else if (k === "freebie") draft.lines[i].freebie = t.value;
-    var cell = document.querySelector('[data-total="' + i + '"]');
-    if (cell) cell.textContent = money(toNumber(draft.lines[i].price) * (Number(draft.lines[i].qty) || 0));
+    else if (k === "discount") draft.lines[i].discount = t.value;
+    updateLine(i);
     saveDraft();
     renderTotal();
   });
@@ -593,13 +680,39 @@
   el("lines").addEventListener("focusout", function (e) {
     var t = e.target;
     if (t.getAttribute("data-k") === "price") t.value = money(draft.lines[t.getAttribute("data-i")].price);
+    // A discount is kept as "5%" or "2000" when you leave it.
+    if (t.getAttribute("data-k") === "discount" && window.QuotationDiscount) {
+      var line = draft.lines[t.getAttribute("data-i")];
+      line.discount = QuotationDiscount.clean(t.value);
+      t.value = line.discount;
+      saveDraft();
+    }
   });
   el("lines").addEventListener("click", function (e) {
+    var clear = e.target.closest("[data-clear]");
+    if (clear) {
+      var ci = clear.getAttribute("data-clear"), input = document.getElementById("disc" + ci);
+      if (draft.lines[ci]) draft.lines[ci].discount = "";
+      if (input) input.value = "";
+      saveDraft(); updateLine(Number(ci)); renderTotal();
+      return;
+    }
     var b = e.target.closest("[data-rm]");
     if (!b) return;
     draft.lines.splice(Number(b.getAttribute("data-rm")), 1);
     saveDraft();
     renderLines();
+  });
+
+  // Discount on the whole quotation (beside TOTAL).
+  document.querySelector('[data-clear="all"]').addEventListener("click", function () {
+    draft.discount = ""; el("allDiscount").value = ""; saveDraft(); renderTotal();
+  });
+  el("allDiscount").addEventListener("input", function () { draft.discount = el("allDiscount").value; saveDraft(); renderTotal(); });
+  el("allDiscount").addEventListener("change", function () {
+    draft.discount = window.QuotationDiscount ? QuotationDiscount.clean(el("allDiscount").value) : el("allDiscount").value;
+    el("allDiscount").value = draft.discount;
+    saveDraft(); renderTotal();
   });
 
   // ---------- customer, date, contact ----------
@@ -736,11 +849,13 @@
       var cut = pick(good) || pick(ok);
       if (!cut) continue;
       var spacer = doc.createElement("div");
+      spacer.className = "page-gap";
       spacer.style.height = (pageEnd + PAGE_TOP - cut.top) + "px";
       if (cut.node.tagName === "TR") {
         // A break inside the laptops: the rows from there go into a new table (with the header row again) on the next
         // page, so the first table closes with its border instead of running on into the blank space.
         var table = cut.node.closest("table"), rest = table.cloneNode(false), body = doc.createElement("tbody");
+        rest.removeAttribute("id"); rest.classList.add("q-cont");
         var head = table.querySelector("thead");
         if (head) rest.appendChild(head.cloneNode(true));
         rest.appendChild(body);
@@ -754,6 +869,50 @@
     }
     return bottom();
   }
+  // Undoes paginate: the blank space and page gaps go, and the laptops moved to a continued table go back.
+  function unpaginate(sheet) {
+    var all = function (sel) { return Array.prototype.slice.call(sheet.querySelectorAll(sel)); };
+    all(".page-gap-band, .page-gap").forEach(function (n) { n.parentNode.removeChild(n); });
+    var body = sheet.querySelector("table.q:not(.q-cont) tbody");
+    all("table.q-cont").forEach(function (t) {
+      Array.prototype.slice.call(t.querySelectorAll("tbody > tr")).forEach(function (row) { body.appendChild(row); });
+      t.parentNode.removeChild(t);
+    });
+    sheet.style.minHeight = "";
+  }
+  // The quotation on screen as its pages: broken as in the PDF, with a gap and "Page 2 of 3" between pages. Not
+  // while a box on the sheet is being typed in (moving its row would take the cursor out): then when you leave it.
+  var pagesQueued = false, pagesWaiting = false;
+  function showPages() {
+    if (pagesQueued) return;
+    pagesQueued = true;
+    requestAnimationFrame(function () {
+      pagesQueued = false;
+      var sheet = el("sheet"), focus = document.activeElement;
+      if (focus && focus !== document.body && sheet.contains(focus) && /^(INPUT|TEXTAREA)$/.test(focus.tagName)) { pagesWaiting = true; return; }
+      pagesWaiting = false;
+      unpaginate(sheet);
+      var pages = Math.max(1, Math.ceil(paginate(sheet) / PAGE_PX - 0.001));
+      sheet.style.minHeight = (pages * PAGE_PX) + "px";
+      for (var p = 1; p < pages; p++) {
+        var band = document.createElement("div");
+        band.className = "page-gap-band no-print";
+        band.style.top = (p * PAGE_PX - 12) + "px";
+        band.textContent = "Page " + (p + 1) + " of " + pages;
+        sheet.appendChild(band);
+      }
+    });
+  }
+  el("sheet").addEventListener("focusout", function () {
+    setTimeout(function () { if (pagesWaiting) showPages(); }, 0);
+  });
+  // Printing uses the browser's own page breaks.
+  window.addEventListener("beforeprint", function () { unpaginate(el("sheet")); });
+  window.addEventListener("afterprint", showPages);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(showPages);
+  // The tab was hidden while the page was laid out (nothing measures then): again when it shows.
+  window.addEventListener("resize", showPages);
+
   el("download").addEventListener("click", function () {
     if (el("download").disabled) return;
     el("status").textContent = "Preparing the PDF…";
@@ -769,10 +928,12 @@
       onclone: function (doc) {
         Array.prototype.slice.call(doc.getElementById("sheet").querySelectorAll("input")).forEach(function (copy, i) {
           var original = inputs[i], cs = original ? getComputedStyle(original) : null;
+          // Boxes shown on screen only (the discount boxes) are left out of the PDF.
+          if (original && original.closest(".no-print")) { copy.style.visibility = "hidden"; return; }
           var span = doc.createElement("span");
           span.textContent = copy.value;
           span.style.cssText = "display:block;white-space:nowrap;overflow:hidden;padding:1px 2px;"
-            + (cs ? "font:" + cs.font + ";text-align:" + cs.textAlign + ";color:" + cs.color + ";" : "");
+            + (cs ? "font:" + cs.font + ";text-align:" + cs.textAlign + ";color:" + cs.color + ";text-decoration:" + cs.textDecorationLine + ";" : "");
           copy.parentNode.replaceChild(span, copy);
         });
         // html2canvas ignores object-fit (the logo came out squashed): each picture gets its fitted size instead.
@@ -787,6 +948,7 @@
           copy.style.objectFit = "fill";
           copy.style.margin = ((h - fh) / 2) + "px " + ((w - fw) / 2) + "px";
         });
+        unpaginate(doc.getElementById("sheet"));
         contentPx = paginate(doc.getElementById("sheet"));
       }
     }).then(function (canvas) {

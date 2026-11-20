@@ -61,6 +61,7 @@
       "flyer-bridge.js",
       "quotation.html",
       "quotation-bridge.js",
+      "quotation-discount.js",
       "flyer-promos.js",
       "flyer-customer.js",
       "reco-customer.js",
