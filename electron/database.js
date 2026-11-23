@@ -9,6 +9,7 @@ const { createFeatureBannerResolver } = require('./feature-banners');
 const { createUsabilityLookup } = require('./app-usability');
 const { makeBranchDetails } = require('./branch-details');
 const { makeLaptopDatabase, specsRowsFromLaptopDb } = require('./laptop-database');
+const { otherProducts } = require('./other-prices');
 
 const SHEET_TABLES = new Set([
   'banner_laptops',
@@ -18,6 +19,7 @@ const SHEET_TABLES = new Set([
   'features_banner',
   'ageing_banner',
   'ageing_monitoring',
+  'other_prices',
   'usability',
   'branch_details',
   'branch_qr',
@@ -581,6 +583,8 @@ function getInitialData() {
     branchDetails: makeBranchDetails(getRows('branch_details'), normalizeImageUrl, getRows('branch_qr')),
     // Flyers page: each laptop's name, part number and specs (LAPTOP DB sheet).
     laptopDatabase,
+    // Quotation: desktops, mobiles and attachments with their selling prices (other-prices.js).
+    otherProducts: otherProducts(getRows('other_prices')),
     ukspPerSkuData,
     ukspBannerData,
     appUkspData: applicationMatrix,

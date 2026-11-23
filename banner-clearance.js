@@ -132,8 +132,9 @@
     g.font = font(800, size); g.letterSpacing = `${-2 * size / 100}px`;
     g.fillText(number, left + pw + 18, 935);
     g.letterSpacing = '0px';
-    // BEFORE, struck out
+    // BEFORE, struck out, then SAVE (AGEING BANNER MONITORING SAVE, else the difference)
     if (c.before > c.cash) {
+      const save = c.save || c.before - c.cash;
       g.font = font(800, 28);
       const bw = g.measureText('BEFORE').width + 40;
       g.font = font(800, 40);
@@ -141,17 +142,31 @@
       g.font = font(800, 26);
       const phpw = g.measureText('PHP').width;
       const whiteW = phpw + ow + 56;
-      slanted(g, 470 + bw - 4, 958, whiteW, 52);
+      g.font = font(800, 28);
+      const saveLabel = 'SAVE PHP ', saveLabelW = g.measureText(saveLabel).width;
+      g.font = font(800, 36);
+      const saveNumW = g.measureText(money(save)).width;
+      const saveW = save > 0 ? saveLabelW + saveNumW + 44 : 0;
+      // the row ends at the price box's right edge (or starts under its left part when it is long)
+      const x = Math.max(250, 912 - (bw - 4 + whiteW + (saveW ? saveW + 8 : 0)));
+      slanted(g, x + bw - 4, 958, whiteW, 52);
       g.fillStyle = '#fff'; g.fill(); g.lineWidth = 2; g.strokeStyle = RED; g.stroke();
-      slanted(g, 470, 958, bw, 52);
+      slanted(g, x, 958, bw, 52);
       g.fillStyle = RED; g.fill();
       g.textAlign = 'left'; g.fillStyle = '#fff'; g.font = font(800, 28);
-      g.fillText('BEFORE', 490, 994);
-      const x0 = 470 + bw + 14;
+      g.fillText('BEFORE', x + 20, 994);
+      const x0 = x + bw + 14;
       g.fillStyle = RED; g.font = font(800, 26); g.fillText('PHP', x0, 994);
       g.font = font(800, 40); g.fillText(old, x0 + phpw + 10, 998);
       g.beginPath(); g.moveTo(x0 + phpw + 4, 990); g.lineTo(x0 + phpw + ow + 18, 976);
       g.lineWidth = 3; g.strokeStyle = RED; g.stroke();
+      if (saveW) {
+        const sx = x + bw - 4 + whiteW + 8;
+        slanted(g, sx, 958, saveW, 52);
+        g.fillStyle = YELLOW; g.fill();
+        g.fillStyle = BLUE; g.font = font(800, 28); g.fillText(saveLabel, sx + 22, 994);
+        g.font = font(800, 36); g.fillText(money(save), sx + 22 + saveLabelW, 996);
+      }
     }
   }
 

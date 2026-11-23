@@ -27,6 +27,7 @@ const { readPriceMatrix } = require('./price-matrix');
 const { PROMO_IMAGES_SHEET, readPromoIcons } = require('./promo-icons');
 const { BRANCH_QR_SHEET, BRANCH_QR_RANGE, branchQrCollection } = require('./branch-qr');
 const { readAgeingMonitoring } = require('./ageing-monitoring');
+const { readOtherPrices } = require('./other-prices');
 const {
   LAPTOP_DATABASE_SHEET, LAPTOP_DATABASE_RANGE, UKSP_ICON_SHEET, UKSP_ICON_RANGE,
   parseLaptopDb, laptopDatabaseCollection, bannerSpecsCollection, bannerLaptopsCollection
@@ -243,6 +244,14 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
       valueRenderOption: 'FORMATTED_VALUE'
     });
     result.ageing_banner = ageingBannerCollection(response.data.values || []);
+  }
+
+  // Quotation: desktops, mobiles and attachments with their selling prices (see other-prices.js), from the price
+  // matrix spreadsheet; a tab that cannot be read is skipped, and when none can be read the last synced ones stay.
+  if (priceMatrixSpreadsheetId) {
+    const others = await readOtherPrices(sheets, priceMatrixSpreadsheetId, (message) => onProgress({ phase: 'warning', message: `${message}; skipped for the Quotation.` }))
+      .catch((error) => { onProgress({ phase: 'warning', message: `Quotation products: ${error.message}` }); return null; });
+    if (others && others.rows.length) result.other_prices = others;
   }
 
   // Clearance banners for ageing laptops (see ageing-monitoring.js): AGEING BANNER MONITORING in PROMO MONITORING,

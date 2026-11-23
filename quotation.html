@@ -36,6 +36,8 @@
     .add-wrap { position: relative; flex: 1 1 320px; max-width: 520px; }
     .add-wrap input { width: 100%; font: 500 13px inherit; font-family: inherit; padding: 8px 10px 8px 32px; border: 1px solid #cbd5e1; border-radius: 9px; }
     .add-wrap .bi { position: absolute; left: 11px; top: 9px; color: var(--muted); }
+    .kind-tag { display: inline-block; margin-right: 6px; padding: 1px 6px; border-radius: 999px; background: #eef2ff; color: #3730a3; font-size: 9.5px; font-weight: 800; letter-spacing: .3px; text-transform: uppercase; vertical-align: 1px; }
+    .kind-tag.laptop { background: #e0f2fe; color: #075985; }
     #results { position: absolute; left: 0; right: 0; top: calc(100% + 4px); max-height: 360px; overflow: auto; background: #fff; border: 1px solid #cbd5e1; border-radius: 10px; box-shadow: 0 12px 30px rgba(0,0,0,.15); display: none; }
     #results.open { display: block; }
     #results button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 12px; font: inherit; font-size: 12.5px; cursor: pointer; border-bottom: 1px solid #f1f5f9; }
@@ -227,7 +229,7 @@
   <h1><i class="bi bi-file-earmark-text"></i> QUOTATION<span class="dev-badge">UNDER DEVELOPMENT</span></h1>
   <div class="add-wrap">
     <i class="bi bi-search" aria-hidden="true"></i>
-    <input id="search" type="search" placeholder="Add a laptop: type model, part number or SKU (Ctrl+Shift+L)" autocomplete="off" spellcheck="false" aria-label="Add a laptop">
+    <input id="search" type="search" placeholder="Add a product: laptop, desktop, phone or accessory · model, part number or SKU (Ctrl+Shift+L)" autocomplete="off" spellcheck="false" aria-label="Add a product">
     <div id="results" role="listbox"></div>
   </div>
   <button id="newQuote" type="button" class="btn light" title="Start a new quotation"><i class="bi bi-file-earmark-plus"></i> New</button>
@@ -601,7 +603,12 @@
   function specLines(laptop) {
     var s = laptop.specs || {};
     return ["Processor", "Graphics", "Memory", "Storage", "Resolution", "OS"].filter(function (k) { return s[k]; })
-      .map(function (k) { return k + " - " + s[k]; });
+      .map(function (k) { return k + " - " + s[k]; }).concat(laptop.details || []);
+  }
+  // Desktops, mobiles and attachments (quotation-bridge.js otherChoices) have a kind; laptops have none.
+  function isLaptop(product) { return product && !product.kind; }
+  function hasLaptopLine() {
+    return draft.lines.some(function (l) { return isLaptop(byCode[key(l.code)]); });
   }
 
   // ---------- promo, bundle and payment term (quotation-terms.js) ----------
@@ -633,13 +640,18 @@
     var list = promosFor(laptop);
     if (!list.length) return '<div class="line-opts no-print"><span class="opt-none">No promo prices for this laptop in the data</span></div>';
     var p = linePromo(line, laptop), bundle = line.bundle === "no" ? "no" : "with", term = line.term || "cash";
+    if (!isLaptop(laptop) && laptop.kind !== "attachment") bundle = "no";
     var select = function (k, title, options) { return '<select data-k="' + k + '" data-i="' + i + '" title="' + title + '" aria-label="' + title + '">' + options + "</select>"; };
     return '<div class="line-opts no-print">'
       + select("promo", "Promo", list.map(function (x) {
         var id = promoId(x);
         return '<option value="' + esc(id) + '"' + (p && id === promoId(p) ? " selected" : "") + ">" + esc(x.title) + (x.branches.length ? " · " + esc(branch()) : "") + "</option>";
       }).join(""))
-      + select("bundle", "Bundle", '<option value="with"' + (bundle === "with" ? " selected" : "") + '>With bundle</option><option value="no"' + (bundle === "no" ? " selected" : "") + ">No bundle</option>")
+      + (isLaptop(laptop)
+        ? select("bundle", "Bundle", '<option value="with"' + (bundle === "with" ? " selected" : "") + '>With bundle</option><option value="no"' + (bundle === "no" ? " selected" : "") + ">No bundle</option>")
+        : laptop.kind === "attachment"
+          ? select("bundle", "Price", '<option value="with"' + (bundle === "with" ? " selected" : "") + '>With a laptop</option><option value="no"' + (bundle === "no" ? " selected" : "") + ">Regular price</option>")
+          : "")
       + select("term", "Payment term", QuotationTerms.list.map(function (t) {
         var v = termPrice(p, bundle, t.key);
         return '<option value="' + t.key + '"' + (t.key === term ? " selected" : "") + (v == null && t.key !== term ? " disabled" : "") + ">" + esc(t.label) + (v == null ? " — no price" : " — " + money(v)) + "</option>";
@@ -650,9 +662,11 @@
     var laptop = byCode[key(code)];
     if (!laptop) return;
     // The branch's promo (else the regular one), with bundle, cash: the price the Banner shows.
-    var p = defaultPromo(laptop), price = termPrice(p, "with", "cash");
-    draft.lines.push({ code: laptop.code, price: price != null ? price : priceFor(laptop), qty: 1, freebie: p ? bundleFreebie(p, "with") : freebieFor(laptop),
-      promo: p ? promoId(p) : "", bundle: "with", term: "cash" });
+    var bundle = isLaptop(laptop) ? "with" : laptop.kind === "attachment" ? (hasLaptopLine() ? "with" : "no") : "no";
+    var p = defaultPromo(laptop), price = termPrice(p, bundle, "cash");
+    draft.lines.push({ code: laptop.code, price: price != null ? price : priceFor(laptop), qty: 1,
+      freebie: !isLaptop(laptop) ? "" : p ? bundleFreebie(p, "with") : freebieFor(laptop),
+      promo: p ? promoId(p) : "", bundle: bundle, term: "cash" });
     saveDraft();
     renderLines();
   }
@@ -730,7 +744,11 @@
     el("print").disabled = !draft.lines.length;
   }
 
-  el("lines").addEventListener("input", function (e) {
+  // The laptops' boxes and buttons: in the table, or in a continued table on the next page (showPages moves the rows
+  // there), so the sheet listens and keeps only what is in a laptops table.
+  function inLines(target) { return Boolean(target && target.closest && target.closest("table.q")); }
+  el("sheet").addEventListener("input", function (e) {
+    if (!inLines(e.target)) return;
     var t = e.target, i = t.getAttribute("data-i"), k = t.getAttribute("data-k");
     if (i == null || !draft.lines[i] || t.tagName === "SELECT") return;
     if (k === "qty") draft.lines[i].qty = Math.max(0, Math.round(toNumber(t.value)));
@@ -743,7 +761,8 @@
   });
   // Promo, bundle or payment term chosen: the price from the sheet for them (and, for promo and bundle, the
   // freebie). A term with no price for that promo and bundle goes back to cash.
-  el("lines").addEventListener("change", function (e) {
+  el("sheet").addEventListener("change", function (e) {
+    if (!inLines(e.target)) return;
     var t = e.target, k = t.getAttribute("data-k"), i = t.getAttribute("data-i");
     if (t.tagName !== "SELECT" || !draft.lines[i]) return;
     var line = draft.lines[i], laptop = byCode[key(line.code)];
@@ -756,12 +775,14 @@
     var price = termPrice(p, line.bundle, line.term);
     if (price == null) { line.term = "cash"; price = termPrice(p, line.bundle, "cash"); }
     if (price != null) line.price = price;
-    if (k !== "term") line.freebie = bundleFreebie(p, line.bundle);
+    if (!isLaptop(laptop) && laptop.kind !== "attachment") line.bundle = "no";
+    if (k !== "term" && isLaptop(laptop)) line.freebie = bundleFreebie(p, line.bundle);
     saveDraft();
     renderLines();
   });
   // The price shows as 54,999.00 again when you leave it.
-  el("lines").addEventListener("focusout", function (e) {
+  el("sheet").addEventListener("focusout", function (e) {
+    if (!inLines(e.target)) return;
     var t = e.target;
     if (t.getAttribute("data-k") === "price") t.value = money(draft.lines[t.getAttribute("data-i")].price);
     // A discount is kept as "5%" or "2000" when you leave it.
@@ -772,7 +793,8 @@
       saveDraft();
     }
   });
-  el("lines").addEventListener("click", function (e) {
+  el("sheet").addEventListener("click", function (e) {
+    if (!inLines(e.target)) return;
     var clear = e.target.closest("[data-clear]");
     if (clear) {
       var ci = clear.getAttribute("data-clear"), input = document.getElementById("disc" + ci);
@@ -819,15 +841,15 @@
     var words = el("search").value.toLowerCase().split(/\s+/).filter(Boolean);
     if (!words.length) { el("results").classList.remove("open"); return; }
     found = data.laptops.filter(function (l) {
-      var hay = (l.code + " " + l.model + " " + l.partNumber).toLowerCase();
+      var hay = (l.code + " " + l.model + " " + l.partNumber + " " + (l.kindLabel || "laptop")).toLowerCase();
       return words.every(function (w) { return hay.indexOf(w) !== -1; });
     }).slice(0, 40);
     active = 0;
     el("results").innerHTML = found.length ? found.map(function (l, i) {
       var p = priceFor(l);
-      return '<button type="button" data-pick="' + i + '"' + (i === 0 ? ' class="active"' : "") + "><b>" + esc(l.model) + "</b> " + esc(l.partNumber)
+      return '<button type="button" data-pick="' + i + '"' + (i === 0 ? ' class="active"' : "") + '><span class="kind-tag' + (l.kind ? "" : " laptop") + '">' + esc(l.kindLabel || "Laptop") + "</span><b>" + esc(l.model) + "</b> " + esc(l.partNumber)
         + (p ? " · PHP " + money(p) : "") + "<small>" + esc(l.code) + "</small></button>";
-    }).join("") : '<div class="none">No laptop matches.</div>';
+    }).join("") : '<div class="none">Nothing matches. Try a model, part number or category (e.g. mouse, monitor).</div>';
     el("results").classList.add("open");
   }
   function pick(i) {

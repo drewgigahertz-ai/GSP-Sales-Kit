@@ -3,7 +3,7 @@
   "productName": "GigaHertz SalesKit Server",
   "extraMetadata": {
     "name": "saleskit-server",
-    "version": "1.0.49",
+    "version": "1.0.50",
     "main": "server/main.js"
   },
   "directories": {
@@ -20,6 +20,7 @@
     "electron/feature-banners.js",
     "electron/ageing-banners.js",
     "electron/ageing-monitoring.js",
+    "electron/other-prices.js",
     "electron/app-usability.js",
     "electron/branch-details.js",
     "electron/branch-qr.js",

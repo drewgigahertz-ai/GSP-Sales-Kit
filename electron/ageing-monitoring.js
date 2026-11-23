@@ -1,7 +1,9 @@
 // Clearance banners for ageing laptops (server side), drawn by the Banner page (banner-clearance.js) from:
 //   AGEING BANNER MONITORING (PROMO MONITORING - FOR BANNERS spreadsheet): a log with a row per laptop and date —
-//     ITEM DESCRIPTION, INV, CASH, ORIGINAL PRICE (the struck-out BEFORE price), BUNDLE DESCRIPTION (the freebies,
-//     one per line), BUNDLE WORTH, DATE AND TIME. Each laptop's latest row is used. Columns are found by their headers.
+//     ITEM DESCRIPTION, INV, CASH, ORIGINAL PRICE, BUNDLE DESCRIPTION (the freebies, one per line), BUNDLE WORTH,
+//     DATE AND TIME, and CASH PRICE (the price shown), OLD PRICE (the struck-out BEFORE price) and SAVE. A row without
+//     CASH PRICE / OLD PRICE uses CASH / ORIGINAL PRICE; without SAVE, the difference. Each laptop's latest row is used.
+//     Columns are found by their headers.
 //   PERIPHEALS (the main spreadsheet): A the freebie's name, B its picture (a Drive link); section rows have no link.
 // A freebie is matched to PERIPHEALS by its name without the "FREEBIES-" start and "(PWP)" / "(hard bundling)".
 
@@ -20,8 +22,11 @@ const itemKey = (value) => text(value).toUpperCase().replace(/\s+/g, ' ');
 const FIELDS = [
   ['item', (h) => h === 'ITEMDESCRIPTION'],
   ['stock', (h) => h === 'INV' || h.startsWith('INVENTORY')],
-  ['cash', (h) => h === 'CASH' || h === 'CASHPRICE'],
+  ['cash', (h) => h === 'CASH'],
   ['before', (h) => h.startsWith('ORIGINALPRICE')],
+  ['price', (h) => h === 'CASHPRICE'],
+  ['oldPrice', (h) => h === 'OLDPRICE'],
+  ['save', (h) => h === 'SAVE' || h === 'SAVINGS'],
   ['freebies', (h) => h === 'BUNDLEDESCRIPTION'],
   ['worth', (h) => h === 'BUNDLEWORTH'],
   ['date', (h) => h.startsWith('DATEANDTIME') || h === 'DATE']
@@ -89,18 +94,24 @@ function ageingMonitoringCollection(values = [], peripheralValues = []) {
     if (!current || date >= current.date) latest.set(key, { row, date, order });
   });
   const pictures = peripheralPictures(peripheralValues);
-  const rows = [...latest.values()].sort((a, b) => a.order - b.order).map(({ row }) => ({
-    item_code: text(cell(row, 'item')).replace(/\s+/g, ' '),
-    stock: String(amount(cell(row, 'stock'))),
-    cash: String(amount(cell(row, 'cash')) || ''),
-    before: String(amount(cell(row, 'before')) || ''),
-    worth: String(amount(cell(row, 'worth')) || ''),
-    freebies: JSON.stringify(splitFreebies(cell(row, 'freebies')).map((name) => ({ name, label: freebieLabel(name), picture: findPicture(pictures, name) }))),
-    date: text(cell(row, 'date'))
-  })).filter((row) => row.cash);
+  const rows = [...latest.values()].sort((a, b) => a.order - b.order).map(({ row }) => {
+    const cash = amount(cell(row, 'price')) || amount(cell(row, 'cash'));
+    const before = amount(cell(row, 'oldPrice')) || amount(cell(row, 'before'));
+    const save = amount(cell(row, 'save')) || (before > cash ? before - cash : 0);
+    return {
+      item_code: text(cell(row, 'item')).replace(/\s+/g, ' '),
+      stock: String(amount(cell(row, 'stock'))),
+      cash: String(cash || ''),
+      before: String(before || ''),
+      save: String(save || ''),
+      worth: String(amount(cell(row, 'worth')) || ''),
+      freebies: JSON.stringify(splitFreebies(cell(row, 'freebies')).map((name) => ({ name, label: freebieLabel(name), picture: findPicture(pictures, name) }))),
+      date: text(cell(row, 'date'))
+    };
+  }).filter((row) => row.cash);
   return {
     collection: 'ageing_monitoring',
-    columns: ['item_code', 'stock', 'cash', 'before', 'worth', 'freebies', 'date'],
+    columns: ['item_code', 'stock', 'cash', 'before', 'save', 'worth', 'freebies', 'date'],
     rows: rows.map((data, index) => ({ id: `item_${String(index + 1).padStart(4, '0')}`, data }))
   };
 }
@@ -126,7 +137,7 @@ async function readAgeingMonitoring(sheets, { promoSpreadsheetId = DEFAULT_PROMO
   return ageingMonitoringCollection(monitoring.data.values || [], peripherals);
 }
 
-// rows: the ageing_monitoring table → Map(item key → { cash, before, worth, stock, freebies: [{ label, picture }] }).
+// rows: the ageing_monitoring table → Map(item key → { cash, before, save, worth, stock, freebies: [{ label, picture }] }).
 function clearanceByItem(rows = [], imageUrl = (value) => value) {
   const result = new Map();
   for (const row of rows) {
@@ -135,6 +146,7 @@ function clearanceByItem(rows = [], imageUrl = (value) => value) {
     result.set(itemKey(row.item_code), {
       cash: amount(row.cash),
       before: amount(row.before),
+      save: amount(row.save),
       worth: amount(row.worth),
       stock: amount(row.stock),
       freebies: (Array.isArray(freebies) ? freebies : []).map((f) => ({ label: text(f.label) || text(f.name), picture: f.picture ? imageUrl(text(f.picture)) : '' }))

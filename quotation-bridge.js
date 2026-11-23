@@ -50,6 +50,50 @@
     }));
   }
 
+  // Desktops, mobiles and attachments (other-prices.js: ATTACHMENT PRICING, DESKTOP PRICING SUMMARY, PM MOBILE VER 2.5).
+  // Their specs are read from the name ("… i5-1240P 1TB + 256GB SSD 8GB WIN11s", "CEL-… (12+256GB) …"); an
+  // attachment shows its category. Attachments have two price sets: with a laptop (withBundle) and regular (noBundle).
+  const KIND_LABELS = { desktop: 'Desktop', mobile: 'Mobile', attachment: 'Accessory' };
+  function specsFromName(name) {
+    const n = ` ${name} `;
+    const pick = (re) => (n.match(re) || [])[1] || '';
+    const phone = n.match(/\((\d+)\s*\+\s*(\d+\s*(?:GB|TB))\)/i);
+    return {
+      Processor: pick(/\s((?:i[3579]|R[3579]|Ultra\s?[579]|Core\s?[3579]|Ryzen\s?[3579])[-\s]?[\w-]*\d\w*)\s/i),
+      Graphics: pick(/\s((?:RTX|GTX|MX|RX)\s?\d{3,4}\w*(?:\/\d+GB)?)\s/i),
+      Memory: phone ? `${phone[1]}GB` : pick(/SSD\s+(\d+GB)(?:\s|$)/i),
+      Storage: phone ? phone[2].replace(/\s/g, '') : pick(/\s(\d+\s?(?:GB|TB)(?:\s?\+\s?\d+\s?(?:GB|TB))?\s?(?:SSD|HDD))\s/i),
+      OS: pick(/\s(WIN(?:DOWS)?\s?1[01]\w*)\s/i).replace(/^WIN\s?(1[01])\w*$/i, 'WINDOWS $1')
+    };
+  }
+  function otherChoices(products, taken) {
+    return products.filter((p) => !taken.has(key(p.item))).map((p) => {
+      const terms = p.terms || {};
+      const name = clean(p.item);
+      const specs = p.kind === 'attachment' ? {} : specsFromName(name);
+      // A desktop's model is its name up to its processor (the specs are listed beside it).
+      let model = name.replace(/^[A-Z]{2,12}-(?=\S)/, '');
+      const cut = specs.Processor ? model.indexOf(` ${specs.Processor}`) : -1;
+      if (p.kind === 'desktop' && cut > 8) model = model.slice(0, cut).replace(/\s+CORE$/i, '').trim();
+      return {
+        code: name,
+        kind: p.kind,
+        kindLabel: p.kind === 'attachment' ? (clean(p.category) || KIND_LABELS.attachment) : (clean(p.category) || KIND_LABELS[p.kind] || ''),
+        category: clean(p.category),
+        // "DESKTOP-ACER AIO C24-195ES ULTRA 5 125U …" → "ACER AIO C24-195ES"
+        model,
+        partNumber: '',
+        specs,
+        details: p.kind === 'attachment' ? [clean(p.category) && `Category - ${clean(p.category)}`].filter(Boolean) : [],
+        cash: (terms.noBundle && terms.noBundle.cash) || (terms.withBundle && terms.withBundle.cash) || null,
+        promo: clean(p.promo),
+        branchCash: {},
+        branchPromo: {},
+        promos: [{ title: clean(p.promo) || 'NO PROMO', freebie: '', branches: [], terms }]
+      };
+    }).sort((a, b) => a.model.localeCompare(b.model));
+  }
+
   function build(data) {
     const bannerData = data.bannerData || {};
     const items = new Map((bannerData.items || []).map((item) => [key(item.itemCode), item]));
@@ -88,6 +132,7 @@
         promos: promoChoices(item)
       };
     }).sort((a, b) => a.model.localeCompare(b.model));
+    laptops.push(...otherChoices(data.otherProducts || [], new Set(laptops.map((l) => key(l.code)))));
 
     const branchDetails = data.branchDetails || {};
     const homeBranch = key(data.homeBranch);
