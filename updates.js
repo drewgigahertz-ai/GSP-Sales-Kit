@@ -6,13 +6,20 @@
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
+      version: '1.0.39',
+      date: 'November 23, 2026',
+      changes: [
+        'Quotation products: besides laptops, add desktops, cellphones, tablets and accessories (mouse, monitor, headset …) with the search box. An accessory has its price with a laptop or its regular price, and every product has its payment terms.',
+        'Quotation: laptops that continue on the next page can be changed again (price, quantity, discount, promo, payment term and remove).'
+      ]
+    },
+    {
       version: '1.0.38',
       date: 'November 20, 2026',
       changes: [
         'Banner: ageing laptops now show a CLEARANCE SALE banner with their discounted cash price, the price before, how much the customer saves, their specs and their freebies with pictures. Download saves it as a picture.',
         'Quotation payment terms: each laptop has Promo, Bundle and Payment term choices (Cash, 3, 6, 9, 12, 18 and 24 months, Home Credit). The price fills in for your choice, with bundle the freebie shows what it is worth, and the quotation names the banks for that term.',
         'Quotation position: type the position shown after the name under the signature (e.g. Branch Personnel) in Branch details. Blank shows Branch Manager.',
-        'Quotation products: besides laptops, add desktops, cellphones, tablets and accessories (mouse, monitor, headset …) with the search box. An accessory has its price with a laptop or its regular price, and every product has its payment terms.',
         'The QUOTATION tab is marked as under development while it is being tested: check prices before giving a quotation, and send your feedback.'
       ]
     },
