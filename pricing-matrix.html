@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pricing Matrix</title>
+  <!--
+    PRICING MATRIX tab: every product's selling prices from GHZ PRICING MATRIX, for every branch (no branch filter).
+    Laptops, desktops, accessories and mobiles; each promo's prices for all payment terms side by side (no bundle /
+    with bundle, or regular / with a laptop), its freebies and worth, its dates, the vendor freebies' claiming, and
+    the salesman incentives (staff only: never copied). Fed by pricing-matrix-bridge.js through window messages.
+  -->
+  <link href="./node_modules/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="./node_modules/@fontsource/plus-jakarta-sans/400.css" rel="stylesheet">
+  <link href="./node_modules/@fontsource/plus-jakarta-sans/500.css" rel="stylesheet">
+  <link href="./node_modules/@fontsource/plus-jakarta-sans/600.css" rel="stylesheet">
+  <link href="./node_modules/@fontsource/plus-jakarta-sans/700.css" rel="stylesheet">
+  <link href="./node_modules/@fontsource/plus-jakarta-sans/800.css" rel="stylesheet">
+  <script src="./quotation-terms.js"></script>
+  <style>
+    :root {
+      --ink: #0f172a; --muted: #64748b; --soft: #94a3b8; --line: #e2e8f0; --bg: #eef2f8; --card: #ffffff;
+      --blue: #0026e6; --navy: #0012b3; --blue-soft: #eef2ff; --green: #047857; --green-soft: #ecfdf5;
+      --amber: #b45309; --amber-soft: #fef3c7; --red: #b91c1c; --red-soft: #fee2e2; --violet: #6d28d9; --violet-soft: #f3e8ff;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: "Plus Jakarta Sans", Arial, sans-serif; font-size: 13px; }
+    button, input, select { font-family: inherit; }
+    .app { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+
+    /* ---------- top bar ---------- */
+    .top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 14px 18px 12px; background: var(--card); border-bottom: 1px solid var(--line); box-shadow: 0 2px 10px rgba(15, 23, 42, .05); }
+    .title { display: flex; align-items: center; gap: 10px; margin-right: 6px; }
+    .title .mark { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: linear-gradient(135deg, var(--navy), #2b5cf2); color: #fff; font-size: 18px; }
+    .title h1 { margin: 0; font-size: 16px; font-weight: 800; letter-spacing: .4px; color: var(--navy); }
+    .title small { display: block; color: var(--muted); font-size: 11.5px; font-weight: 600; }
+    .search { position: relative; flex: 1 1 340px; max-width: 560px; }
+    .search i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--soft); }
+    .search input { width: 100%; padding: 10px 34px 10px 36px; border: 1.5px solid #cbd5e1; border-radius: 11px; font-size: 13.5px; font-weight: 500; outline: none; background: #f8fafc; transition: border-color .15s, background .15s; }
+    .search input:focus { border-color: var(--blue); background: #fff; box-shadow: 0 0 0 4px rgba(0, 38, 230, .08); }
+    .search .clear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); border: 0; background: none; color: var(--soft); cursor: pointer; font-size: 14px; display: none; }
+    .search.has-text .clear { display: block; }
+    .kinds { display: flex; gap: 6px; flex-wrap: wrap; }
+    .kinds button { display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: #1e293b; font-weight: 700; font-size: 12.5px; cursor: pointer; }
+    .kinds button .n { padding: 0 7px; border-radius: 999px; background: #f1f5f9; color: var(--muted); font-size: 10.5px; }
+    .kinds button:hover { border-color: var(--blue); }
+    .kinds button.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+    .kinds button.on .n { background: rgba(255, 255, 255, .2); color: #fff; }
+    .filters { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; color: var(--muted); font-size: 12px; font-weight: 600; }
+    .filters select { padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; font-size: 12px; font-weight: 600; color: var(--ink); }
+    .switch { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; user-select: none; }
+    .switch input { display: none; }
+    .switch .track { width: 30px; height: 17px; border-radius: 999px; background: #cbd5e1; position: relative; transition: background .15s; }
+    .switch .track:after { content: ""; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: #fff; transition: left .15s; }
+    .switch input:checked + .track { background: var(--blue); }
+    .switch input:checked + .track:after { left: 15px; }
+    .filters .spacer { flex: 1; }
+    #count { color: var(--soft); }
+
+    /* ---------- body: list + detail ---------- */
+    .body { display: grid; grid-template-columns: minmax(300px, 380px) 1fr; min-height: 0; }
+    .list { overflow: auto; border-right: 1px solid var(--line); background: #f8fafc; padding: 8px; }
+    .row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; width: 100%; padding: 10px 12px; margin-bottom: 4px; border: 1px solid transparent; border-radius: 10px; background: transparent; text-align: left; cursor: pointer; color: inherit; }
+    .row:hover { background: #fff; border-color: var(--line); }
+    .row.on { background: #fff; border-color: var(--blue); box-shadow: 0 4px 14px rgba(0, 38, 230, .08); }
+    .row .name { font-weight: 700; font-size: 12.8px; line-height: 1.3; }
+    .row .price { font-weight: 800; color: var(--navy); white-space: nowrap; }
+    .row .sub { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; color: var(--muted); font-size: 11px; }
+    .tag { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; letter-spacing: .2px; background: #f1f5f9; color: #334155; }
+    .tag.promo { background: var(--blue-soft); color: #3730a3; }
+    .tag.soon { background: var(--amber-soft); color: var(--amber); }
+    .tag.ended { background: var(--red-soft); color: var(--red); }
+    .tag.kind { background: #e0f2fe; color: #075985; text-transform: uppercase; }
+    .more, .empty { padding: 14px; color: var(--muted); font-size: 12px; text-align: center; }
+
+    .detail { overflow: auto; padding: 18px 22px 30px; }
+    .placeholder { height: 100%; display: grid; place-items: center; text-align: center; color: var(--muted); }
+    .placeholder i { font-size: 40px; color: #c7d2fe; display: block; margin-bottom: 8px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 6px 20px rgba(15, 23, 42, .05); }
+    .head { padding: 18px 20px; display: grid; grid-template-columns: 1fr auto; gap: 10px 18px; align-items: start; }
+    .head h2 { margin: 4px 0 2px; font-size: 20px; font-weight: 800; line-height: 1.2; }
+    .head .code { color: var(--muted); font-size: 11.5px; font-weight: 600; word-break: break-word; }
+    .head .big { text-align: right; }
+    .head .big .lbl { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+    .head .big .amt { font-size: 26px; font-weight: 800; color: var(--navy); white-space: nowrap; }
+    .head .big .alt { color: var(--muted); font-size: 11.5px; font-weight: 600; }
+    .specs { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+    .specs span { padding: 4px 9px; border-radius: 8px; background: #f8fafc; border: 1px solid var(--line); font-size: 11.5px; }
+    .specs b { color: var(--muted); font-weight: 700; margin-right: 4px; }
+    .head .actions { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 9px; padding: 7px 13px; font-weight: 700; font-size: 12.5px; cursor: pointer; background: var(--navy); color: #fff; }
+    .btn.light { background: #eef2f7; color: #1e293b; }
+
+    .promos { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 12px; }
+    .promos button { display: grid; gap: 1px; text-align: left; padding: 8px 12px; border: 1.5px solid var(--line); border-radius: 11px; background: #fff; cursor: pointer; max-width: 320px; }
+    .promos button b { font-size: 12.5px; }
+    .promos button small { color: var(--muted); font-size: 10.5px; font-weight: 600; }
+    .promos button.on { border-color: var(--blue); background: var(--blue-soft); }
+    .section-label { margin: 16px 0 8px; font-size: 11px; font-weight: 800; letter-spacing: .8px; color: var(--muted); text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+
+    .grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr); gap: 16px; align-items: start; }
+    table.terms { width: 100%; border-collapse: separate; border-spacing: 0; }
+    table.terms th { position: sticky; top: 0; background: #f8fafc; padding: 10px 14px; text-align: right; font-size: 11px; font-weight: 800; letter-spacing: .5px; color: var(--muted); text-transform: uppercase; border-bottom: 1px solid var(--line); }
+    table.terms th:first-child { text-align: left; border-top-left-radius: 14px; }
+    table.terms th:last-child { border-top-right-radius: 14px; }
+    table.terms td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; text-align: right; vertical-align: top; }
+    table.terms tr:last-child td { border-bottom: 0; }
+    table.terms td:first-child { text-align: left; }
+    table.terms .term { font-weight: 700; }
+    table.terms .banks { color: var(--muted); font-size: 10.5px; font-weight: 500; margin-top: 2px; max-width: 290px; line-height: 1.35; }
+    table.terms .amt { font-weight: 800; font-size: 14px; white-space: nowrap; }
+    table.terms .mo { color: var(--muted); font-size: 10.5px; font-weight: 600; white-space: nowrap; }
+    table.terms .none { color: #cbd5e1; }
+    table.terms tr.cash td { background: #f8faff; }
+    table.terms tr.cash .amt { color: var(--navy); font-size: 15px; }
+    table.terms .best { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--green-soft); color: var(--green); font-size: 9.5px; font-weight: 800; vertical-align: 2px; }
+
+    .side { display: grid; gap: 12px; }
+    .box { padding: 14px 16px; }
+    .box h3 { margin: 0 0 10px; font-size: 12px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; display: flex; align-items: center; gap: 7px; }
+    .box h3 i { font-size: 15px; }
+    .box ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; }
+    .box li { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; line-height: 1.35; }
+    .box li i { color: var(--blue); margin-top: 1px; }
+    .box .worth { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); display: flex; justify-content: space-between; font-weight: 700; }
+    .box .worth b { color: var(--green); }
+    .box .muted { color: var(--muted); font-size: 12px; }
+    .dates { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-weight: 700; }
+    .dates .arrow { color: var(--soft); }
+    .valid { display: block; color: var(--muted); font-size: 11px; font-weight: 600; margin-top: 2px; }
+    .box.staff { border-color: #ddd6fe; background: linear-gradient(180deg, #faf5ff, #fff); }
+    .box.staff h3 { color: var(--violet); }
+    .box.staff .lock { margin-left: auto; padding: 1px 7px; border-radius: 999px; background: var(--violet-soft); color: var(--violet); font-size: 9.5px; letter-spacing: .3px; }
+    .box.staff .amount { font-size: 18px; font-weight: 800; color: var(--violet); }
+    body.hide-staff .staff { display: none; }
+
+    #toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(20px); opacity: 0; padding: 9px 16px; border-radius: 10px; background: #0f172a; color: #fff; font-weight: 700; font-size: 12.5px; transition: all .2s; pointer-events: none; }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    @media (max-width: 980px) {
+      .body { grid-template-columns: 1fr; grid-template-rows: 40% 60%; }
+      .list { border-right: 0; border-bottom: 1px solid var(--line); }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="title">
+      <div class="mark"><i class="bi bi-tags-fill"></i></div>
+      <div><h1>PRICING MATRIX</h1><small>Prices, promos, bundles &amp; incentives · all branches</small></div>
+    </div>
+    <div class="search" id="searchBox">
+      <i class="bi bi-search"></i>
+      <input id="search" type="search" autocomplete="off" spellcheck="false" placeholder="Search model, part number, SKU or promo (Ctrl+Shift+L)" aria-label="Search products">
+      <button class="clear" id="clearSearch" type="button" aria-label="Clear the search"><i class="bi bi-x-circle-fill"></i></button>
+    </div>
+    <div class="kinds" id="kinds" role="group" aria-label="Product group"></div>
+    <div class="filters">
+      <label>Category <select id="category"><option value="">All</option></select></label>
+      <label>Sort <select id="sort">
+        <option value="name">Name A–Z</option>
+        <option value="low">Cash price: low to high</option>
+        <option value="high">Cash price: high to low</option>
+        <option value="ending">Promo ending soonest</option>
+      </select></label>
+      <label class="switch"><input type="checkbox" id="promoOnly"><span class="track"></span> With a promo only</label>
+      <label class="switch" title="Salesman incentives are for staff only: they are never copied"><input type="checkbox" id="showStaff" checked><span class="track"></span> <i class="bi bi-lock-fill"></i> Show incentives</label>
+      <span class="spacer"></span>
+      <span id="count"></span>
+    </div>
+  </div>
+  <div class="body">
+    <div class="list" id="list" role="listbox" aria-label="Products"></div>
+    <div class="detail" id="detail"><div class="placeholder"><div><i class="bi bi-hourglass-split"></i>Loading the price matrix…</div></div></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+(function () {
+  var el = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var money = function (n) { return Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  var peso = function (n) { return n == null ? "" : "₱" + money(n); };
+  function toParent(message) { if (window.parent && window.parent !== window) window.parent.postMessage(message, "*"); }
+
+  var KINDS = [["laptop", "Laptop", "bi-laptop"], ["desktop", "Desktop", "bi-pc-display"], ["attachment", "Accessories", "bi-mouse2"], ["mobile", "Mobile", "bi-phone"]];
+  // Months for the monthly figure ("₱4,166.58/mo"); cash, 3-month straight and Home Credit have none.
+  var MONTHS = { m6: 6, m9: 9, m12: 12, m18: 18, m24: 24, bdo24: 24, m24b: 24 };
+  var TERMS = (window.QuotationTerms && window.QuotationTerms.list) || [];
+  // Price sets shown side by side: laptops no bundle / with bundle; accessories regular / with a laptop.
+  function setsFor(product, promo) {
+    var names = product.kind === "attachment" ? { noBundle: "Regular", withBundle: "With a laptop" } : { noBundle: "No bundle", withBundle: "With bundle" };
+    var t = promo.terms || {};
+    var sets = ["noBundle", "withBundle"].filter(function (s) { return t[s] && Object.keys(t[s]).length; });
+    if (sets.length === 1 && product.kind !== "laptop" && product.kind !== "attachment") names[sets[0]] = "Price";
+    return sets.map(function (s) { return { key: s, label: names[s], prices: t[s] }; });
+  }
+  function cashOf(product, promo) {
+    var t = (promo || product.promos[0]).terms || {};
+    return (t.withBundle && t.withBundle.cash) || (t.noBundle && t.noBundle.cash) || null;
+  }
+
+  // Promo dates: "Ends in 3 days" (amber, within 7 days), "Ended" (red), "Starts Jun 1".
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  function day(iso) { var m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
+  function dayLabel(iso) { var d = day(iso); return d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""; }
+  function dateState(promo) {
+    var start = day(promo.start), end = day(promo.end);
+    if (end && end < today) return { cls: "ended", text: "Ended " + dayLabel(promo.end) };
+    if (start && start > today) return { cls: "", text: "Starts " + dayLabel(promo.start) };
+    if (end) {
+      var left = Math.round((end - today) / 864e5);
+      if (left <= 7) return { cls: "soon", text: left === 0 ? "Ends today" : "Ends in " + left + " day" + (left === 1 ? "" : "s") };
+    }
+    return null;
+  }
+  var hasPromo = function (promo) { return promo.title && !/^no promo$/i.test(promo.title); };
+
+  // ---------- state ----------
+  var products = [];
+  var state = { kind: "laptop", category: "", sort: "name", promoOnly: false, query: "", selected: "", promo: 0 };
+  try { var saved = JSON.parse(localStorage.getItem("saleskit.pricing.view") || "{}"); Object.assign(state, saved, { query: "", promo: 0 }); } catch (e) { /* defaults */ }
+  try { el("showStaff").checked = localStorage.getItem("saleskit.pricing.staff") !== "0"; } catch (e) { /* shown */ }
+  function remember() { try { localStorage.setItem("saleskit.pricing.view", JSON.stringify({ kind: state.kind, sort: state.sort, promoOnly: state.promoOnly })); } catch (e) { /* not kept */ } }
+  function applyStaff() { document.body.classList.toggle("hide-staff", !el("showStaff").checked); }
+  applyStaff();
+
+  // ---------- filtering ----------
+  function inKind() { return products.filter(function (p) { return p.kind === state.kind; }); }
+  function visible() {
+    var words = state.query.toLowerCase().split(/\s+/).filter(Boolean);
+    var list = inKind().filter(function (p) {
+      if (state.category && p.category !== state.category) return false;
+      if (state.promoOnly && !p.promos.some(hasPromo)) return false;
+      if (!words.length) return true;
+      var hay = (p.code + " " + p.model + " " + p.partNumber + " " + p.category + " " + p.promos.map(function (x) { return x.title; }).join(" ")).toLowerCase();
+      return words.every(function (w) { return hay.indexOf(w) !== -1; });
+    });
+    var endOf = function (p) { var ends = p.promos.map(function (x) { return day(x.end); }).filter(function (d) { return d && d >= today; }); return ends.length ? Math.min.apply(null, ends) : Infinity; };
+    if (state.sort === "low" || state.sort === "high") {
+      var dir = state.sort === "low" ? 1 : -1;
+      // Products without a cash price go last either way.
+      list.sort(function (a, b) {
+        var x = cashOf(a), y = cashOf(b);
+        if (x == null || y == null) return (x == null) - (y == null);
+        return (x - y) * dir;
+      });
+    } else if (state.sort === "ending") {
+      list.sort(function (a, b) { return endOf(a) - endOf(b); });
+    }
+    return list;
+  }
+
+  function renderKinds() {
+    var counts = {};
+    products.forEach(function (p) { counts[p.kind] = (counts[p.kind] || 0) + 1; });
+    if (!counts[state.kind]) state.kind = (KINDS.filter(function (k) { return counts[k[0]]; })[0] || KINDS[0])[0];
+    el("kinds").innerHTML = KINDS.filter(function (k) { return counts[k[0]]; }).map(function (k) {
+      return '<button type="button" data-kind="' + k[0] + '"' + (k[0] === state.kind ? ' class="on"' : "") + '><i class="bi ' + k[2] + '"></i>' + k[1] + ' <span class="n">' + counts[k[0]].toLocaleString() + "</span></button>";
+    }).join("");
+    var cats = Array.from(new Set(inKind().map(function (p) { return p.category; }).filter(Boolean))).sort();
+    if (cats.indexOf(state.category) === -1) state.category = "";
+    el("category").innerHTML = '<option value="">All</option>' + cats.map(function (c) { return "<option" + (c === state.category ? " selected" : "") + ">" + esc(c) + "</option>"; }).join("");
+    el("category").parentElement.style.display = cats.length ? "" : "none";
+    el("sort").value = state.sort;
+    el("promoOnly").checked = state.promoOnly;
+  }
+
+  var LIMIT = 300;
+  function renderList() {
+    var list = visible();
+    el("count").textContent = list.length.toLocaleString() + " product" + (list.length === 1 ? "" : "s");
+    if (!list.length) {
+      el("list").innerHTML = '<div class="empty"><i class="bi bi-search"></i><br>Nothing matches. Try another model, part number or category.</div>';
+      return list;
+    }
+    if (!list.some(function (p) { return p.id === state.selected; })) { state.selected = list[0].id; state.promo = 0; }
+    el("list").innerHTML = list.slice(0, LIMIT).map(function (p) {
+      var cash = cashOf(p);
+      var promoCount = p.promos.filter(hasPromo).length;
+      var soon = p.promos.map(dateState).filter(function (s) { return s && s.cls === "soon"; })[0];
+      return '<button type="button" class="row' + (p.id === state.selected ? " on" : "") + '" data-id="' + esc(p.id) + '" role="option" aria-selected="' + (p.id === state.selected) + '">'
+        + '<span class="name">' + esc(p.model) + "</span>"
+        + '<span class="price">' + (cash ? peso(cash) : "—") + "</span>"
+        + '<span class="sub">' + (p.partNumber ? esc(p.partNumber) + " · " : "") + (p.category ? '<span class="tag">' + esc(p.category) + "</span>" : "")
+        + (promoCount ? '<span class="tag promo"><i class="bi bi-gift"></i>' + (promoCount > 1 ? promoCount + " promos" : esc(p.promos.filter(hasPromo)[0].title)) + "</span>" : "")
+        + (soon ? '<span class="tag soon">' + esc(soon.text) + "</span>" : "") + "</span></button>";
+    }).join("") + (list.length > LIMIT ? '<div class="more">Showing ' + LIMIT + " of " + list.length.toLocaleString() + ": type to narrow it down.</div>" : "");
+    return list;
+  }
+
+  // ---------- the selected product ----------
+  function current() { return products.filter(function (p) { return p.id === state.selected; })[0] || null; }
+  function renderDetail() {
+    var p = current();
+    if (!p) {
+      el("detail").innerHTML = '<div class="placeholder"><div><i class="bi bi-tags"></i>' + (products.length ? "Pick a product on the left." : "No prices yet: sync the server with the price matrix.") + "</div></div>";
+      return;
+    }
+    if (state.promo >= p.promos.length) state.promo = 0;
+    var promo = p.promos[state.promo];
+    var sets = setsFor(p, promo);
+    var cash = cashOf(p, promo);
+    var noBundleCash = promo.terms && promo.terms.noBundle && promo.terms.noBundle.cash;
+    var h = '<div class="card head"><div><span class="tag kind">' + esc(p.kindLabel) + "</span>" + (p.category ? ' <span class="tag">' + esc(p.category) + "</span>" : "")
+      + "<h2>" + esc(p.model) + '</h2><div class="code">' + (p.partNumber ? "<b>" + esc(p.partNumber) + "</b> · " : "") + esc(p.code) + "</div></div>"
+      + '<div class="big"><div class="lbl">Cash price' + (sets.length > 1 ? (p.kind === "attachment" ? " · with a laptop" : " · with bundle") : "") + "</div><div class=\"amt\">" + (cash ? peso(cash) : "—") + "</div>"
+      + (sets.length > 1 && noBundleCash && noBundleCash !== cash ? '<div class="alt">' + peso(noBundleCash) + (p.kind === "attachment" ? " regular price" : " without the bundle") + "</div>" : "") + "</div>"
+      + (p.specs.length ? '<div class="specs">' + p.specs.map(function (s) { return "<span><b>" + esc(s[0]) + "</b>" + esc(s[1]) + "</span>"; }).join("") + "</div>" : "")
+      + '<div class="actions"><button type="button" class="btn" id="copy"><i class="bi bi-clipboard"></i> Copy prices</button></div></div>';
+
+    if (p.promos.length > 1) {
+      h += '<div class="section-label"><i class="bi bi-gift"></i> Promos (' + p.promos.length + ")</div><div class=\"promos\">" + p.promos.map(function (x, i) {
+        var s = dateState(x);
+        return '<button type="button" data-promo="' + i + '"' + (i === state.promo ? ' class="on"' : "") + "><b>" + esc(x.title) + "</b><small>"
+          + esc(x.branches.length ? x.branches.join(", ") : "All branches") + (s ? " · " + esc(s.text) : "") + "</small></button>";
+      }).join("") + "</div>";
+    } else {
+      h += '<div class="section-label"><i class="bi bi-gift"></i> ' + esc(hasPromo(promo) ? promo.title : "No promo") + (promo.branches.length ? " · " + esc(promo.branches.join(", ")) : "") + "</div>";
+    }
+
+    // Payment terms: every term with a price in any set, in the price matrix's order; the lowest monthly marked.
+    var rows = TERMS.filter(function (t) { return sets.some(function (s) { return s.prices[t.key] != null; }); });
+    var best = {};
+    sets.forEach(function (s) {
+      var low = Infinity;
+      rows.forEach(function (t) { if (MONTHS[t.key] && s.prices[t.key] != null) low = Math.min(low, s.prices[t.key] / MONTHS[t.key]); });
+      best[s.key] = low;
+    });
+    var table = '<table class="terms"><thead><tr><th>Payment term</th>' + sets.map(function (s) { return "<th>" + esc(s.label) + "</th>"; }).join("") + "</tr></thead><tbody>"
+      + rows.map(function (t) {
+        var banks = t.text.replace(/^[^:]*:\s*/, "").replace(/\.$/, "");
+        return '<tr class="' + (t.key === "cash" ? "cash" : "") + '"><td><div class="term">' + esc(t.label.replace(/\s*\(.*\)$/, "")) + '</div><div class="banks">' + esc(t.key === "cash" || t.key === "m3" || t.key === "hc" || t.key === "m9" ? t.text.replace(/\.$/, "") : banks) + "</div></td>"
+          + sets.map(function (s) {
+            var v = s.prices[t.key];
+            if (v == null) return '<td><span class="none">—</span></td>';
+            var mo = MONTHS[t.key] ? v / MONTHS[t.key] : null;
+            return '<td><div class="amt">' + peso(v) + "</div>" + (mo ? '<div class="mo">' + peso(mo) + "/mo" + (Math.abs(mo - best[s.key]) < 0.005 ? '<span class="best">LOWEST</span>' : "") + "</div>" : "") + "</td>";
+          }).join("") + "</tr>";
+      }).join("") + "</tbody></table>";
+
+    var side = "";
+    var worth = promo.terms && promo.terms.bundleWorth;
+    if (promo.freebies.length || worth) {
+      side += '<div class="card box"><h3><i class="bi bi-box2-heart" style="color:var(--blue)"></i> ' + (promo.freebies.length ? "Bundle freebies" : "Bundle") + "</h3>"
+        + (promo.freebies.length ? "<ul>" + promo.freebies.map(function (f) { return '<li><i class="bi bi-check-circle-fill"></i><span>' + esc(f) + "</span></li>"; }).join("") + "</ul>" : "")
+        + (worth ? '<div class="worth"' + (promo.freebies.length ? "" : ' style="margin-top:0;padding-top:0;border-top:0"') + "><span>Total worth</span><b>" + peso(worth) + "</b></div>" : "") + "</div>";
+    }
+    if (promo.start || promo.end) {
+      var s = dateState(promo);
+      side += '<div class="card box"><h3><i class="bi bi-calendar-event" style="color:var(--blue)"></i> Promo dates</h3><div class="dates"><span>' + esc(dayLabel(promo.start) || "—") + '</span><i class="bi bi-arrow-right arrow"></i><span>' + esc(dayLabel(promo.end) || "—") + "</span>"
+        + (s ? '<span class="tag ' + s.cls + '">' + esc(s.text) + "</span>" : "") + "</div></div>";
+    }
+    if (promo.vendor.length) {
+      side += '<div class="card box"><h3><i class="bi bi-patch-check" style="color:var(--green)"></i> Vendor freebies to end user</h3><ul>' + promo.vendor.map(function (v) {
+        return '<li><i class="bi bi-award-fill" style="color:var(--green)"></i><span>' + esc(v.text) + (v.validity ? '<span class="valid">Claiming: ' + esc(v.validity) + "</span>" : "") + "</span></li>";
+      }).join("") + "</ul></div>";
+    }
+    if (promo.incentive) {
+      var amount = /^[\d,.]+$/.test(promo.incentive) ? peso(Number(promo.incentive.replace(/,/g, ""))) : esc(promo.incentive);
+      side += '<div class="card box staff"><h3><i class="bi bi-lock-fill"></i> Salesman incentive<span class="lock">STAFF ONLY</span></h3><div class="amount">' + amount + "</div>"
+        + (promo.incentiveValidity ? '<span class="valid">Valid ' + esc(promo.incentiveValidity) + "</span>" : "") + "</div>";
+    }
+    if (!side) side = '<div class="card box"><div class="muted"><i class="bi bi-info-circle"></i> No freebies, dates or vendor promos for this one.</div></div>';
+
+    h += '<div class="grid"><div class="card">' + table + '</div><div class="side">' + side + "</div></div>";
+    el("detail").innerHTML = h;
+    el("detail").scrollTop = 0;
+  }
+
+  // Prices to paste into a chat: never the incentives.
+  function copyText() {
+    var p = current(); if (!p) return "";
+    var promo = p.promos[state.promo] || p.promos[0];
+    var sets = setsFor(p, promo);
+    var lines = [p.model + (p.partNumber ? " (" + p.partNumber + ")" : ""), p.code];
+    if (hasPromo(promo)) lines.push("Promo: " + promo.title);
+    lines.push("");
+    TERMS.forEach(function (t) {
+      var parts = sets.filter(function (s) { return s.prices[t.key] != null; }).map(function (s) { return (sets.length > 1 ? s.label + " " : "") + peso(s.prices[t.key]); });
+      if (parts.length) lines.push(t.label + ": " + parts.join(" · "));
+    });
+    if (promo.freebies.length) lines.push("", "Freebies: " + promo.freebies.join(", ") + (promo.terms.bundleWorth ? " (worth " + peso(promo.terms.bundleWorth) + ")" : ""));
+    if (promo.vendor.length) lines.push("Vendor freebies: " + promo.vendor.map(function (v) { return v.text; }).join("; "));
+    if (promo.end) lines.push("Promo until " + dayLabel(promo.end));
+    lines.push("", "Prices are subject to change without prior notice.");
+    return lines.join("\n");
+  }
+
+  function render() { renderKinds(); renderList(); renderDetail(); }
+  var toastTimer;
+  function toast(message) { el("toast").textContent = message; el("toast").classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(function () { el("toast").classList.remove("show"); }, 1600); }
+
+  // ---------- events ----------
+  el("kinds").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-kind]"); if (!b) return;
+    state.kind = b.getAttribute("data-kind"); state.category = ""; state.selected = ""; remember(); render();
+  });
+  el("category").addEventListener("change", function () { state.category = el("category").value; renderList(); renderDetail(); });
+  el("sort").addEventListener("change", function () { state.sort = el("sort").value; remember(); renderList(); });
+  el("promoOnly").addEventListener("change", function () { state.promoOnly = el("promoOnly").checked; remember(); renderList(); renderDetail(); });
+  el("showStaff").addEventListener("change", function () { try { localStorage.setItem("saleskit.pricing.staff", el("showStaff").checked ? "1" : "0"); } catch (e) { /* not kept */ } applyStaff(); });
+  var searchTimer;
+  el("search").addEventListener("input", function () {
+    el("searchBox").classList.toggle("has-text", Boolean(el("search").value));
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function () {
+      state.query = el("search").value;
+      // A search that finds nothing in this group but something in another switches to it.
+      if (state.query && !visible().length) {
+        var other = KINDS.map(function (k) { return k[0]; }).filter(function (k) {
+          var keep = state.kind; state.kind = k; var n = visible().length; state.kind = keep; return n;
+        })[0];
+        if (other) { state.kind = other; state.category = ""; renderKinds(); }
+      }
+      renderList(); renderDetail();
+    }, 120);
+  });
+  el("clearSearch").addEventListener("click", function () { el("search").value = ""; el("search").dispatchEvent(new Event("input")); el("search").focus(); });
+  el("list").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-id]"); if (!b) return;
+    state.selected = b.getAttribute("data-id"); state.promo = 0;
+    Array.prototype.forEach.call(el("list").querySelectorAll(".row"), function (r) { r.classList.toggle("on", r === b); r.setAttribute("aria-selected", r === b); });
+    renderDetail();
+  });
+  el("detail").addEventListener("click", function (e) {
+    var chip = e.target.closest("[data-promo]");
+    if (chip) { state.promo = Number(chip.getAttribute("data-promo")); renderDetail(); return; }
+    if (e.target.closest("#copy")) toParent({ channel: "saleskit-pricing-copy", text: copyText() });
+  });
+  // ↑ / ↓ move through the list (not while typing elsewhere).
+  document.addEventListener("keydown", function (e) {
+    var ctrl = e.ctrlKey || e.metaKey;
+    var typing = e.target instanceof HTMLInputElement && e.target.id !== "search" || e.target instanceof HTMLSelectElement;
+    if (e.key === "?" && !ctrl && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); toParent({ channel: "saleskit-pricing-help" }); return; }
+    if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !typing && !ctrl) {
+      var rows = Array.prototype.slice.call(el("list").querySelectorAll(".row"));
+      var i = rows.findIndex(function (r) { return r.classList.contains("on"); });
+      var next = rows[Math.max(0, Math.min(rows.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))];
+      if (next) { e.preventDefault(); next.click(); next.scrollIntoView({ block: "nearest" }); }
+      return;
+    }
+    if (!ctrl || e.altKey) return;
+    if (!e.shiftKey && /^Digit[1-9]$/.test(e.code)) { e.preventDefault(); toParent({ channel: "saleskit-pricing-hotkey", keys: { ctrl: true, shift: false, alt: false, code: e.code } }); }
+    else if (e.shiftKey && e.code === "KeyL") { e.preventDefault(); el("search").focus(); el("search").select(); }
+    else if (!e.shiftKey && e.code === "KeyC" && !window.getSelection().toString() && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); toParent({ channel: "saleskit-pricing-copy", text: copyText() }); }
+  });
+
+  // ---------- data from the app (pricing-matrix-bridge.js) ----------
+  window.addEventListener("message", function (event) {
+    if (event.source !== window.parent || !event.data) return;
+    var m = event.data;
+    if (m.channel === "saleskit-pricing-data") {
+      products = Array.isArray(m.products) ? m.products : [];
+      render();
+    } else if (m.channel === "saleskit-pricing-status") {
+      toast(m.message || "");
+    }
+  });
+  toParent({ channel: "saleskit-pricing-ready" });
+})();
+</script>
+</body>
+</html>

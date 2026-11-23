@@ -28,6 +28,7 @@ const { PROMO_IMAGES_SHEET, readPromoIcons } = require('./promo-icons');
 const { BRANCH_QR_SHEET, BRANCH_QR_RANGE, branchQrCollection } = require('./branch-qr');
 const { readAgeingMonitoring } = require('./ageing-monitoring');
 const { readOtherPrices } = require('./other-prices');
+const { readPricingExtras } = require('./pricing-extras');
 const {
   LAPTOP_DATABASE_SHEET, LAPTOP_DATABASE_RANGE, UKSP_ICON_SHEET, UKSP_ICON_RANGE,
   parseLaptopDb, laptopDatabaseCollection, bannerSpecsCollection, bannerLaptopsCollection
@@ -252,6 +253,11 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
     const others = await readOtherPrices(sheets, priceMatrixSpreadsheetId, (message) => onProgress({ phase: 'warning', message: `${message}; skipped for the Quotation.` }))
       .catch((error) => { onProgress({ phase: 'warning', message: `Quotation products: ${error.message}` }); return null; });
     if (others && others.rows.length) result.other_prices = others;
+    // PRICING MATRIX tab: promo dates, incentives and vendor freebies' claiming (pricing-extras.js). When they cannot
+    // be read, the last synced ones stay.
+    const extras = await readPricingExtras(sheets, priceMatrixSpreadsheetId, (message) => onProgress({ phase: 'warning', message: `${message}; skipped for the Pricing Matrix.` }))
+      .catch((error) => { onProgress({ phase: 'warning', message: `Pricing Matrix extras: ${error.message}` }); return null; });
+    if (extras && extras.rows.length) result.pricing_extras = extras;
   }
 
   // Clearance banners for ageing laptops (see ageing-monitoring.js): AGEING BANNER MONITORING in PROMO MONITORING,

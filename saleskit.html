@@ -26,6 +26,7 @@
   <script src="./banner-bridge.js"></script>
   <script src="./flyer-bridge.js"></script>
   <script src="./quotation-bridge.js"></script>
+  <script src="./pricing-matrix-bridge.js"></script>
   <script src="./activity-tracker.js" defer></script>
   <script src="./branch-mode.js" defer></script>
   <script src="./hotkeys.js" defer></script>
@@ -2743,6 +2744,7 @@
       <button class="nav-tab-ghz" id="tabBanner" onclick="navigateTo('banner')" role="tab">BANNER</button>
       <button class="nav-tab-ghz" id="tabFlyers" onclick="navigateTo('flyers')" role="tab">FLYERS</button>
       <button class="nav-tab-ghz" id="tabQuotation" onclick="navigateTo('quotation')" role="tab" title="Under development: out for testing and feedback">QUOTATION<span class="tab-dev">TESTING</span></button>
+      <button class="nav-tab-ghz" id="tabPricing" onclick="navigateTo('pricing')" role="tab">PRICING MATRIX</button>
     </div>
   </div>
 
@@ -3423,6 +3425,11 @@
     <!-- VIEW: FLYERS (flyer.html, fed by flyer-bridge.js) -->
     <div id="viewFlyers" class="view-section">
       <iframe id="flyerPageFrame" class="banner-page-frame" src="flyer.html" title="Flyers"></iframe>
+    </div>
+
+    <!-- VIEW: PRICING MATRIX (pricing-matrix.html, fed by pricing-matrix-bridge.js) -->
+    <div id="viewPricing" class="view-section">
+      <iframe id="pricingPageFrame" class="banner-page-frame" src="pricing-matrix.html" title="Pricing Matrix"></iframe>
     </div>
 
     <!-- VIEW: QUOTATION (quotation.html, fed by quotation-bridge.js) -->
@@ -4530,6 +4537,7 @@
       'banner': { tab: 'tabBanner', view: 'viewBanner' },
       'flyers': { tab: 'tabFlyers', view: 'viewFlyers' },
       'quotation': { tab: 'tabQuotation', view: 'viewQuotation' },
+      'pricing': { tab: 'tabPricing', view: 'viewPricing' },
       'uksp': { tab: 'tabUksp', view: 'viewUksp' },
       'attachment': { tab: 'tabAttachment', view: 'viewAttachment' }
     };
@@ -4628,6 +4636,7 @@
       if (clean.includes('banner')) return 'banner';
       if (clean.includes('flyer')) return 'flyers';
       if (clean.includes('quot')) return 'quotation';
+      if (clean.includes('pricing')) return 'pricing';
       if (clean.includes('sales') || clean.includes('kit') || clean === 'sk') return 'saleskit';
       if (clean.includes('reco') || clean.includes('table')) return 'recotable';
       if (clean.includes('avail')) return 'availability';
@@ -4870,6 +4879,9 @@
         }
         if (normKey === 'quotation' && typeof window.fitQuotationFrame === 'function') {
           requestAnimationFrame(window.fitQuotationFrame);
+        }
+        if (normKey === 'pricing' && typeof window.fitPricingFrame === 'function') {
+          requestAnimationFrame(window.fitPricingFrame);
         }
       }
     }
@@ -9084,6 +9096,7 @@
       if (typeof window.updateBannerPage === 'function') window.updateBannerPage(data.bannerData, data.homeBranch, data.specsMap);
       if (typeof window.updateFlyerPage === 'function') window.updateFlyerPage(data);
       if (typeof window.updateQuotationPage === 'function') window.updateQuotationPage(data);
+      if (typeof window.updatePricingPage === 'function') window.updatePricingPage(data);
       // "Stock as of …" under LOCATION (stock-as-of.js): the inventory CSV's date.
       if (typeof window.updateStockAsOf === 'function') window.updateStockAsOf(data);
       window.SERVER_INITIAL_DATA = data;

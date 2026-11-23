@@ -91,6 +91,7 @@
     { ctrl: true, shift: false, code: 'Digit3', pages: null, label: 'Banner', run: () => navigateTo('banner') },
     { ctrl: true, shift: false, code: 'Digit4', pages: null, label: 'Flyers', run: () => navigateTo('flyers') },
     { ctrl: true, shift: false, code: 'Digit5', pages: null, label: 'Quotation', run: () => navigateTo('quotation') },
+    { ctrl: true, shift: false, code: 'Digit6', pages: null, label: 'Pricing Matrix', run: () => navigateTo('pricing') },
     { ctrl: true, shift: true, code: 'KeyA', pages: BOTH, label: 'Application selection', run: () => openMenu('appsDropdownMenu', 'toggleAppsMenu', 'appsSearchInput') },
     { ctrl: true, shift: true, code: 'KeyL', pages: RECO, label: 'Location selection', run: openLocation },
     { ctrl: true, shift: true, code: 'KeyR', pages: BOTH, label: 'Recommendation selection', run: () => openMenu('recoForDropdownMenu', 'toggleRecoForMenu') },

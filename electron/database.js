@@ -10,6 +10,7 @@ const { createUsabilityLookup } = require('./app-usability');
 const { makeBranchDetails } = require('./branch-details');
 const { makeLaptopDatabase, specsRowsFromLaptopDb } = require('./laptop-database');
 const { otherProducts } = require('./other-prices');
+const { pricingExtras } = require('./pricing-extras');
 const { inventoryStock, itemKey: inventoryKey } = require('./inventory-csv');
 
 const SHEET_TABLES = new Set([
@@ -21,6 +22,7 @@ const SHEET_TABLES = new Set([
   'ageing_banner',
   'ageing_monitoring',
   'other_prices',
+  'pricing_extras',
   'usability',
   'branch_details',
   'branch_qr',
@@ -593,6 +595,8 @@ function getInitialData() {
     inventoryAsOf: inventory.byItem.size ? inventory.asOf : '',
     // Quotation: desktops, mobiles and attachments with their selling prices (other-prices.js).
     otherProducts: otherProducts(getRows('other_prices')),
+    // PRICING MATRIX tab: each promo's dates, incentives and vendor freebies' claiming, by 'kind|ITEM|PROMO'.
+    pricingExtras: pricingExtras(getRows('pricing_extras')),
     ukspPerSkuData,
     ukspBannerData,
     appUkspData: applicationMatrix,

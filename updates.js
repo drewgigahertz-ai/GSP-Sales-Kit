@@ -6,6 +6,16 @@
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
+      version: '1.0.40',
+      date: 'November 23, 2026',
+      changes: [
+        'New PRICING MATRIX tab (Ctrl+6): every laptop, desktop, accessory and mobile with all its payment terms side by side (no bundle and with bundle, or regular and with a laptop), the monthly amount and the lowest one, its promos, bundle freebies and their worth, the promo dates (with "Ends in 3 days"), and the vendor freebies to claim. Search by model, part number or promo, and Copy prices to paste them in a chat.',
+        'Pricing Matrix: the salesman incentive shows in its own STAFF ONLY box. It is never copied, and Show incentives hides it.',
+        'Reco Table: "Stock as of" under LOCATION shows the date of the branch stock (amber when it is older than yesterday).',
+        'Reco Table: the lines between the picture, the name and price, and the specs stay level on all three laptops when a long name takes two lines.'
+      ]
+    },
+    {
       version: '1.0.39',
       date: 'November 23, 2026',
       changes: [
