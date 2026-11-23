@@ -114,9 +114,11 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
     const allowed = [...targets.map((t) => t.keyword), ...ALWAYS_ALLOWED, ...desktopAllowed.split(/[\n,]+/)].filter((k) => words(k).length);
     const apps = l.desktop.items.filter((item) => item.kind === 'app' || item.kind === 'web');
     const extra = apps.filter((item) => !allowed.some((k) => fits(item, k))).map((item) => item.name);
+    // The allowed apps and website links that are on the desktop (shown with the rest).
+    const present = apps.filter((item) => allowed.some((k) => fits(item, k))).map((item) => item.name);
     const missing = targetsForSegment(targets, segmentOf(l)).filter((t) => !apps.some((item) => fits(item, t.keyword))).map((t) => t.name);
     const other = l.desktop.items.filter((item) => item.kind === 'file' || item.kind === 'folder').map((item) => item.name);
-    return { status: extra.length || missing.length ? 'check' : 'ok', extra, missing, other, at: l.desktop.at };
+    return { status: extra.length || missing.length ? 'check' : 'ok', present, extra, missing, other, at: l.desktop.at };
   }
 
   let history = [];

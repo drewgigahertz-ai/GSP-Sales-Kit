@@ -132,6 +132,7 @@ textarea{font:inherit;resize:vertical;min-height:38px}
 .desk-detail{margin-bottom:10px;padding:8px 10px;border-radius:8px;background:#f6f8fc}
 .desk-detail .k{font-weight:700;font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
 .bad-text{color:var(--bad)}
+.ok-text{color:var(--ok)}
 .k{font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
 .hint{font-size:.8rem;color:var(--muted);padding:0 18px 16px;line-height:1.5}
 .msg{font-size:.82rem;font-weight:700}.msg.bad{color:var(--bad)}.msg.good{color:var(--ok)}
@@ -260,6 +261,7 @@ function desktopDetail(l){
   const list=(label,names,cls)=>names.length?`<div class="d"><b class="${cls}">${label}:</b> ${names.map(esc).join(', ')}</div>`:'';
   return`<div class="desk-detail"><div class="k">Desktop${d.at?` · checked ${esc(when(d.at))}`:''}</div>`
     +(d.status==='ok'?'<div class="d">Only allowed apps are on the desktop.</div>':'')
+    +list('Apps on the desktop',d.present||[],'ok-text')
     +list('Not allowed on the desktop',d.extra,'bad-text')+list('Missing from the desktop',d.missing,'bad-text')
     +list('Files and folders (not counted)',d.other,'')+'</div>';
 }
