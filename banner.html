@@ -673,6 +673,18 @@
 
     /* NEW PRICING details for the chosen laptop: one line of small plain text along the bottom of the
        banner, for the salesperson, kept quiet so customers hardly notice it. */
+    /* "Prices are subject to change…": bottom right on every layout (above layouts 2 and 3, which cover the stage). */
+    #stage .fine-print {
+      right: 28px;
+      bottom: 10px;
+      z-index: 30;
+      color: #475569;
+      font-family: Arial, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      font-style: italic;
+      white-space: nowrap;
+    }
+
     .price-details {
       bottom: 8px;
       left: 40px;
@@ -1087,6 +1099,7 @@
           <div class="abs feature" style="left:1327px" id="feature4"><img class="picture-slot" alt="" hidden><span></span></div>
 
           <div class="abs price-details" id="priceDetails" aria-label="Price details"></div>
+          <div class="abs fine-print">Prices are subject to change without prior notice.</div>
           <canvas id="clearanceCanvas" aria-label="Clearance banner"></canvas>
         </div>
         <img id="ageingBanner" alt="">

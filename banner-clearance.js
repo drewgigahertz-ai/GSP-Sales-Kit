@@ -317,6 +317,14 @@
   // clearance: { model, partNumber, specs, cash, before, worth, freebies: [{ label, picture }] };
   // urls: { logo, freebies: [url] } (pictures as the page can show them). Draws on canvas (3840×2160).
   // options.readableOnly: pictures the canvas may not read are left out (so the drawing can be saved as a file).
+  // Bottom right, below the freebies (like the generated banner's).
+  function finePrint(g) {
+    g.font = `italic 400 18px Arial, 'Segoe UI', sans-serif`;
+    g.fillStyle = '#475569';
+    g.textAlign = 'right';
+    g.fillText('Prices are subject to change without prior notice.', W - 34, H - 16);
+  }
+
   async function draw(canvas, clearance, urls = {}, options = {}) {
     canvas.width = W * SCALE;
     canvas.height = H * SCALE;
@@ -334,6 +342,7 @@
     price(g, clearance);
     burst(g);
     freebies(g, clearance, (clearance.freebies || []).map((f, i) => (freebieImages[i] ? trimmed(freebieImages[i]) : null)));
+    finePrint(g);
     return canvas;
   }
 
