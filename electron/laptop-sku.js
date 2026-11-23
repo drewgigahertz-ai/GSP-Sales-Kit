@@ -6,8 +6,14 @@ const fs = require('node:fs');
 const { brandName } = require('./device-info');
 
 const clean = (value, max = 40) => String(value ?? '').replace(/[^\x20-\x7e]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
-// SKUs compared without case or spaces ("82kb 00ab" = "82KB00AB").
-const skuKey = (sku) => clean(sku, 60).toUpperCase().replace(/\s+/g, '');
+// SKUs compared without case or spaces ("82kb 00ab" = "82KB00AB"), with or without LAPTOP DB's "LAP-" in front
+// ("ACER NITRO …" = "LAP-ACER NITRO …"): the Reco Table's SKUs and some typed ones have no "LAP-". The key always
+// has it, cut like a saved SKU (60 characters), so a long name matches however it was written.
+const skuKey = (sku) => {
+  const text = clean(sku, 200).toUpperCase();
+  if (!text) return '';
+  return clean(/^LAP\s*-/.test(text) ? text : `LAP-${text}`, 60).replace(/^LAP\s*-\s*/, 'LAP-').replace(/\s+/g, '');
+};
 
 // The SKU saved on this laptop: { sku, setAt, setBy } in <userData>/laptop-sku.json.
 function createLaptopSkuStore(filePath) {
