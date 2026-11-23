@@ -806,6 +806,30 @@
       position: relative;
     }
 
+    /* Side by side, the three cards share their rows (picture, name and price, specs), so a long name that wraps
+       makes every card's name box taller and the lines between them stay level. Not in Present (flex layout there). */
+    @media (min-width: 992px) {
+      .reco-columns-grid {
+        grid-template-rows: auto auto 1fr;
+      }
+
+      .reco-column {
+        display: grid;
+        grid-row: span 3;
+        grid-template-rows: subgrid;
+        row-gap: 0;
+      }
+
+      .saleskit-presentation-whole .reco-columns-grid {
+        grid-template-rows: none;
+      }
+
+      .saleskit-presentation-whole .reco-column {
+        display: flex;
+        grid-row: auto;
+      }
+    }
+
     /* Tier Header Ribbons */
     .reco-tier-header {
       padding: 11px 18px;
