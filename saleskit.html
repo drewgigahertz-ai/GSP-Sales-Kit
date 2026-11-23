@@ -34,6 +34,7 @@
   <script src="./reco-promos.js"></script>
   <script src="./reco-alternatives.js"></script>
   <script src="./reco-all-laptops.js"></script>
+  <script src="./stock-as-of.js"></script>
   <script src="./presentation-picker.js" defer></script>
   <script src="./price-notify.js" defer></script>
   <script src="./updates.js" defer></script>
@@ -9083,6 +9084,8 @@
       if (typeof window.updateBannerPage === 'function') window.updateBannerPage(data.bannerData, data.homeBranch, data.specsMap);
       if (typeof window.updateFlyerPage === 'function') window.updateFlyerPage(data);
       if (typeof window.updateQuotationPage === 'function') window.updateQuotationPage(data);
+      // "Stock as of …" under LOCATION (stock-as-of.js): the inventory CSV's date.
+      if (typeof window.updateStockAsOf === 'function') window.updateStockAsOf(data);
       window.SERVER_INITIAL_DATA = data;
       window.sheetData = data;
       window.UKSP_BANNER_DATA = data.ukspBannerData || { features: [], skus: [] };

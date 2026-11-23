@@ -958,6 +958,10 @@
         grid-template-columns: minmax(0, 1fr);
       }
     }
+      /* Inventory CSV: the file read and its date, or why it could not be read. */
+    .inventory-status { margin-top: 5px; font-size: 12px; color: #64748b; }
+    .inventory-status.ok { color: #047857; }
+    .inventory-status.problem { color: #b45309; }
   </style>
 </head>
 <body>
@@ -1368,6 +1372,11 @@
             <div class="col-12">
               <label class="label" for="pricingSpreadsheetId">Pricing spreadsheet (NEW PRICING, used when the price matrix cannot be read)</label>
               <input class="form-control form-control-sm" id="pricingSpreadsheetId" spellcheck="false" placeholder="Link or ID · blank = the NEW PRICING tab of the spreadsheet above">
+            </div>
+            <div class="col-12">
+              <label class="label" for="inventoryFolder">Inventory CSV folder (Stock Status - YYYYMMDD.csv)</label>
+              <input class="form-control form-control-sm" id="inventoryFolder" spellcheck="false" placeholder="e.g. Z: · blank = branch stock from LAPTOP DB">
+              <div class="inventory-status" id="inventoryStatus"></div>
             </div>
             <div class="col-6">
               <label class="label" for="syncInterval">Sync every</label>

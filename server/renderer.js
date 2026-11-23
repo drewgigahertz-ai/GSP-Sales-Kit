@@ -143,7 +143,27 @@ function renderProgress(progress) {
   $('syncProgressText').textContent = text;
 }
 
+// "Stock Status - 20261120.csv · stock as of Nov 20, 2026 · 431 laptops with stock", or why it was not read.
+function renderInventory() {
+  const box = $('inventoryStatus');
+  const info = state.inventory;
+  const day = (iso) => (iso ? new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '');
+  box.className = 'inventory-status';
+  if (!state.inventoryFolder) {
+    box.textContent = 'Off: branch stock comes from LAPTOP DB.';
+  } else if (!info) {
+    box.textContent = 'Read at the next sync.';
+  } else if (info.ok) {
+    box.classList.add('ok');
+    box.textContent = `${info.file} · stock as of ${day(info.asOf)} · ${info.laptops} laptops with stock · ${info.branches.length} branches`;
+  } else {
+    box.classList.add('problem');
+    box.textContent = `Not read: ${info.error}.${info.lastFile ? ` Still using ${info.lastFile} (stock as of ${day(info.lastAsOf)}).` : ''}`;
+  }
+}
+
 function renderSettings() {
+  renderInventory();
   const keyPath = $('keyPath');
   keyPath.textContent = state.serviceAccountPath || 'No key file chosen';
   keyPath.title = state.serviceAccountPath || '';
@@ -152,6 +172,7 @@ function renderSettings() {
   $('spreadsheetId').value = state.spreadsheetId;
   $('pricingSpreadsheetId').value = state.pricingSpreadsheetId || '';
   $('priceMatrixSpreadsheetId').value = state.priceMatrixSpreadsheetId || '';
+  $('inventoryFolder').value = state.inventoryFolder || '';
   const interval = $('syncInterval');
   if (![...interval.options].some((option) => Number(option.value) === state.syncIntervalMinutes)) {
     interval.add(new Option(`${state.syncIntervalMinutes} minutes`, state.syncIntervalMinutes));
@@ -1198,6 +1219,7 @@ $('settingsForm').addEventListener('submit', async (event) => {
     spreadsheetId: $('spreadsheetId').value,
     pricingSpreadsheetId: $('pricingSpreadsheetId').value,
     priceMatrixSpreadsheetId: $('priceMatrixSpreadsheetId').value,
+    inventoryFolder: $('inventoryFolder').value,
     syncIntervalMinutes: Number($('syncInterval').value),
     port: Number($('port').value),
     autoStart: $('autoStart').checked,

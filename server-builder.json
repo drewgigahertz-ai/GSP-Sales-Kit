@@ -21,6 +21,7 @@
     "electron/ageing-banners.js",
     "electron/ageing-monitoring.js",
     "electron/other-prices.js",
+    "electron/inventory-csv.js",
     "electron/app-usability.js",
     "electron/branch-details.js",
     "electron/branch-qr.js",

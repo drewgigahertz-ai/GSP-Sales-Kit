@@ -24,6 +24,7 @@ const { buildDataHealth } = require('./data-health');
 const { createAppCheck } = require('./app-check');
 const { createWebAdmin } = require('./web-admin');
 const { skuChoices, skuKey } = require('../electron/laptop-sku');
+const { readInventoryCsv } = require('../electron/inventory-csv');
 const { version: APP_VERSION } = require('../package.json');
 
 const APP_NAME = 'GigaHertz SalesKit Server';
@@ -49,6 +50,11 @@ let apiError = '';
 let activeSync = null;
 let syncProgress = null;
 let syncTimer = null;
+// Branch stock from the inventory CSV on Z: (electron/inventory-csv.js): read on every sync and every hour.
+let inventoryTimer = null;
+// The last read: { ok, file, asOf, laptops, branches, checkedAt } or { ok: false, error, checkedAt } (dashboard).
+let inventoryStatus = null;
+const INVENTORY_CHECK_MS = 60 * 60 * 1000;
 let nextSyncAt = null;
 let quitting = false;
 let trayHintShown = false;
@@ -122,7 +128,9 @@ function loadSettings() {
     lastSync: saved?.lastSync || null,
     dataVersion: Number(saved?.dataVersion) || 1,
     dataUpdatedAt: saved?.dataUpdatedAt || null,
-    allowWithoutLogin: saved?.allowWithoutLogin !== false
+    allowWithoutLogin: saved?.allowWithoutLogin !== false,
+    // Where "Stock Status - YYYYMMDD.csv" is uploaded (the folder or one folder down); blank = no inventory CSV.
+    inventoryFolder: typeof saved?.inventoryFolder === 'string' ? saved.inventoryFolder : 'Z:\\'
   };
   if (!saved) writeSettings(loaded);
   return loaded;
@@ -192,7 +200,9 @@ function getState() {
     allowWithoutLogin: settings.allowWithoutLogin,
     clientRelease: clientRelease ? clientReleaseSummary() : null,
     serverUpdate: serverUpdater ? serverUpdater.get() : null,
-    dataHealth: dataHealth ? { total: dataHealth.total, checkedAt: dataHealth.checkedAt } : null
+    dataHealth: dataHealth ? { total: dataHealth.total, checkedAt: dataHealth.checkedAt } : null,
+    inventoryFolder: settings.inventoryFolder,
+    inventory: inventoryStatus
   };
 }
 
@@ -463,6 +473,8 @@ async function runSync(reason) {
       syncProgress = progress;
       send('server:sync-progress', progress);
     });
+    const inventory = readInventory();
+    if (inventory) sheets.inventory_stock = inventory;
     syncProgress = { phase: 'sqlite', message: 'Updating the database…' };
     send('server:sync-progress', syncProgress);
     const backup = await backups.snapshot('before-sync');
@@ -559,6 +571,58 @@ function startPriceWatch() {
     log
   });
   priceWatch.start();
+}
+
+// The newest inventory CSV as the inventory_stock collection, or null when it cannot be read (logged once per
+// new problem; the last stock read stays). No folder set: an empty one (LAPTOP DB's stock is used again).
+function readInventory() {
+  if (!settings.inventoryFolder) {
+    inventoryStatus = null;
+    return { collection: 'inventory_stock', columns: ['item_key', 'item', 'stock', 'as_of', 'file'], rows: [] };
+  }
+  const checkedAt = new Date().toISOString();
+  try {
+    const { collection, summary } = readInventoryCsv(settings.inventoryFolder);
+    if (!inventoryStatus || !inventoryStatus.ok || inventoryStatus.file !== summary.file || inventoryStatus.modified !== summary.modified) {
+      log('success', `Inventory: ${summary.file} read (stock as of ${summary.asOf}, ${summary.laptops} laptops with stock)`);
+    }
+    inventoryStatus = { ok: true, ...summary, checkedAt };
+    return collection;
+  } catch (error) {
+    if (!inventoryStatus || inventoryStatus.ok || inventoryStatus.error !== error.message) {
+      log('warning', `Inventory CSV not read: ${error.message}; the last stock read stays.`);
+    }
+    inventoryStatus = { ...(inventoryStatus && inventoryStatus.ok ? { lastFile: inventoryStatus.file, lastAsOf: inventoryStatus.asOf } : inventoryStatus || {}), ok: false, error: error.message, checkedAt };
+    return null;
+  }
+}
+
+// Every hour (between syncs): a new CSV updates the stock right away, without a whole sync.
+async function checkInventory() {
+  if (activeSync) return;
+  const fileOf = (status) => (status && status.ok ? `${status.file}|${status.modified}` : '');
+  const before = fileOf(inventoryStatus);
+  const collection = readInventory();
+  pushState();
+  if (!collection || (before && before === fileOf(inventoryStatus))) return;
+  try {
+    const summary = database.replaceSheetsData({ inventory_stock: collection });
+    if (!summary.changed) return;
+    bumpDataVersion();
+    log('success', 'Inventory: branch stock updated');
+    const event = { at: new Date().toISOString(), sheets: ['INVENTORY'], dataVersion: settings.dataVersion };
+    for (const listener of dataListeners) {
+      try { listener(event); } catch {}
+    }
+    pushState();
+  } catch (error) {
+    log('error', `Inventory: could not save the stock: ${error.message}`);
+  }
+}
+
+function scheduleInventoryCheck() {
+  clearInterval(inventoryTimer);
+  inventoryTimer = setInterval(() => { checkInventory().catch(() => {}); }, INVENTORY_CHECK_MS);
 }
 
 function scheduleSync() {
@@ -805,6 +869,9 @@ handle('server:update-settings', async (_event, changes = {}) => {
     if (id && !/^[\w-]{20,}$/.test(id)) throw new Error('Enter a valid price matrix spreadsheet link or ID, or leave it blank.');
     settings.priceMatrixSpreadsheetId = id;
   }
+  if (changes.inventoryFolder !== undefined) {
+    settings.inventoryFolder = String(changes.inventoryFolder || '').trim().slice(0, 300);
+  }
   if (changes.syncIntervalMinutes !== undefined) {
     const minutes = Number(changes.syncIntervalMinutes);
     if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440) throw new Error('Sync interval must be 1–1440 minutes.');
@@ -833,6 +900,10 @@ handle('server:update-settings', async (_event, changes = {}) => {
   if (settings.spreadsheetId !== previous.spreadsheetId) log('info', 'Spreadsheet ID updated.');
   if (settings.pricingSpreadsheetId !== previous.pricingSpreadsheetId) log('info', 'Pricing spreadsheet updated.');
   if (settings.priceMatrixSpreadsheetId !== previous.priceMatrixSpreadsheetId) log('info', 'Price matrix spreadsheet updated.');
+  if (settings.inventoryFolder !== previous.inventoryFolder) {
+    log('info', settings.inventoryFolder ? `Inventory folder: ${settings.inventoryFolder}` : 'Inventory CSV turned off: LAPTOP DB stock is used again.');
+    checkInventory().catch(() => {});
+  }
   pushState();
   return getState();
 });
@@ -1037,6 +1108,7 @@ if (!app.requestSingleInstanceLock()) {
       log('error', `Could not start the server: ${error.message}`);
     }
     scheduleSync();
+    scheduleInventoryCheck();
     if (settings.serviceAccountPath) syncNow('startup');
     if (PRICE_WATCH) startPriceWatch();
     if (RECO_WATCH) startRecoWatch();

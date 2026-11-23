@@ -10,6 +10,7 @@ const { createUsabilityLookup } = require('./app-usability');
 const { makeBranchDetails } = require('./branch-details');
 const { makeLaptopDatabase, specsRowsFromLaptopDb } = require('./laptop-database');
 const { otherProducts } = require('./other-prices');
+const { inventoryStock, itemKey: inventoryKey } = require('./inventory-csv');
 
 const SHEET_TABLES = new Set([
   'banner_laptops',
@@ -32,6 +33,7 @@ const SHEET_TABLES = new Set([
   'reco_db',
   'promo_icons',
   'laptop_database',
+  'inventory_stock',
   'logo'
 ]);
 
@@ -540,6 +542,10 @@ function getInitialData() {
     Object.fromEntries(applicationMatrix.applications.map(({ name, hierarchy }) => [name.toLowerCase(), hierarchy]))
   );
   const laptopDatabase = makeLaptopDatabase(getRows('laptop_database'));
+  // Branch stock from the newest inventory CSV (inventory-csv.js), in place of LAPTOP DB's stock columns: a laptop
+  // the CSV does not list has no stock. Without a CSV yet, LAPTOP DB's stock stays.
+  const inventory = inventoryStock(getRows('inventory_stock'));
+  if (inventory.byItem.size) for (const laptop of laptopDatabase) laptop.stock = inventory.byItem.get(inventoryKey(laptop.item)) || {};
   attachBranchStock(bannerData, criteriaSegmentData, recoTableData, laptopDatabase);
   attachClearanceLaptops(bannerData, laptopDatabase);
   const ukspBannerData = makeUkspBannerData(getRows('uksp_banner'), getRows('features_banner'));
@@ -583,6 +589,8 @@ function getInitialData() {
     branchDetails: makeBranchDetails(getRows('branch_details'), normalizeImageUrl, getRows('branch_qr')),
     // Flyers page: each laptop's name, part number and specs (LAPTOP DB sheet).
     laptopDatabase,
+    // The inventory CSV's date ('YYYY-MM-DD'), shown as "Stock as of …"; '' while the stock is LAPTOP DB's.
+    inventoryAsOf: inventory.byItem.size ? inventory.asOf : '',
     // Quotation: desktops, mobiles and attachments with their selling prices (other-prices.js).
     otherProducts: otherProducts(getRows('other_prices')),
     ukspPerSkuData,
