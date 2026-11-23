@@ -311,14 +311,14 @@
       <p>Freebies may vary based on availability.</p>
       <div class="gap"></div>
       <p>For <b><u>check payments</u></b>, please make checks payable to:</p>
-      <div class="row"><span>Account Name:</span><b>GHERTZ Computer Corp.</b></div>
-      <div class="row"><span>Account Number:</span><b>00402 802 2005</b></div>
+      <div class="row"><span>Account Name:</span><b class="acct-name">GHERTZ Computer Corp.</b></div>
+      <div class="row"><span>Account Number:</span><b class="acct-no">00402 802 2005</b></div>
       <p>Clearing: BDO-to-BDO (On-Us) clears same day; other banks (LCK) take 3 business days.</p>
       <div class="gap"></div>
       <p>For <b><u>bank transfers</u></b>, please see the details below:</p>
       <div class="row"><span>Bank:</span><b>BDO</b></div>
-      <div class="row"><span>Account Name:</span><b>GHERTZ Computer Corp.</b></div>
-      <div class="row"><span>Account Number:</span><b>00402 802 2005</b></div>
+      <div class="row"><span>Account Name:</span><b class="acct-name">GHERTZ Computer Corp.</b></div>
+      <div class="row"><span>Account Number:</span><b class="acct-no">00402 802 2005</b></div>
       <p><b>Note:</b> Please use <b><u>InstaPay</u></b> for bank transfer transactions to ensure real time processing.</p>
       <div class="gap"></div>
       <p>For inquiries, contact our Viber or FB page below.</p>
@@ -471,6 +471,11 @@
     setImage(el("branchLogo"), branchValue("logo"), "branch-logo", "Branch logo", "");
     // The FB page's name (Branch FB/QR → FB LINKS), e.g. "Acer Concept Store - Festival Mall Alabang".
     el("fbCap").innerHTML = "scan to visit our Official<br><b>" + esc(fbPageName(d)) + "</b> FB Page";
+    // The branch's BDO account for checks and transfers (LOGO sheet BANK DETAILS / ACCOUNT NAME); GHERTZ's without one.
+    var acct = d.bankAccount ? String(d.bankAccount).replace(/^(\d{5})(\d{3})(\d+)$/, "$1 $2 $3") : "00402 802 2005";
+    var acctName = d.bankAccount && d.accountName ? d.accountName : "GHERTZ Computer Corp.";
+    Array.prototype.forEach.call(document.querySelectorAll(".acct-name"), function (b) { b.textContent = acctName; });
+    Array.prototype.forEach.call(document.querySelectorAll(".acct-no"), function (b) { b.textContent = acct; });
     // The panel follows the branch, but never wipes changes that are not saved yet (e.g. on a data refresh).
     if (!dirty) fillInfo();
   }

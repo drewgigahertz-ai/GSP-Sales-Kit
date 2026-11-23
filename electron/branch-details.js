@@ -2,7 +2,8 @@
 //   E: BRANCH, F: PIC (the branch's logo), G: store name, H: BRANCH (again, beside the address), I: ADDRESS.
 // The logo and the address lists may be in different orders, so each is looked up by its own branch column.
 // Quotation details, in columns after ADDRESS found by their headers (row 1), on the same row as the address:
-//   TIN, MOBILE, BRANCH MANAGER, MANAGER NO., VIBER QR (picture link), FB QR (picture link).
+//   TIN, MOBILE, BRANCH MANAGER, MANAGER NO., VIBER QR (picture link), FB QR (picture link), BANK DETAILS (the BDO
+//   account number for checks and transfers) and ACCOUNT NAME (the company the account is under).
 
 const BRANCH_DETAILS_RANGE = 'E1:Z';
 
@@ -13,8 +14,22 @@ const QUOTATION_FIELDS = [
   ['manager', 'BRANCHMANAGER'],
   ['manager_no', 'MANAGERNO'],
   ['viber_qr', 'VIBER'],
-  ['fb_qr', 'FB']
+  ['fb_qr', 'FB'],
+  ['bank_account', 'BANKDETAILS'],
+  ['account_name', 'ACCOUNTNAME']
 ];
+
+// "004028021998" (or "4028025349", when the sheet dropped the leading zeros) → "004028021998": BDO account numbers
+// have 12 digits. Anything that is not a number (#N/A, a note) is no account.
+function accountNumber(value) {
+  const digits = text(value).replace(/[\s-]/g, '');
+  if (!/^\d{6,12}$/.test(digits)) return '';
+  return digits.padStart(12, '0');
+}
+function accountName(value) {
+  const name = text(value).replace(/\s+/g, ' ');
+  return !name || name.startsWith('#') ? '' : name;
+}
 
 function text(value) {
   return value === null || value === undefined ? '' : String(value).trim();
@@ -64,14 +79,14 @@ function branchDetailsCollection(values = [], formulas = []) {
 }
 
 // rows: the branch_details table; qrRows: the branch_qr table (Branch FB/QR tab, see branch-qr.js) →
-// { BRANCH: { logo, storeName, address, tin, mobile, manager, managerNo, viberQr, fbQr, fbName } }, branch codes in
+// { BRANCH: { logo, storeName, address, tin, mobile, manager, managerNo, viberQr, fbQr, fbName, bankAccount, accountName } }, branch codes in
 // capitals. Branch FB/QR comes first; the LOGO sheet's quotation columns fill what it leaves blank.
 function makeBranchDetails(rows, imageUrl = (value) => value, qrRows = []) {
   const details = {};
   const entry = (branch) => {
     const key = text(branch).toUpperCase();
     if (!key) return null;
-    if (!details[key]) details[key] = { logo: '', storeName: '', address: '', tin: '', mobile: '', manager: '', managerNo: '', viberQr: '', fbQr: '', fbName: '' };
+    if (!details[key]) details[key] = { logo: '', storeName: '', address: '', tin: '', mobile: '', manager: '', managerNo: '', viberQr: '', fbQr: '', fbName: '', bankAccount: '', accountName: '' };
     return details[key];
   };
   for (const row of qrRows || []) {
@@ -98,6 +113,8 @@ function makeBranchDetails(rows, imageUrl = (value) => value, qrRows = []) {
       if (!byAddress.managerNo && row.manager_no) byAddress.managerNo = text(row.manager_no);
       if (!byAddress.viberQr && row.viber_qr) byAddress.viberQr = imageUrl(text(row.viber_qr));
       if (!byAddress.fbQr && row.fb_qr) byAddress.fbQr = imageUrl(text(row.fb_qr));
+      if (!byAddress.bankAccount && accountNumber(row.bank_account)) byAddress.bankAccount = accountNumber(row.bank_account);
+      if (!byAddress.accountName && accountName(row.account_name)) byAddress.accountName = accountName(row.account_name);
     }
   }
   return details;

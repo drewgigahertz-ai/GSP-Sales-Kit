@@ -10,7 +10,8 @@
       date: 'November 23, 2026',
       changes: [
         'Quotation products: besides laptops, add desktops, cellphones, tablets and accessories (mouse, monitor, headset …) with the search box. An accessory has its price with a laptop or its regular price, and every product has its payment terms.',
-        'Quotation: laptops that continue on the next page can be changed again (price, quantity, discount, promo, payment term and remove).'
+        'Quotation: laptops that continue on the next page can be changed again (price, quantity, discount, promo, payment term and remove).',
+        'Quotation: check payments and bank transfers show your branch’s own BDO account name and number.'
       ]
     },
     {
