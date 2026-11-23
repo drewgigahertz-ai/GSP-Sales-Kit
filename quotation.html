@@ -255,9 +255,9 @@
     </div>
     <label class="card"><span class="card-label"><i class="bi bi-receipt"></i> TIN</span><input id="f_tin" autocomplete="off" placeholder="e.g. 229-918-217-0004"><span class="from-sheet" data-sheet="tin"></span></label>
     <label class="card"><span class="card-label"><i class="bi bi-phone"></i> MOBILE</span><input id="f_mobile" autocomplete="off" placeholder="e.g. 09178789511"><span class="from-sheet" data-sheet="mobile"></span></label>
-    <label class="card"><span class="card-label"><i class="bi bi-person-badge"></i> BRANCH MANAGER</span><input id="f_manager" autocomplete="off" placeholder="Name"><span class="from-sheet" data-sheet="manager"></span></label>
-    <label class="card"><span class="card-label"><i class="bi bi-person-vcard"></i> POSITION</span><input id="f_position" autocomplete="off" placeholder="Branch Manager"><span class="from-sheet">Shown after the name · blank = Branch Manager</span></label>
-    <label class="card"><span class="card-label"><i class="bi bi-telephone"></i> MANAGER NO.</span><input id="f_managerNo" autocomplete="off" placeholder="e.g. 09665897891"><span class="from-sheet" data-sheet="managerNo"></span></label>
+    <label class="card"><span class="card-label"><i class="bi bi-person-badge"></i> BRANCH PERSONNEL</span><input id="f_manager" autocomplete="off" placeholder="Name"><span class="from-sheet" data-sheet="manager"></span></label>
+    <label class="card"><span class="card-label"><i class="bi bi-person-vcard"></i> POSITION</span><input id="f_position" autocomplete="off" placeholder="Branch Personnel"><span class="from-sheet">Shown after the name · blank = Branch Personnel</span></label>
+    <label class="card"><span class="card-label"><i class="bi bi-telephone"></i> PERSONNEL NO.</span><input id="f_managerNo" autocomplete="off" placeholder="e.g. 09665897891"><span class="from-sheet" data-sheet="managerNo"></span></label>
     <div class="card">
       <div class="card-label"><i class="bi bi-qr-code"></i> QR CODES &amp; LOGO</div>
       <div class="pics">
@@ -326,8 +326,8 @@
     </div>
 
     <div class="sign">
-      <div class="name"><span class="detail" data-f="manager" data-ph="Branch manager: set in Branch details"></span> - <span class="detail" data-f="position" data-ph="Branch Manager"></span></div>
-      <div class="no"><span class="detail" data-f="managerNo" data-ph="Manager no.: set in Branch details"></span></div>
+      <div class="name"><span class="detail" data-f="manager" data-ph="Branch personnel: set in Branch details"></span> - <span class="detail" data-f="position" data-ph="Branch Personnel"></span></div>
+      <div class="no"><span class="detail" data-f="managerNo" data-ph="Personnel no.: set in Branch details"></span></div>
       <div class="qrs">
         <div id="viberQr"></div>
         <div class="cap">*Please scan for a direct<br>Viber contact.</div>
@@ -442,9 +442,9 @@
     var s = saved();
     return (s && s[field]) || "";
   }
-  // The position under the signature is "Branch Manager" unless one is typed in Branch details.
+  // The position under the signature is "Branch Personnel" unless one is typed in Branch details.
   function branchValue(field) {
-    return savedValue(field) || sheetValue(field) || (field === "position" ? "Branch Manager" : "");
+    return savedValue(field) || sheetValue(field) || (field === "position" ? "Branch Personnel" : "");
   }
   // Empty TIN / mobile parts (and the "|" between them) are left out of the PDF and print.
   function markEmpty() {
