@@ -51,6 +51,16 @@
     .quick { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 6px; }
     .quick button { border: 1px dashed #94a3b8; background: #fff; border-radius: 999px; padding: 5px 12px; font: 600 12px inherit; font-family: inherit; cursor: pointer; color: #1e293b; }
     .quick button b { color: var(--bar); }
+    /* Category chips: every kind of product the quotation has, with counts; one click lists that kind. */
+    .kinds { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: -2px; }
+    .kinds .field { margin-right: 2px; }
+    .kinds button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #cbd5e1; background: #fff; border-radius: 999px; padding: 4px 11px; font: 700 12px inherit; font-family: inherit; color: #1e293b; cursor: pointer; }
+    .kinds button i { color: var(--bar); }
+    .kinds button .n { padding: 0 6px; border-radius: 999px; background: #eef2f7; color: var(--muted); font-size: 10.5px; }
+    .kinds button:hover { border-color: var(--bar); }
+    .kinds button.on { background: var(--bar); border-color: var(--bar); color: #fff; }
+    .kinds button.on i { color: #fff; }
+    .kinds button.on .n { background: rgba(255,255,255,.22); color: #fff; }
     #status { font-size: 12.5px; color: var(--muted); margin-left: auto; }
 
     /* ---------- the A4 sheet ---------- */
@@ -237,6 +247,7 @@
   <button id="download" type="button" class="btn" title="Save as PDF (Ctrl+D)"><i class="bi bi-download"></i> Download PDF</button>
   <button id="print" type="button" class="btn" title="Print (Ctrl+P)"><i class="bi bi-printer"></i> Print</button>
   <span id="status"></span>
+  <div id="kinds" class="kinds" role="group" aria-label="Browse products by category"></div>
   <div class="dev-note"><i class="bi bi-cone-striped" aria-hidden="true"></i><span><b>Under development:</b> this tab is still being tested. Check the prices and details before giving a quotation to a customer, and send your feedback to Process Improvement.</span></div>
 </div>
 <div class="layout">
@@ -850,19 +861,51 @@
 
   // ---------- search ----------
   var found = [], active = 0;
+  // The category chips under the search: Laptops, Desktops, Mobiles, Accessories (only the ones there are), with
+  // counts. A chip lists every product of its kind (typing narrows it down); clicking it again shows all kinds.
+  var KINDS = [["laptop", "Laptops", "bi-laptop"], ["desktop", "Desktops", "bi-pc-display"], ["mobile", "Mobiles", "bi-phone"], ["attachment", "Accessories", "bi-mouse"]];
+  var kindFilter = "";
+  var kindOf = function (l) { return l.kind || "laptop"; };
+  function renderKinds() {
+    var counts = {};
+    data.laptops.forEach(function (l) { counts[kindOf(l)] = (counts[kindOf(l)] || 0) + 1; });
+    var shown = KINDS.filter(function (k) { return counts[k[0]]; });
+    if (kindFilter && !counts[kindFilter]) kindFilter = "";
+    el("kinds").innerHTML = shown.length > 1 ? '<span class="field">Browse:</span>' + shown.map(function (k) {
+      return '<button type="button" data-kind="' + k[0] + '" aria-pressed="' + (k[0] === kindFilter) + '"' + (k[0] === kindFilter ? ' class="on"' : "")
+        + ' title="List every one (click again for all products)"><i class="bi ' + k[2] + '"></i>' + k[1] + ' <span class="n">' + counts[k[0]] + "</span></button>";
+    }).join("") : "";
+    var kind = KINDS.filter(function (k) { return k[0] === kindFilter; })[0];
+    el("search").placeholder = kind ? "Search " + kind[1].toLowerCase() + " · click the chip again for all products" : el("search").dataset.all;
+  }
+  el("search").dataset.all = el("search").placeholder;
+  // A chip keeps the search box focused, so the list stays open.
+  el("kinds").addEventListener("mousedown", function (e) { if (e.target.closest("[data-kind]")) e.preventDefault(); });
+  el("kinds").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-kind]");
+    if (!b) return;
+    kindFilter = kindFilter === b.getAttribute("data-kind") ? "" : b.getAttribute("data-kind");
+    renderKinds();
+    el("search").focus();
+    search();
+  });
   function search() {
     var words = el("search").value.toLowerCase().split(/\s+/).filter(Boolean);
-    if (!words.length) { el("results").classList.remove("open"); return; }
+    if (!words.length && !kindFilter) { el("results").classList.remove("open"); return; }
     found = data.laptops.filter(function (l) {
+      if (kindFilter && kindOf(l) !== kindFilter) return false;
       var hay = (l.code + " " + l.model + " " + l.partNumber + " " + (l.kindLabel || "laptop")).toLowerCase();
       return words.every(function (w) { return hay.indexOf(w) !== -1; });
-    }).slice(0, 40);
+    });
+    var total = found.length;
+    found = found.slice(0, words.length ? 40 : 400);
     active = 0;
     el("results").innerHTML = found.length ? found.map(function (l, i) {
       var p = priceFor(l);
       return '<button type="button" data-pick="' + i + '"' + (i === 0 ? ' class="active"' : "") + '><span class="kind-tag' + (l.kind ? "" : " laptop") + '">' + esc(l.kindLabel || "Laptop") + "</span><b>" + esc(l.model) + "</b> " + esc(l.partNumber)
         + (p ? " · PHP " + money(p) : "") + "<small>" + esc(l.code) + "</small></button>";
-    }).join("") : '<div class="none">Nothing matches. Try a model, part number or category (e.g. mouse, monitor).</div>';
+    }).join("") + (total > found.length ? '<div class="none">Showing ' + found.length + " of " + total + ": type to narrow it down.</div>" : "")
+      : '<div class="none">Nothing matches. Try a model, part number or category (e.g. mouse, monitor).</div>';
     el("results").classList.add("open");
   }
   function pick(i) {
@@ -873,6 +916,7 @@
     el("status").textContent = "Added " + found[i].model;
   }
   el("search").addEventListener("input", search);
+  el("search").addEventListener("focus", function () { if (kindFilter) search(); });
   el("search").addEventListener("keydown", function (e) {
     var buttons = el("results").querySelectorAll("button");
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
@@ -1126,6 +1170,7 @@
       renderHeader();
       renderLines();
       renderQuick();
+      renderKinds();
     } else if (m.channel === "saleskit-quotation-customer") {
       var c = m.customer || {};
       recoName = c.name || "";
