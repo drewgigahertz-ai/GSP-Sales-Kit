@@ -306,17 +306,67 @@
         const laptop = laptopFor(row.item);
         if (laptop && getLaptopStock(laptop, selectedLocation) > 0) list.push(laptop);
       });
-      const main = rows[0] && key(rows[0].tag) === TIERS[tier]
-        ? list.find((prod) => same(prod.sku || prod.cleanSku, rows[0].item) && getLaptopStock(prod, selectedLocation) > 0)
-        : null;
-      if (!main) return;
-      if (isSmt) {
-        list.forEach((prod) => { prod.smtDefault = prod === main; });
-      } else {
+      const inStockOf = (sku) => list.find((prod) => same(prod.sku || prod.cleanSku, sku) && getLaptopStock(prod, selectedLocation) > 0);
+      const main = rows[0] && key(rows[0].tag) === TIERS[tier] ? inStockOf(rows[0].item) : null;
+      if (!isSmt) {
+        if (!main) return;
         list.splice(list.indexOf(main), 1);
         list.unshift(main);
+        return;
       }
+      // SMT: the tier starts on DB's recommended laptop; when it has no stock here, RECO TABLE's pick for the tier
+      // (when in stock), then DB's first alternative in stock, then a laptop other branches recommend for this tier
+      // and segment that this branch has. Only when none of them is in stock does the list's own default stay (the
+      // laptop with the most stock here, whatever its segment); the card's badge then says so (pickNote).
+      const tableDefault = list.find((prod) => prod.smtDefault && prod.smtRecommended && getLaptopStock(prod, selectedLocation) > 0);
+      let pick = main || tableDefault || null;
+      for (const row of rows) {
+        if (pick) break;
+        pick = inStockOf(row.item);
+      }
+      if (!pick) {
+        pick = segmentPick(tier, hierarchy, list);
+        if (pick) pick.smtHow = 'segment';
+      }
+      if (!pick) return;
+      list.forEach((prod) => { prod.smtDefault = prod === pick; });
     });
+  }
+
+  // A laptop in the tier's list (in stock here) that other branches have as this tier's laptop or alternative for
+  // the segment (RECO DB, and RECO TABLE's TAG for the target market), most stock here first.
+  function segmentPick(tier, hierarchy, list) {
+    const wanted = new Set();
+    for (const row of Array.isArray(window.RECO_DB_DATA) ? window.RECO_DB_DATA : []) {
+      if (Number(row.hierarchy) === Number(hierarchy) && [TIERS[tier], `ALTERNATIVE ${TIERS[tier]}`].includes(key(row.tag)) && row.item) wanted.add(normalizeSmtSku(row.item));
+    }
+    const market = typeof getSmtTargetMarket === 'function' ? key(getSmtTargetMarket(hierarchy)) : '';
+    for (const row of Array.isArray(window.RECO_TABLE_DATA) ? window.RECO_TABLE_DATA : []) {
+      if (market && key(row['TARGET MARKET']) === market && key(row.TAG) === TIERS[tier] && row['ITEM DESCRIPTION']) wanted.add(normalizeSmtSku(row['ITEM DESCRIPTION']));
+    }
+    return list
+      .filter((prod) => wanted.has(normalizeSmtSku(prod.sku || prod.cleanSku)) && getLaptopStock(prod, selectedLocation) > 0)
+      .sort((a, b) => getLaptopStock(b, selectedLocation) - getLaptopStock(a, selectedLocation))[0] || null;
+  }
+
+  // A short name for an item code: its model from LAPTOP DB / SPECS, else the code without "LAP-".
+  function laptopName(sku) {
+    const fromDb = ((window.sheetData && window.sheetData.laptopDatabase) || []).find((laptop) => same(laptop.item, sku));
+    const prod = fromDb ? laptopDbProduct(fromDb) : laptopFor(sku);
+    return (prod && prod.title) || String(sku || '').replace(/^LAP[-_\s]*/i, '');
+  }
+
+  // SMT card badge: how the laptop on the card was picked. { kind: 'main' | 'alternative' | 'segment' | 'other',
+  // missing: the name of the tier's recommended laptop when it has no stock here ('' when there is none) }.
+  function pickNote(tier, prod) {
+    if (!prod) return { kind: 'other', missing: '' };
+    const rows = dbRows(tier, currentHierarchy);
+    const mainRow = rows[0] && key(rows[0].tag) === TIERS[tier] ? rows[0] : null;
+    const row = rows.find((r) => same(prod.sku || prod.cleanSku, r.item));
+    if ((row && key(row.tag) === TIERS[tier]) || prod.smtRecommended) return { kind: 'main', missing: '' };
+    const missing = mainRow ? laptopName(mainRow.item) : '';
+    if (row) return { kind: 'alternative', missing };
+    return { kind: prod.smtHow === 'segment' ? 'segment' : 'other', missing };
   }
 
   // The card's choices: DB's recommended laptop and alternatives, as laptops of the tier's list.
@@ -459,5 +509,5 @@
   window.addEventListener('resize', closeMenu);
   document.addEventListener('scroll', (event) => { if (event.target !== menu) closeMenu(); }, true);
 
-  window.RecoAlternatives = { applyToCatalog, isRecommended, show, toggle, laptopDbProduct };
+  window.RecoAlternatives = { applyToCatalog, isRecommended, pickNote, show, toggle, laptopDbProduct };
 })();

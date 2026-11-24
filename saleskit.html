@@ -6460,10 +6460,21 @@
 
         if (selectedRecommendationMode === 'SMT') {
           const branchName = isBranch ? selectedLocation : 'All Branches';
+          // How the laptop was picked (reco-alternatives.js pickNote): the branch's own pick, its alternative (the
+          // pick has no stock here), another branch's pick for this segment, or none of them.
+          const note = isBranch && window.RecoAlternatives && RecoAlternatives.pickNote ? RecoAlternatives.pickNote(tier, prod) : { kind: 'main', missing: '' };
+          const outOfStock = note.missing ? `${note.missing} has no stock at ${branchName}` : '';
+          const BADGES = {
+            main: ['bg-success', 'bi-check-circle-fill', `${branchName} ${tierName} Reco Table Selection`, ''],
+            alternative: ['bg-primary', 'bi-arrow-repeat', `${branchName} ${tierName} Alternative`, outOfStock],
+            segment: ['bg-warning text-dark', 'bi-shuffle', `${tierName} pick of other branches`, outOfStock || `No ${tierName} pick in stock at ${branchName}`],
+            other: ['bg-danger', 'bi-exclamation-triangle-fill', `Not a Reco Table pick: most stock at ${branchName}`, outOfStock || `No ${tierName} pick in stock at ${branchName}`]
+          };
+          const [tone, icon, label, why] = BADGES[note.kind] || BADGES.main;
           stockBadgeEl.innerHTML = `
             <div class="d-flex align-items-center gap-1.5 py-0.5">
-              <span class="badge bg-success text-white px-2.5 py-1 rounded-pill shadow-sm" style="font-size: 0.74rem; font-weight: 600; letter-spacing: 0.2px;">
-                <i class="bi bi-check-circle-fill me-1"></i>${escapeHtml(branchName)} ${tierName} Reco Table Selection
+              <span class="badge ${tone}${tone.includes('text-dark') ? '' : ' text-white'} px-2.5 py-1 rounded-pill shadow-sm" style="font-size: 0.74rem; font-weight: 600; letter-spacing: 0.2px; white-space: normal; text-align: left;"${why ? ` title="${escapeHtml(why)}"` : ''}>
+                <i class="bi ${icon} me-1"></i>${escapeHtml(label)}${why ? `<span style="display:block; font-weight: 500; opacity: .9;">${escapeHtml(why)}</span>` : ''}
               </span>
             </div>
           `;
