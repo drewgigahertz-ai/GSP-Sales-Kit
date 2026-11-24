@@ -47,9 +47,14 @@
       const db = laptopDb.get(key(item.itemCode)) || {};
       const specs = db.specs || {};
       const guide = item.specs || {};
+      // Units per branch: the inventory CSV's (on the Banner data), else LAPTOP DB's.
+      const stock = {};
+      Object.entries((item.stock && Object.keys(item.stock).length ? item.stock : db.stock) || {})
+        .forEach(([branch, units]) => { if (Number(units) > 0) stock[key(branch)] = Number(units); });
       products.push({
         id: `laptop|${key(item.itemCode)}`,
         kind: 'laptop',
+        stock,
         kindLabel: 'Laptop',
         code: clean(item.itemCode),
         model: modelName([db.brand, db.model].filter(Boolean).join(' ')) || modelName(item.brandModel) || clean(item.itemCode),
@@ -125,7 +130,16 @@
       });
     }
     products.sort((a, b) => a.model.localeCompare(b.model));
-    return { channel: 'saleskit-pricing-data', products, updatedAt: data.dataUpdatedAt || '', hasExtras: Object.keys(extras).length > 0 };
+    return {
+      channel: 'saleskit-pricing-data',
+      products,
+      updatedAt: data.dataUpdatedAt || '',
+      hasExtras: Object.keys(extras).length > 0,
+      // Branch stock shows only when the server has stock counts; the account's branch is listed first.
+      hasStock: products.some((p) => p.stock && Object.keys(p.stock).length),
+      stockAsOf: data.inventoryAsOf || '',
+      homeBranch: key(data.homeBranch)
+    };
   }
 
   // Called by the page whenever SalesKit data is loaded or refreshed.
@@ -156,6 +170,9 @@
       } catch {
         send({ channel: 'saleskit-pricing-status', message: 'Could not copy' });
       }
+    } else if (channel === 'saleskit-pricing-quote') {
+      // "Add to Quotation": the product with the promo, price set and term on screen (quotation-bridge.js).
+      if (typeof window.addToQuotation === 'function') window.addToQuotation(Object.assign({}, event.data.request, { from: 'Pricing Matrix' }));
     } else if (channel === 'saleskit-pricing-hotkey') {
       if (typeof window.runSalesKitHotkey === 'function') window.runSalesKitHotkey(event.data.keys || {});
     } else if (channel === 'saleskit-pricing-help') {

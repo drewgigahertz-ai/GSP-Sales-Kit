@@ -6,6 +6,19 @@
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
+      version: '1.0.41',
+      date: 'November 24, 2026',
+      changes: [
+        'Add to Quotation: a button on the Reco Table (under each laptop’s price), the Sales Kit (in each laptop’s column header), the Banner and the Pricing Matrix adds that laptop to your quotation and opens the Quotation tab. The promo shown there goes along; in the Pricing Matrix, click any price to quote that payment term (or Ctrl+Q). Adding the same laptop again adds one more to its quantity.',
+        'Quotation number and Valid until: each quotation gets its own number (branch, date and count, e.g. MEGAP-261124-01). Valid until is 7 days from today, or the end of the earliest promo on the quotation if that is sooner; type another date to change it.',
+        'Quotation History: every quotation you download or print is kept on this laptop. Open one to change or send it again, or Copy as new to start from it with a new number and today’s date.',
+        'Quotation: each laptop shows the stock at your branch (on screen only), and installment terms print the amount a month (e.g. PHP 13,249.92 a month for 12 months).',
+        'Quotation: when a price in the price matrix changes after a laptop was added, the line says so with a button to use the new price. A price you typed yourself stays until you press it.',
+        'Laptop pictures: the Sales Kit and the presentation now always show them without their white background, also when the picture was still being cleaned up as they appeared. Each picture is cleaned once, so switching laptops back and forth is quicker.',
+        'Pricing Matrix: Branch stock for each laptop, and Compare to put up to 3 products side by side (all payment terms, freebies, promo dates, stock and specs, with the lowest price in each row marked).'
+      ]
+    },
+    {
       version: '1.0.40',
       date: 'November 23, 2026',
       changes: [

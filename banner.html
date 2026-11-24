@@ -55,6 +55,28 @@
       background: #fff;
     }
 
+    #quoteBannerButton {
+      display: inline-flex;
+      min-height: 32px;
+      flex: 0 0 auto;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 11px;
+      border: 1px solid #86efac;
+      border-radius: 6px;
+      background: #f0fdf4;
+      color: #047857;
+      font: inherit;
+      font-size: .72rem;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    #quoteBannerButton:hover:not(:disabled) { background: #dcfce7; }
+    #quoteBannerButton:disabled { opacity: .45; cursor: not-allowed; }
+    #quoteBannerButton:focus-visible { outline: 3px solid rgba(4, 120, 87, .3); outline-offset: 2px; }
+
     #refreshBannerButton,
     #downloadBannerButton,
     #fullscreenButton {
@@ -1046,6 +1068,9 @@
           <select id="colorSelect" title="Colour of the cash price box"></select>
         </label>
         <span id="bannerStatus" class="small text-muted" aria-live="polite"></span>
+        <button id="quoteBannerButton" type="button" title="Add this laptop to the quotation, with the promo shown" disabled>
+          <i class="bi bi-file-earmark-plus" aria-hidden="true"></i> Add to Quotation
+        </button>
         <button id="refreshBannerButton" type="button" title="Load the latest data from the SalesKit server">
           <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh data
         </button>
@@ -1432,6 +1457,7 @@
       if (!sameItem || !(item.promoRows || [])[chosenPromoRow]) chosenPromoRow = null;
       renderPromoSelect();
       $('downloadBannerButton').disabled = false;
+      $('quoteBannerButton').disabled = false;
       loadItemList({ keepScroll: true });
       // Refreshed data keeps the view the salesperson chose; another laptop starts on its ageing banner.
       showBannerView(item, sameItem ? bannerView : 'ageing');
@@ -1804,6 +1830,14 @@
     }
 
     $('downloadBannerButton').addEventListener('click', downloadBanner);
+
+    // Add to Quotation: the laptop on screen with the promo title it shows (SalesKit's quotation-bridge.js).
+    $('quoteBannerButton').addEventListener('click', () => {
+      const item = currentItem();
+      if (!item) return;
+      const shown = priceFor(item);
+      toParent({ channel: 'saleskit-banner-quote', code: item.itemCode, promo: (shown && shown !== item && shown.title) || '' });
+    });
 
     // Ctrl+D (or Ctrl+Shift+D) downloads, as on the other pages. Ctrl+1 / Ctrl+2 / Ctrl+3 / Ctrl+4 switch SalesKit tabs
     // from here too (SalesKit's hotkeys.js runs them).

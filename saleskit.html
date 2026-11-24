@@ -27,6 +27,7 @@
   <script src="./flyer-bridge.js"></script>
   <script src="./quotation-bridge.js"></script>
   <script src="./pricing-matrix-bridge.js"></script>
+  <script src="./quote-buttons.js"></script>
   <script src="./activity-tracker.js" defer></script>
   <script src="./branch-mode.js" defer></script>
   <script src="./hotkeys.js" defer></script>
@@ -6423,6 +6424,7 @@
                 imgEl.dataset.transparentBase64 = transUrl;
                 imgEl.dataset.cachedForUrl = prod.image;
                 imgEl.src = transUrl;
+                shareCleanedPicture(prod.image, transUrl);
               }
             }).catch(err => console.warn(err));
           }
@@ -6704,6 +6706,45 @@
     // ============================================================
     // TRANSPARENT BACKGROUND & IMAGE EXPORT UTILITIES
     // ============================================================
+    // Laptop pictures without their background, by picture address and settings: each picture is cleaned once.
+    const removedBackgrounds = new Map();
+
+    // The Reco Table cards clean their laptop pictures a moment after showing them; the Sales Kit columns and the
+    // presentation copy whatever picture a card has when they are drawn. So every cleaned picture is kept here
+    // (original address → cleaned picture) and given to every copy, also the ones drawn before it was ready.
+    const cleanedPictures = new Map();
+    const absoluteUrl = (url) => { try { return new URL(url, location.href).href; } catch (e) { return String(url || ''); } };
+    function transparentPicturesOn() {
+      return document.getElementById('transparentBgToggle')?.checked ?? true;
+    }
+    // The cleaned picture for an address (when Remove background is on), else the address itself.
+    function cleanedPictureFor(url) {
+      if (!url || !transparentPicturesOn()) return url;
+      return cleanedPictures.get(absoluteUrl(url)) || url;
+    }
+    // Every laptop picture in root that has a cleaned version shows it.
+    function useCleanedPictures(root) {
+      if (!root || !transparentPicturesOn() || !cleanedPictures.size) return;
+      root.querySelectorAll('img').forEach((img) => {
+        const clean = img.src && cleanedPictures.get(img.src);
+        if (clean) img.src = clean;
+      });
+    }
+    // A card's picture is cleaned: the Sales Kit columns and the presentation (on screen and its saved slides) use it.
+    function shareCleanedPicture(rawUrl, cleanUrl) {
+      if (!rawUrl || !cleanUrl || !cleanUrl.startsWith('data:image/')) return;
+      cleanedPictures.set(absoluteUrl(rawUrl), cleanUrl);
+      if (!transparentPicturesOn()) return;
+      ['skImgExceed', 'skImgMeet', 'skImgBudget'].forEach((id) => {
+        const img = document.getElementById(id);
+        if (img && img.src === absoluteUrl(rawUrl)) img.src = cleanUrl;
+      });
+      useCleanedPictures(document.getElementById('salesKitPresentation'));
+      try {
+        (salesKitPresentationSlides || []).forEach((slide) => { if (slide && slide.wholeResult) useCleanedPictures(slide.wholeResult); });
+      } catch (e) {}
+    }
+
     async function removeImageBackground(source, tolerance = 32, isProductLaptop = true) {
       if (!source) return '';
       let imgSrc = '';
@@ -6716,6 +6757,30 @@
         imgSrc = source.trim();
       }
       if (!imgSrc) return '';
+
+      const memoKey = `${imgSrc}|${tolerance}|${isProductLaptop}`;
+      if (!removedBackgrounds.has(memoKey)) {
+        const work = cleanImageBackground(imgSrc, tolerance, isProductLaptop);
+        removedBackgrounds.set(memoKey, work);
+        // A failed try (no data: picture) is tried again next time.
+        work.then((done) => { if (!done || !done.startsWith('data:image/')) removedBackgrounds.delete(memoKey); });
+      }
+      const result = await removedBackgrounds.get(memoKey);
+      if (targetImgEl && result && result.startsWith('data:image/')) {
+        targetImgEl.src = result;
+      }
+      return result;
+    }
+
+    async function cleanImageBackground(imgSrc, tolerance, isProductLaptop) {
+      // A web picture (Google Drive) cannot be read pixel by pixel, so the background would stay: the copy saved
+      // on this laptop (saleskit-image://, which allows it) is used instead, downloaded first if needed.
+      if (/^https?:\/\//i.test(imgSrc) && window.saleskit && typeof window.saleskit.cacheImage === 'function') {
+        try {
+          const saved = await window.saleskit.cacheImage(imgSrc);
+          if (saved) imgSrc = saved;
+        } catch (e) {}
+      }
 
       if (!imgSrc.startsWith('data:image/') && typeof google !== 'undefined' && google.script && google.script.run) {
         try {
@@ -6989,10 +7054,6 @@
         img.onerror = () => resolve(imgSrc);
         img.src = imgSrc;
       });
-
-      if (targetImgEl && result && result.startsWith('data:image/')) {
-        targetImgEl.src = result;
-      }
       return result;
     }
 
@@ -7015,6 +7076,7 @@
               imgEl.dataset.transparentBase64 = transUrl;
               imgEl.dataset.cachedForUrl = rawUrl;
               imgEl.src = transUrl;
+              shareCleanedPicture(rawUrl, transUrl);
             }
           }
         } else {
@@ -7834,6 +7896,7 @@
       renderSalesKitPresentationBannerTabs(slide);
       if (slide.type === 'reco') {
         wholeElement.appendChild(slide.wholeResult.cloneNode(true));
+        useCleanedPictures(wholeElement);
         return;
       }
 
@@ -7852,7 +7915,8 @@
         const source = document.getElementById(imageId);
         if (source && source.src && source.style.display !== 'none') {
           const image = document.createElement('img');
-          image.src = source.src;
+          // The cleaned picture, also when the column still shows the original (cleaned after it was drawn).
+          image.src = cleanedPictureFor(source.src);
           image.alt = document.getElementById(titleId)?.dataset.title || 'Recommended laptop';
           card.appendChild(image);
         }
@@ -8816,21 +8880,21 @@
       if (skImgExceed) {
         const src = (isTransparent && imgExceedEl && imgExceedEl.dataset.transparentBase64)
           ? imgExceedEl.dataset.transparentBase64
-          : (exceedObj.image || (imgExceedEl ? (imgExceedEl.dataset.rawUrl || imgExceedEl.src) : ''));
+          : cleanedPictureFor(exceedObj.image || (imgExceedEl ? (imgExceedEl.dataset.rawUrl || imgExceedEl.src) : ''));
         skImgExceed.src = src;
         skImgExceed.style.display = src ? 'block' : 'none';
       }
       if (skImgMeet) {
         const src = (isTransparent && imgMeetEl && imgMeetEl.dataset.transparentBase64)
           ? imgMeetEl.dataset.transparentBase64
-          : (meetObj.image || (imgMeetEl ? (imgMeetEl.dataset.rawUrl || imgMeetEl.src) : ''));
+          : cleanedPictureFor(meetObj.image || (imgMeetEl ? (imgMeetEl.dataset.rawUrl || imgMeetEl.src) : ''));
         skImgMeet.src = src;
         skImgMeet.style.display = src ? 'block' : 'none';
       }
       if (skImgBudget) {
         const src = (isTransparent && imgBudgetEl && imgBudgetEl.dataset.transparentBase64)
           ? imgBudgetEl.dataset.transparentBase64
-          : (budgetObj.image || (imgBudgetEl ? (imgBudgetEl.dataset.rawUrl || imgBudgetEl.src) : ''));
+          : cleanedPictureFor(budgetObj.image || (imgBudgetEl ? (imgBudgetEl.dataset.rawUrl || imgBudgetEl.src) : ''));
         skImgBudget.src = src;
         skImgBudget.style.display = src ? 'block' : 'none';
       }

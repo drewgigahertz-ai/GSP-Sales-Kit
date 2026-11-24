@@ -72,6 +72,15 @@
         ['Ctrl + P', 'Print']
       ]
     },
+    pricing: {
+      title: 'Pricing Matrix',
+      keys: [
+        ['Ctrl + Shift + L', 'Search products'],
+        ['← / →', 'Previous / next product'],
+        ['Ctrl + Q', 'Add to Quotation'],
+        ['Ctrl + C', 'Copy prices']
+      ]
+    },
     presentation: {
       title: 'Presentation',
       keys: [

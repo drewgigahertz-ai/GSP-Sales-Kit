@@ -16,9 +16,14 @@
   ];
   var byKey = {};
   TERMS.forEach(function (t) { byKey[t.key] = t; });
+  // Months for the monthly amount ("₱4,166.58 a month"); cash, 3 months (straight payment) and Home Credit have none.
+  var MONTHS = { m6: 6, m9: 9, m12: 12, m18: 18, m24: 24, bdo24: 24, m24b: 24 };
 
   window.QuotationTerms = {
     list: TERMS,
-    get: function (key) { return byKey[key] || byKey.cash; }
+    months: MONTHS,
+    get: function (key) { return byKey[key] || byKey.cash; },
+    // The amount a month for a term price, or null for a term without months.
+    monthly: function (key, price) { return MONTHS[key] && price != null ? Number(price) / MONTHS[key] : null; }
   };
 })();

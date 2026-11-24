@@ -139,6 +139,44 @@
     .box.staff .amount { font-size: 18px; font-weight: 800; color: var(--violet); }
     body.hide-staff .staff { display: none; }
 
+    /* A price in the terms table adds the product to the quotation at that term. */
+    table.terms td.pick { cursor: pointer; border-radius: 8px; }
+    table.terms td.pick:hover { background: var(--blue-soft); box-shadow: inset 0 0 0 1px #c7d2fe; }
+    table.terms td.pick:hover .amt:after { content: " +"; color: var(--blue); }
+    .btn.quote { background: var(--green); }
+    .btn.on { background: var(--blue-soft); color: var(--navy); box-shadow: inset 0 0 0 1.5px var(--blue); }
+    .hint { color: var(--soft); font-size: 11px; font-weight: 600; }
+    /* Branch stock box */
+    .stock-home { display: flex; justify-content: space-between; align-items: baseline; font-weight: 800; font-size: 14px; }
+    .stock-home .n { color: var(--green); }
+    .stock-home .n.zero { color: var(--red); }
+    .stock-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+    .stock-list span { padding: 2px 8px; border-radius: 999px; background: #f1f5f9; font-size: 11px; font-weight: 700; }
+    .stock-list span b { color: var(--green); margin-left: 3px; }
+    /* Compare: up to 3 products side by side */
+    .tray { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 10px; background: var(--blue-soft); font-size: 12px; font-weight: 700; color: var(--navy); }
+    .tray[hidden] { display: none; }
+    .tray .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; border-radius: 999px; background: #fff; border: 1px solid #c7d2fe; color: var(--ink); font-weight: 600; max-width: 280px; }
+    .tray .chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tray .chip button { border: 0; background: #eef2f7; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; color: var(--muted); font-size: 11px; }
+    .tray .btn { padding: 5px 11px; font-size: 12px; }
+    .tray .spacer { flex: 1; }
+    .compare { overflow-x: auto; }
+    table.cmp { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; min-width: 640px; }
+    table.cmp th, table.cmp td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; text-align: left; font-size: 12.5px; }
+    table.cmp th.lbl, table.cmp td.lbl { width: 170px; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .4px; text-transform: uppercase; background: #f8fafc; }
+    table.cmp thead th { position: sticky; top: 0; background: #fff; z-index: 1; border-bottom: 2px solid var(--line); }
+    table.cmp thead th h3 { margin: 4px 0 2px; font-size: 14px; font-weight: 800; line-height: 1.25; }
+    table.cmp thead th .code { color: var(--muted); font-size: 11px; font-weight: 600; }
+    table.cmp thead .acts { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+    table.cmp thead .acts .btn { padding: 4px 9px; font-size: 11.5px; }
+    table.cmp .amt { font-weight: 800; white-space: nowrap; }
+    table.cmp .mo { color: var(--muted); font-size: 10.5px; font-weight: 600; }
+    table.cmp .win { color: var(--green); }
+    table.cmp .win:after { content: " ★"; font-size: 10px; }
+    table.cmp tr.sec td { background: #f8fafc; color: var(--navy); font-size: 11px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; }
+    table.cmp select { max-width: 100%; padding: 3px 6px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 11.5px; font-weight: 600; }
+
     #toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(20px); opacity: 0; padding: 9px 16px; border-radius: 10px; background: #0f172a; color: #fff; font-weight: 700; font-size: 12.5px; transition: all .2s; pointer-events: none; }
     #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
@@ -174,6 +212,7 @@
       <span class="spacer"></span>
       <span id="count"></span>
     </div>
+    <div class="tray" id="tray" hidden></div>
   </div>
   <div class="body">
     <div class="detail" id="detail"><div class="placeholder"><div><i class="bi bi-hourglass-split"></i>Loading the price matrix…</div></div></div>
@@ -190,8 +229,8 @@
   function toParent(message) { if (window.parent && window.parent !== window) window.parent.postMessage(message, "*"); }
 
   var KINDS = [["laptop", "Laptop", "bi-laptop"], ["desktop", "Desktop", "bi-pc-display"], ["attachment", "Accessories", "bi-mouse2"], ["mobile", "Mobile", "bi-phone"]];
-  // Months for the monthly figure ("₱4,166.58/mo"); cash, 3-month straight and Home Credit have none.
-  var MONTHS = { m6: 6, m9: 9, m12: 12, m18: 18, m24: 24, bdo24: 24, m24b: 24 };
+  // Months for the monthly figure ("₱4,166.58/mo"): quotation-terms.js.
+  var MONTHS = (window.QuotationTerms && window.QuotationTerms.months) || {};
   var TERMS = (window.QuotationTerms && window.QuotationTerms.list) || [];
   // Price sets shown side by side: laptops no bundle / with bundle; accessories regular / with a laptop.
   function setsFor(product, promo) {
@@ -224,16 +263,43 @@
 
   // ---------- state ----------
   var products = [];
-  var state = { kind: "laptop", category: "", sort: "name", promoOnly: false, query: "", selected: "", promo: 0 };
+  // hasStock / stockAsOf / homeBranch: branch stock from the server (pricing-matrix-bridge.js).
+  var meta = { hasStock: false, stockAsOf: "", homeBranch: "" };
+  // view: one product ("detail") or the products picked to compare side by side ("compare", up to COMPARE_MAX).
+  var COMPARE_MAX = 3;
+  var state = { kind: "laptop", category: "", sort: "name", promoOnly: false, query: "", selected: "", promo: 0, view: "detail", compare: [], comparePromo: {} };
   // The product last opened in each group (kept on this laptop), so coming back shows it again.
   var lastPicked = {};
   try {
     var saved = JSON.parse(localStorage.getItem("saleskit.pricing.view") || "{}");
     lastPicked = saved.picked || {};
-    Object.assign(state, { kind: saved.kind || state.kind, sort: saved.sort || state.sort, promoOnly: Boolean(saved.promoOnly) });
+    Object.assign(state, { kind: saved.kind || state.kind, sort: saved.sort || state.sort, promoOnly: Boolean(saved.promoOnly), compare: Array.isArray(saved.compare) ? saved.compare.slice(0, COMPARE_MAX) : [] });
   } catch (e) { /* defaults */ }
   try { el("showStaff").checked = localStorage.getItem("saleskit.pricing.staff") !== "0"; } catch (e) { /* shown */ }
-  function remember() { try { localStorage.setItem("saleskit.pricing.view", JSON.stringify({ kind: state.kind, sort: state.sort, promoOnly: state.promoOnly, picked: lastPicked })); } catch (e) { /* not kept */ } }
+  function remember() { try { localStorage.setItem("saleskit.pricing.view", JSON.stringify({ kind: state.kind, sort: state.sort, promoOnly: state.promoOnly, picked: lastPicked, compare: state.compare })); } catch (e) { /* not kept */ } }
+
+  // ---------- Add to Quotation ----------
+  // The price set a product is quoted with first: with bundle (accessories: with a laptop) when it has one.
+  function defaultSet(sets) { return (sets.filter(function (s) { return s.key === "withBundle"; })[0] || sets[0] || { key: "withBundle" }).key; }
+  // Sent to the Quotation tab (quotation-bridge.js addToQuotation): the item code, promo title, bundle and term.
+  function quote(p, promo, setKey, term) {
+    toParent({ channel: "saleskit-pricing-quote", request: { code: p.code, promo: promo && hasPromo(promo) ? promo.title : "", bundle: setKey === "noBundle" ? "no" : "with", term: term || "cash" } });
+  }
+
+  // ---------- branch stock ----------
+  function units(p, branch) { return (p.stock && Number(p.stock[branch])) || 0; }
+  function totalUnits(p) { return Object.keys(p.stock || {}).reduce(function (s, b) { return s + units(p, b); }, 0); }
+  function stockBox(p) {
+    if (!meta.hasStock || p.kind !== "laptop") return "";
+    var home = meta.homeBranch && ["HO", "ALL", "ALL BRANCHES"].indexOf(meta.homeBranch) === -1 ? meta.homeBranch : "";
+    var others = Object.keys(p.stock || {}).filter(function (b) { return b !== home && units(p, b) > 0; }).sort(function (a, b) { return units(p, b) - units(p, a) || a.localeCompare(b); });
+    var asOf = day(meta.stockAsOf);
+    return '<div class="card box"><h3><i class="bi bi-box-seam" style="color:var(--blue)"></i> Branch stock' + (asOf ? '<span class="hint" style="margin-left:auto;text-transform:none;letter-spacing:0">as of ' + esc(dayLabel(meta.stockAsOf)) + "</span>" : "") + "</h3>"
+      + (home ? '<div class="stock-home"><span>' + esc(home) + '</span><span class="n' + (units(p, home) ? "" : " zero") + '">' + (units(p, home) || "No") + " unit" + (units(p, home) === 1 ? "" : "s") + "</span></div>" : "")
+      + (others.length ? '<div class="stock-list">' + others.map(function (b) { return "<span>" + esc(b) + "<b>" + units(p, b) + "</b></span>"; }).join("") + "</div>"
+        : '<div class="muted" style="margin-top:' + (home ? "8px" : "0") + '">' + (home ? "None at other branches." : "No stock at any branch.") + "</div>")
+      + "</div>";
+  }
   function applyStaff() { document.body.classList.toggle("hide-staff", !el("showStaff").checked); }
   applyStaff();
 
@@ -327,7 +393,7 @@
   function pick(i) {
     var p = shown[i];
     if (!p) return;
-    state.selected = p.id; state.promo = 0;
+    state.selected = p.id; state.promo = 0; state.view = "detail";
     lastPicked[state.kind] = p.id; remember();
     closeResults();
     renderDetail();
@@ -356,6 +422,9 @@
   }
   function current() { return products.filter(function (p) { return p.id === state.selected; })[0] || null; }
   function renderDetail() {
+    renderTray();
+    if (state.view === "compare" && compared().length) { renderCompare(); return; }
+    state.view = "detail";
     var p = current();
     if (!p) {
       el("detail").innerHTML = '<div class="placeholder"><div><i class="bi bi-tags"></i>' + (products.length ? (shown.length ? "Pick a product in the search box above." : "Nothing matches the search or filters.") : "No prices yet: sync the server with the price matrix.") + "</div></div>";
@@ -371,7 +440,10 @@
       + '<div class="big"><div class="lbl">Cash price' + (sets.length > 1 ? (p.kind === "attachment" ? " · with a laptop" : " · with bundle") : "") + "</div><div class=\"amt\">" + (cash ? peso(cash) : "—") + "</div>"
       + (sets.length > 1 && noBundleCash && noBundleCash !== cash ? '<div class="alt">' + peso(noBundleCash) + (p.kind === "attachment" ? " regular price" : " without the bundle") + "</div>" : "") + "</div>"
       + (p.specs.length ? '<div class="specs">' + p.specs.map(function (s) { return "<span><b>" + esc(s[0]) + "</b>" + esc(s[1]) + "</span>"; }).join("") + "</div>" : "")
-      + '<div class="actions"><button type="button" class="btn" id="copy"><i class="bi bi-clipboard"></i> Copy prices</button>' + stepper(p) + "</div></div>";
+      + '<div class="actions"><button type="button" class="btn quote" id="quote" title="Add to the quotation with this promo, ' + (sets.length > 1 ? esc(sets.filter(function (s) { return s.key === defaultSet(sets); })[0].label.toLowerCase()) + ", " : "") + 'cash (Ctrl+Q)"><i class="bi bi-file-earmark-plus"></i> Add to Quotation</button>'
+      + '<button type="button" class="btn light" id="copy"><i class="bi bi-clipboard"></i> Copy prices</button>'
+      + '<button type="button" class="btn light' + (state.compare.indexOf(p.id) !== -1 ? " on" : "") + '" id="compareToggle" title="Compare up to ' + COMPARE_MAX + ' products side by side"><i class="bi bi-layout-three-columns"></i> ' + (state.compare.indexOf(p.id) !== -1 ? "In compare" : "Compare") + "</button>"
+      + '<span class="hint">or click a price below to quote that term</span>' + stepper(p) + "</div></div>";
 
     if (p.promos.length > 1) {
       h += '<div class="section-label"><i class="bi bi-gift"></i> Promos (' + p.promos.length + ")</div><div class=\"promos\">" + p.promos.map(function (x, i) {
@@ -399,7 +471,7 @@
             var v = s.prices[t.key];
             if (v == null) return '<td><span class="none">—</span></td>';
             var mo = MONTHS[t.key] ? v / MONTHS[t.key] : null;
-            return '<td><div class="amt">' + peso(v) + "</div>" + (mo ? '<div class="mo">' + peso(mo) + "/mo" + (Math.abs(mo - best[s.key]) < 0.005 ? '<span class="best">LOWEST</span>' : "") + "</div>" : "") + "</td>";
+            return '<td class="pick" data-term="' + t.key + '" data-set="' + s.key + '" title="Add to the quotation: ' + esc(t.label) + (sets.length > 1 ? ", " + esc(s.label.toLowerCase()) : "") + '"><div class="amt">' + peso(v) + "</div>" + (mo ? '<div class="mo">' + peso(mo) + "/mo" + (Math.abs(mo - best[s.key]) < 0.005 ? '<span class="best">LOWEST</span>' : "") + "</div>" : "") + "</td>";
           }).join("") + "</tr>";
       }).join("") + "</tbody></table>";
 
@@ -426,8 +498,118 @@
         + (promo.incentiveValidity ? '<span class="valid">Valid ' + esc(promo.incentiveValidity) + "</span>" : "") + "</div>";
     }
     if (!side) side = '<div class="card box"><div class="muted"><i class="bi bi-info-circle"></i> No freebies, dates or vendor promos for this one.</div></div>';
+    side = stockBox(p) + side;
 
     h += '<div class="grid"><div class="card">' + table + '</div><div class="side">' + side + "</div></div>";
+    el("detail").innerHTML = h;
+    el("detail").scrollTop = 0;
+  }
+
+  // ---------- compare ----------
+  function compared() {
+    return state.compare.map(function (id) { return products.filter(function (p) { return p.id === id; })[0]; }).filter(Boolean);
+  }
+  function toggleCompare(p) {
+    var i = state.compare.indexOf(p.id);
+    if (i !== -1) state.compare.splice(i, 1);
+    else if (state.compare.length >= COMPARE_MAX) { toast("Compare holds " + COMPARE_MAX + " products: remove one first"); return; }
+    else state.compare.push(p.id);
+    remember();
+    if (state.view === "compare" && !compared().length) state.view = "detail";
+    renderDetail();
+  }
+  // The bar under the filters: the products picked to compare, with Compare / Back.
+  function renderTray() {
+    var list = compared();
+    el("tray").hidden = !list.length;
+    if (!list.length) { el("tray").innerHTML = ""; return; }
+    el("tray").innerHTML = '<i class="bi bi-layout-three-columns"></i> Compare'
+      + list.map(function (p) { return '<span class="chip" title="' + esc(p.code) + '"><span>' + esc(p.model) + (p.partNumber ? " · " + esc(p.partNumber) : "") + '</span><button type="button" data-uncompare="' + esc(p.id) + '" aria-label="Remove ' + esc(p.model) + ' from compare">✕</button></span>'; }).join("")
+      + '<span class="spacer"></span>'
+      + (state.view === "compare"
+        ? '<button type="button" class="btn light" data-tray="back"><i class="bi bi-arrow-left"></i> Back to the product</button>'
+        : '<button type="button" class="btn" data-tray="open"' + (list.length < 2 ? ' disabled title="Pick one more product to compare"' : "") + '><i class="bi bi-layout-three-columns"></i> Compare ' + list.length + "</button>")
+      + '<button type="button" class="btn light" data-tray="clear">Clear</button>';
+  }
+  function comparePromoOf(p) {
+    var i = state.comparePromo[p.id] || 0;
+    return p.promos[i] || p.promos[0];
+  }
+  function renderCompare() {
+    var list = compared();
+    var cols = list.map(function (p) {
+      var promo = comparePromoOf(p), sets = setsFor(p, promo), setKey = defaultSet(sets);
+      var set = sets.filter(function (s) { return s.key === setKey; })[0] || { prices: {} };
+      var noBundle = sets.filter(function (s) { return s.key === "noBundle"; })[0];
+      return { p: p, promo: promo, sets: sets, setKey: setKey, prices: set.prices, label: set.label, noBundle: noBundle && noBundle.key !== setKey ? noBundle : null };
+    });
+    // The lowest value in a row is marked (when two or more products have one).
+    function lowest(values) {
+      var nums = values.filter(function (v) { return v != null; });
+      return nums.length > 1 ? Math.min.apply(null, nums) : null;
+    }
+    function row(label, cells, cls) { return "<tr" + (cls ? ' class="' + cls + '"' : "") + '><td class="lbl">' + label + "</td>" + cells.join("") + "</tr>"; }
+    function priceRow(label, values, note) {
+      var low = lowest(values);
+      return row(esc(label), values.map(function (v, i) {
+        if (v == null) return '<td><span style="color:#cbd5e1">—</span></td>';
+        return '<td><span class="amt' + (low !== null && Math.abs(v - low) < 0.005 ? " win" : "") + '">' + peso(v) + "</span>" + (note ? note(v, i) : "") + "</td>";
+      }));
+    }
+    var h = '<div class="card compare"><table class="cmp"><thead><tr><th class="lbl">' + list.length + " products</th>" + cols.map(function (c) {
+      var p = c.p;
+      return "<th><span class=\"tag kind\">" + esc(p.kindLabel) + "</span><h3>" + esc(p.model) + '</h3><div class="code">' + (p.partNumber ? "<b>" + esc(p.partNumber) + "</b> · " : "") + esc(p.code) + "</div>"
+        + (p.promos.length > 1 ? '<div style="margin-top:6px"><select data-cmp-promo="' + esc(p.id) + '" aria-label="Promo">' + p.promos.map(function (x, i) { return '<option value="' + i + '"' + (x === c.promo ? " selected" : "") + ">" + esc(x.title) + (x.branches.length ? " · " + esc(x.branches.join(", ")) : "") + "</option>"; }).join("") + "</select></div>" : "")
+        + '<div class="acts"><button type="button" class="btn quote" data-cmp-quote="' + esc(p.id) + '"><i class="bi bi-file-earmark-plus"></i> Add to Quotation</button>'
+        + '<button type="button" class="btn light" data-cmp-open="' + esc(p.id) + '">Details</button>'
+        + '<button type="button" class="btn light" data-uncompare="' + esc(p.id) + '" aria-label="Remove from compare">✕</button></div></th>';
+    }).join("") + "</tr></thead><tbody>";
+    var span = '<td colspan="' + list.length + '"></td>';
+    h += row("Prices", [span], "sec");
+    h += priceRow("Cash" + (cols.some(function (c) { return c.sets.length > 1; }) ? " (with bundle)" : ""), cols.map(function (c) { return c.prices.cash != null ? c.prices.cash : null; }));
+    if (cols.some(function (c) { return c.noBundle; })) h += priceRow("Cash without bundle", cols.map(function (c) { return c.noBundle && c.noBundle.prices.cash != null ? c.noBundle.prices.cash : null; }));
+    TERMS.filter(function (t) { return t.key !== "cash" && cols.some(function (c) { return c.prices[t.key] != null; }); }).forEach(function (t) {
+      h += priceRow(t.label, cols.map(function (c) { return c.prices[t.key] != null ? c.prices[t.key] : null; }), function (v) {
+        return MONTHS[t.key] ? '<div class="mo">' + peso(v / MONTHS[t.key]) + "/mo</div>" : "";
+      });
+    });
+    h += priceRow("Lowest a month", cols.map(function (c) {
+      var low = null;
+      Object.keys(MONTHS).forEach(function (k) { if (c.prices[k] != null) { var m = c.prices[k] / MONTHS[k]; if (low === null || m < low) low = m; } });
+      return low;
+    }));
+    h += row("Promo", [span], "sec");
+    h += row("Promo", cols.map(function (c) { return "<td>" + esc(hasPromo(c.promo) ? c.promo.title : "No promo") + (c.promo.branches.length ? '<div class="mo">' + esc(c.promo.branches.join(", ")) + "</div>" : "") + "</td>"; }));
+    h += row("Dates", cols.map(function (c) {
+      var s = dateState(c.promo);
+      return "<td>" + (c.promo.start || c.promo.end ? esc(dayLabel(c.promo.start) || "—") + " → " + esc(dayLabel(c.promo.end) || "—") : '<span style="color:#cbd5e1">—</span>') + (s ? ' <span class="tag ' + s.cls + '">' + esc(s.text) + "</span>" : "") + "</td>";
+    }));
+    h += row("Freebies", cols.map(function (c) { return "<td>" + (c.promo.freebies.length ? esc(c.promo.freebies.join(", ")) : '<span style="color:#cbd5e1">—</span>') + "</td>"; }));
+    var worths = cols.map(function (c) { return c.promo.terms && c.promo.terms.bundleWorth > 0 ? c.promo.terms.bundleWorth : null; });
+    if (worths.some(function (w) { return w != null; })) {
+      var most = worths.filter(function (w) { return w != null; }).length > 1 ? Math.max.apply(null, worths.filter(function (w) { return w != null; })) : null;
+      h += row("Freebie worth", worths.map(function (w) { return w == null ? '<td><span style="color:#cbd5e1">—</span></td>' : '<td><span class="amt' + (most !== null && w === most ? " win" : "") + '">' + peso(w) + "</span></td>"; }));
+    }
+    if (cols.some(function (c) { return c.promo.vendor.length; })) h += row("Vendor freebies", cols.map(function (c) { return "<td>" + (c.promo.vendor.length ? esc(c.promo.vendor.map(function (v) { return v.text; }).join("; ")) : '<span style="color:#cbd5e1">—</span>') + "</td>"; }));
+    if (meta.hasStock && cols.some(function (c) { return c.p.kind === "laptop"; })) {
+      var home = meta.homeBranch && ["HO", "ALL", "ALL BRANCHES"].indexOf(meta.homeBranch) === -1 ? meta.homeBranch : "";
+      h += row("Stock" + (meta.stockAsOf ? ' <span style="text-transform:none;font-weight:600">as of ' + esc(dayLabel(meta.stockAsOf)) + "</span>" : ""), [span], "sec");
+      if (home) h += row(esc(home), cols.map(function (c) { var n = units(c.p, home); return "<td>" + (c.p.kind !== "laptop" ? "—" : '<b style="color:' + (n ? "var(--green)" : "var(--red)") + '">' + (n || "None") + "</b>") + "</td>"; }));
+      h += row("All branches", cols.map(function (c) { return "<td>" + (c.p.kind !== "laptop" ? "—" : totalUnits(c.p) + " unit" + (totalUnits(c.p) === 1 ? "" : "s")) + "</td>"; }));
+    }
+    var labels = [];
+    cols.forEach(function (c) { c.p.specs.forEach(function (s) { if (labels.indexOf(s[0]) === -1) labels.push(s[0]); }); });
+    if (labels.length) {
+      h += row("Specs", [span], "sec");
+      labels.forEach(function (label) {
+        h += row(esc(label), cols.map(function (c) { var s = c.p.specs.filter(function (x) { return x[0] === label; })[0]; return "<td>" + (s ? esc(s[1]) : '<span style="color:#cbd5e1">—</span>') + "</td>"; }));
+      });
+    }
+    // Staff only: hidden with Show incentives off (body.hide-staff .staff).
+    if (cols.some(function (c) { return c.promo.incentive; })) {
+      h += row('<i class="bi bi-lock-fill"></i> Incentive', cols.map(function (c) { return '<td class="staff" style="color:var(--violet);font-weight:800">' + esc(c.promo.incentive || "—") + "</td>"; }), "staff");
+    }
+    h += "</tbody></table></div>";
     el("detail").innerHTML = h;
     el("detail").scrollTop = 0;
   }
@@ -500,12 +682,62 @@
   el("search").addEventListener("blur", function () { setTimeout(closeResults, 120); });
   el("clearSearch").addEventListener("mousedown", function (e) { e.preventDefault(); });
   el("clearSearch").addEventListener("click", function () { el("search").value = ""; el("search").dispatchEvent(new Event("input")); el("search").focus(); });
+  function byId(id) { return products.filter(function (p) { return p.id === id; })[0] || null; }
+  // Add to Quotation with the promo on screen, with bundle (or the only price set), cash.
+  function quoteCurrent() {
+    var p = current();
+    if (!p || state.view !== "detail") return;
+    var promo = p.promos[state.promo] || p.promos[0];
+    quote(p, promo, defaultSet(setsFor(p, promo)), "cash");
+  }
   el("detail").addEventListener("click", function (e) {
     var chip = e.target.closest("[data-promo]");
     if (chip) { state.promo = Number(chip.getAttribute("data-promo")); renderDetail(); return; }
     if (e.target.closest("#prev")) { step(-1); return; }
     if (e.target.closest("#next")) { step(1); return; }
-    if (e.target.closest("#copy")) toParent({ channel: "saleskit-pricing-copy", text: copyText() });
+    if (e.target.closest("#copy")) { toParent({ channel: "saleskit-pricing-copy", text: copyText() }); return; }
+    if (e.target.closest("#quote")) { quoteCurrent(); return; }
+    if (e.target.closest("#compareToggle")) { var cp = current(); if (cp) toggleCompare(cp); return; }
+    // A price in the terms table: quoted at that term and price set.
+    var cell = e.target.closest("td.pick");
+    if (cell) {
+      var p = current();
+      if (p) quote(p, p.promos[state.promo] || p.promos[0], cell.getAttribute("data-set"), cell.getAttribute("data-term"));
+      return;
+    }
+    // Compare view
+    var b = e.target.closest("[data-cmp-quote],[data-cmp-open],[data-uncompare]");
+    if (!b) return;
+    var target = byId(b.getAttribute("data-cmp-quote") || b.getAttribute("data-cmp-open") || b.getAttribute("data-uncompare"));
+    if (!target) return;
+    if (b.hasAttribute("data-uncompare")) { toggleCompare(target); return; }
+    if (b.hasAttribute("data-cmp-quote")) {
+      var promo = comparePromoOf(target);
+      quote(target, promo, defaultSet(setsFor(target, promo)), "cash");
+      return;
+    }
+    // Details: that product's own view (its group and the promo picked here).
+    state.kind = target.kind; state.category = ""; state.query = ""; el("search").value = ""; el("searchBox").classList.remove("has-text");
+    state.selected = target.id; state.promo = Math.max(0, target.promos.indexOf(comparePromoOf(target))); state.view = "detail";
+    lastPicked[state.kind] = target.id; remember();
+    renderKinds(); renderList(); renderDetail();
+  });
+  el("detail").addEventListener("change", function (e) {
+    var select = e.target.closest("[data-cmp-promo]");
+    if (!select) return;
+    state.comparePromo[select.getAttribute("data-cmp-promo")] = Number(select.value);
+    renderCompare();
+  });
+  el("tray").addEventListener("click", function (e) {
+    var un = e.target.closest("[data-uncompare]");
+    if (un) { var p = byId(un.getAttribute("data-uncompare")); if (p) toggleCompare(p); return; }
+    var b = e.target.closest("[data-tray]");
+    if (!b || b.disabled) return;
+    var what = b.getAttribute("data-tray");
+    if (what === "open") state.view = "compare";
+    else if (what === "back") state.view = "detail";
+    else if (what === "clear") { state.compare = []; state.view = "detail"; remember(); }
+    renderDetail();
   });
   // Left / right arrows step through the products (not while typing or in a dropdown).
   document.addEventListener("keydown", function (e) {
@@ -516,6 +748,7 @@
     if (!ctrl || e.altKey) return;
     if (!e.shiftKey && /^Digit[1-9]$/.test(e.code)) { e.preventDefault(); toParent({ channel: "saleskit-pricing-hotkey", keys: { ctrl: true, shift: false, alt: false, code: e.code } }); }
     else if (e.shiftKey && e.code === "KeyL") { e.preventDefault(); el("search").focus(); el("search").select(); }
+    else if (!e.shiftKey && e.code === "KeyQ") { e.preventDefault(); quoteCurrent(); }
     else if (!e.shiftKey && e.code === "KeyC" && !window.getSelection().toString() && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); toParent({ channel: "saleskit-pricing-copy", text: copyText() }); }
   });
 
@@ -525,6 +758,7 @@
     var m = event.data;
     if (m.channel === "saleskit-pricing-data") {
       products = Array.isArray(m.products) ? m.products : [];
+      meta = { hasStock: Boolean(m.hasStock), stockAsOf: m.stockAsOf || "", homeBranch: m.homeBranch || "" };
       render();
     } else if (m.channel === "saleskit-pricing-status") {
       toast(m.message || "");

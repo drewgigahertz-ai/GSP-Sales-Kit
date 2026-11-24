@@ -77,7 +77,45 @@
     .head img.logo { height: 80px; max-width: 360px; object-fit: contain; }
     .head .addr { margin-top: 6px; font-weight: 700; font-size: 11px; white-space: pre-line; }
     .head .ids { font-weight: 700; font-size: 11px; margin-top: 2px; }
-    .meta { margin-top: 26px; display: grid; grid-template-columns: 120px 1fr 60px 170px; row-gap: 6px; align-items: center; }
+    .meta { margin-top: 26px; display: grid; grid-template-columns: 120px 1fr 96px 170px; row-gap: 6px; align-items: center; }
+    .meta .lbl { white-space: nowrap; }
+    .meta .side-val input { font-weight: 700; font-size: 12px; text-align: right; }
+    /* Under a line (screen only): branch stock and a price that changed in the price matrix since it was added. */
+    .line-note { margin-top: 6px; font-size: 9.5px; font-weight: 700; line-height: 1.3; border-radius: 6px; padding: 2px 5px; display: inline-block; }
+    .line-note.in { background: #dcfce7; color: #166534; }
+    .line-note.out { background: #fee2e2; color: #b91c1c; }
+    .line-note.warn { background: #fef3c7; color: #92400e; display: block; text-align: left; }
+    .line-note.warn button { margin-top: 3px; border: 0; border-radius: 5px; background: #92400e; color: #fff; font: 700 9.5px inherit; font-family: inherit; padding: 2px 7px; cursor: pointer; }
+    body.capturing #sheet .line-note { display: inline-block !important; visibility: hidden; }
+    body.capturing #sheet .line-note.warn { display: block !important; }
+    @media print { #sheet .line-note { display: inline-block !important; visibility: hidden; } #sheet .line-note.warn { display: block !important; } }
+    /* The amount a month for an installment term (printed). */
+    table.q .monthly { margin-top: 2px; font-weight: 700; }
+    /* A line added from another tab blinks once. */
+    @keyframes justAdded { from { background: #dbeafe; } to { background: transparent; } }
+    table.q tr.just-added td { animation: justAdded 1.6s ease-out; }
+    /* Never in the PDF (html2canvas's copy would start the blink over) or print. */
+    body.capturing table.q tr.just-added td { animation: none; background: transparent; }
+    @media print { table.q tr.just-added td { animation: none; background: transparent; } }
+    /* Saved quotations (History): a panel under the toolbar. */
+    .hist-wrap { position: relative; }
+    #history { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: 540px; max-height: 70vh; display: none; flex-direction: column; background: #fff; border: 1px solid #cbd5e1; border-radius: 12px; box-shadow: 0 18px 40px rgba(15, 23, 42, .18); }
+    #history.open { display: flex; }
+    #history .h-top { display: flex; gap: 8px; align-items: center; padding: 10px; border-bottom: 1px solid #eef2f7; }
+    #history .h-top input { flex: 1; font: 500 12.5px inherit; font-family: inherit; padding: 7px 9px; border: 1px solid #cbd5e1; border-radius: 8px; }
+    #history .h-top small { color: var(--muted); font-size: 11px; white-space: nowrap; }
+    #history .h-list { overflow: auto; padding: 6px; }
+    #history .h-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 8px 10px; border-radius: 9px; border-bottom: 1px solid #f1f5f9; }
+    #history .h-row:hover { background: #f5f8ff; }
+    #history .h-row.current { background: #eef3ff; }
+    #history .h-main b { color: var(--bar); font-size: 12.5px; }
+    #history .h-main small { display: block; color: var(--muted); font-size: 11px; }
+    #history .h-amt { text-align: right; font-weight: 800; font-size: 12.5px; white-space: nowrap; }
+    #history .h-acts { grid-column: 1 / -1; display: flex; gap: 6px; }
+    #history .h-acts button { border: 1px solid #cbd5e1; background: #fff; border-radius: 6px; padding: 2px 9px; font: 700 11px inherit; font-family: inherit; cursor: pointer; color: #1e293b; }
+    #history .h-acts button:hover { border-color: var(--bar); color: var(--bar); }
+    #history .h-acts button.del { margin-left: auto; color: #b91c1c; }
+    #history .h-empty { padding: 18px; text-align: center; color: var(--muted); font-size: 12.5px; }
     .meta .lbl { color: #333; }
     .meta .date { text-align: right; }
     input.plain, textarea.plain { border: 0; border-bottom: 1px dashed transparent; background: transparent; font: inherit; color: inherit; padding: 1px 2px; width: 100%; outline: none; }
@@ -244,6 +282,13 @@
     <div id="results" role="listbox"></div>
   </div>
   <button id="newQuote" type="button" class="btn light" title="Start a new quotation"><i class="bi bi-file-earmark-plus"></i> New</button>
+  <span class="hist-wrap">
+    <button id="historyBtn" type="button" class="btn light" title="Quotations saved on this laptop (kept when you download or print one)" aria-expanded="false" aria-controls="history"><i class="bi bi-clock-history"></i> History</button>
+    <div id="history" role="dialog" aria-label="Saved quotations">
+      <div class="h-top"><input id="historySearch" type="search" placeholder="Search customer, quotation no., branch or model" autocomplete="off" spellcheck="false" aria-label="Search saved quotations"><small id="historyCount"></small></div>
+      <div class="h-list" id="historyList"></div>
+    </div>
+  </span>
   <button id="download" type="button" class="btn" title="Save as PDF (Ctrl+D)"><i class="bi bi-download"></i> Download PDF</button>
   <button id="print" type="button" class="btn" title="Print (Ctrl+P)"><i class="bi bi-printer"></i> Print</button>
   <span id="status"></span>
@@ -304,8 +349,10 @@
     <div class="meta">
       <div></div><div></div>
       <div class="lbl">Date:</div><div class="date"><input id="date" class="plain" aria-label="Date"></div>
-      <div class="lbl">Customer Name:</div><div class="strong"><input id="customer" class="plain" placeholder="Customer name" aria-label="Customer name"></div><div></div><div></div>
-      <div class="lbl">Contact No.:</div><div class="strong"><input id="contact" class="plain" placeholder="Contact number" aria-label="Contact number"></div><div></div><div></div>
+      <div class="lbl">Customer Name:</div><div class="strong"><input id="customer" class="plain" placeholder="Customer name" aria-label="Customer name"></div>
+      <div class="lbl">Quotation No.:</div><div class="side-val"><input id="number" class="plain" aria-label="Quotation number"></div>
+      <div class="lbl">Contact No.:</div><div class="strong"><input id="contact" class="plain" placeholder="Contact number" aria-label="Contact number"></div>
+      <div class="lbl">Valid until:</div><div class="side-val"><input id="valid" class="plain" aria-label="Valid until" title="7 days from today, or the earliest promo end on this quotation if sooner. Type another date to change it."></div>
     </div>
 
     <p class="intro">Please see the quotation below.</p>
@@ -377,10 +424,56 @@
   var byCode = {};
   var picks = { exceed: "", meet: "", budget: "" };
   var recoName = "";
-  var draft = loadDraft() || { branch: "", date: today(), customer: "", customerTyped: false, contact: "", lines: [] };
+  var draft = loadDraft() || blankDraft("");
 
   function loadDraft() { try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || "null"); } catch (e) { return null; } }
   function saveDraft() { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch (e) { /* not saved */ } }
+  // number: given once the branch is known (assignNumber); valid / validTyped: "Valid until", worked out until typed.
+  function blankDraft(branchCode) {
+    return { branch: branchCode, date: today(), customer: "", customerTyped: false, contact: "", lines: [], number: "", valid: "", validTyped: false };
+  }
+
+  // ---------- quotation number: BRANCH-YYMMDD-NN, counted per day on this laptop ----------
+  var SEQ_KEY = "saleskit.quotation.seq";
+  function newNumber() {
+    var d = new Date();
+    var ymd = String(d.getFullYear()).slice(-2) + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0");
+    var seq = {};
+    try { seq = JSON.parse(localStorage.getItem(SEQ_KEY) || "{}") || {}; } catch (e) { seq = {}; }
+    // Numbers already in History for today count too (a cleared counter never gives the same number twice).
+    var prefix = (branch().replace(/[^A-Z0-9]/g, "") || "GHZ") + "-" + ymd + "-";
+    var n = Math.max(seq[ymd] || 0, savedQuotes.reduce(function (max, h) {
+      var m = String(h.number || "").indexOf(prefix) === 0 ? parseInt(String(h.number).slice(prefix.length), 10) : 0;
+      return m > max ? m : max;
+    }, 0)) + 1;
+    var next = {}; next[ymd] = n;
+    try { localStorage.setItem(SEQ_KEY, JSON.stringify(next)); } catch (e) { /* counted in memory only */ }
+    return prefix + String(n).padStart(2, "0");
+  }
+  function assignNumber() {
+    if (draft.number || !branch()) return;
+    draft.number = newNumber();
+    saveDraft();
+  }
+
+  // ---------- valid until: 7 days, or the earliest promo end on the quotation if sooner ----------
+  var VALID_DAYS = 7;
+  function dayOf(iso) { var m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
+  function longDate(d) { return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }); }
+  function autoValid() {
+    var start = new Date(); start.setHours(0, 0, 0, 0);
+    var until = new Date(start); until.setDate(until.getDate() + VALID_DAYS);
+    draft.lines.forEach(function (line) {
+      var product = byCode[key(line.code)];
+      var p = product && linePromo(line, product), end = p && dayOf(p.end);
+      if (end && end >= start && end < until) until = end;
+    });
+    return longDate(until);
+  }
+  function renderValid() {
+    if (!draft.validTyped) draft.valid = autoValid();
+    if (document.activeElement !== el("valid")) el("valid").value = draft.valid || "";
+  }
 
   // ---------- pictures (saved on this laptop by the app, so they show offline and in the PDF) ----------
   var imageWaiters = {}, imageSeq = 0, imageCache = {};
@@ -682,17 +775,89 @@
       }).join(""))
       + "</div>";
   }
-  function addLine(code) {
+  // Adds a product: the branch's promo (else the regular one), with bundle, cash (the price the Banner shows), unless
+  // opts names a promo title, bundle ('with' / 'no') or term (from "Add to Quotation" on another tab). The same
+  // product with the same promo, bundle and term already on the quotation gets one more instead of a second line.
+  // Returns { line, merged, promoFound } or null when the product is not in the price list.
+  function addLine(code, opts) {
+    opts = opts || {};
     var laptop = byCode[key(code)];
-    if (!laptop) return;
-    // The branch's promo (else the regular one), with bundle, cash: the price the Banner shows.
+    if (!laptop) return null;
     var bundle = isLaptop(laptop) ? "with" : laptop.kind === "attachment" ? (hasLaptopLine() ? "with" : "no") : "no";
-    var p = defaultPromo(laptop), price = termPrice(p, bundle, "cash");
-    draft.lines.push({ code: laptop.code, price: price != null ? price : priceFor(laptop), qty: 1,
-      freebie: !isLaptop(laptop) ? "" : p ? bundleFreebie(p, "with") : freebieFor(laptop),
-      promo: p ? promoId(p) : "", bundle: bundle, term: "cash" });
+    if (opts.bundle === "with" || opts.bundle === "no") bundle = opts.bundle;
+    if (!isLaptop(laptop) && laptop.kind !== "attachment") bundle = "no";
+    var p = defaultPromo(laptop), promoFound = true;
+    if (opts.promo && !/^no promo$/i.test(opts.promo)) {
+      var wanted = promosFor(laptop).filter(function (x) { return key(x.title) === key(opts.promo); })[0];
+      if (wanted) p = wanted; else promoFound = false;
+    }
+    var term = opts.term || "cash", price = termPrice(p, bundle, term);
+    if (price == null && term !== "cash") { term = "cash"; price = termPrice(p, bundle, "cash"); }
+    if (price == null) price = priceFor(laptop);
+    var promo = p ? promoId(p) : "";
+    var same = draft.lines.filter(function (l) {
+      return key(l.code) === key(laptop.code) && (l.promo || "") === promo && (l.bundle === "no" ? "no" : "with") === (bundle === "no" ? "no" : "with") && (l.term || "cash") === term;
+    })[0];
+    if (same) {
+      same.qty = (Number(same.qty) || 0) + 1;
+      saveDraft();
+      renderLines();
+      return { line: same, merged: true, promoFound: promoFound };
+    }
+    var line = { code: laptop.code, price: price, sheetPrice: price, qty: 1,
+      freebie: !isLaptop(laptop) ? "" : p ? bundleFreebie(p, bundle) : freebieFor(laptop),
+      promo: promo, bundle: bundle, term: term };
+    draft.lines.push(line);
     saveDraft();
     renderLines();
+    return { line: line, merged: false, promoFound: promoFound };
+  }
+
+  // ---------- branch stock (inventory CSV, else LAPTOP DB) ----------
+  function stockAt(product) {
+    return data.hasStock && product && product.stock ? (Number(product.stock[branch()]) || 0) : null;
+  }
+  // Laptops only: the server has no stock counts for desktops, mobiles and accessories.
+  function stockNote(product) {
+    if (!data.hasStock || !isLaptop(product)) return "";
+    var units = stockAt(product), title = data.stockAsOf ? ' title="Stock as of ' + esc(longDate(dayOf(data.stockAsOf) || new Date())) + '"' : "";
+    return units > 0
+      ? '<div class="line-note in no-print"' + title + '>' + units + " in stock at " + esc(branch()) + "</div>"
+      : '<div class="line-note out no-print"' + title + ">No stock at " + esc(branch()) + "</div>";
+  }
+
+  // ---------- prices that changed in the price matrix since the line was added ----------
+  // A line keeps the sheet's price from when it was added or its promo, bundle or term was picked (sheetPrice), so a
+  // later change in the price matrix shows on screen with a button to use the new price. A price typed by hand
+  // stays as typed.
+  function sheetNow(line, product) {
+    var p = linePromo(line, product);
+    return { promo: p, price: termPrice(p, line.bundle === "no" ? "no" : "with", line.term || "cash") };
+  }
+  function changeNote(line, product, i) {
+    if (!data.laptops.length) return "";
+    if (!product) return '<div class="line-note warn no-print">No longer in the price list: check before giving this quotation.</div>';
+    var now = sheetNow(line, product), notes = [];
+    if (line.promo && now.promo && promoId(now.promo) !== line.promo) {
+      notes.push("Promo “" + esc(line.promo.split("|")[0]) + "” is no longer in the price list for " + esc(branch()) + ".");
+    }
+    if (now.price != null && line.sheetPrice != null && Math.abs(now.price - line.sheetPrice) > 0.005) {
+      notes.push("Price list is now PHP " + money(now.price) + " (was " + money(line.sheetPrice) + ").");
+    }
+    if (!notes.length) return "";
+    return '<div class="line-note warn no-print">' + notes.join(" ") + (now.price != null ? '<br><button type="button" data-refresh="' + i + '">Use the price list’s</button>' : "") + "</div>";
+  }
+  // Lines saved before sheetPrice existed take today's sheet price as their starting point.
+  function baselinePrices() {
+    var changed = false;
+    draft.lines.forEach(function (line) {
+      var product = byCode[key(line.code)];
+      if (line.sheetPrice != null || !product) return;
+      var now = sheetNow(line, product).price;
+      line.sheetPrice = now != null ? now : toNumber(line.price);
+      changed = true;
+    });
+    if (changed) saveDraft();
   }
 
   function renderLines() {
@@ -707,10 +872,12 @@
       var laptop = byCode[key(line.code)] || { model: line.code, partNumber: "", specs: {} };
       var specs = specLines(laptop);
       var deal = lineDeal(line), total = deal.net * (Number(line.qty) || 0);
-      return '<tr class="line-tools" data-i="' + i + '">'
+      var product = byCode[key(line.code)];
+      var perMonth = window.QuotationTerms && QuotationTerms.monthly ? QuotationTerms.monthly(line.term, deal.net) : null;
+      return '<tr class="line-tools' + (i === justAdded ? " just-added" : "") + '" data-i="' + i + '">'
         + '<td class="model" style="position:relative"><button class="rm no-print" data-rm="' + i + '" title="Remove this laptop" aria-label="Remove">&times;</button>'
-        + esc(laptop.model) + (laptop.partNumber ? "<br>(" + esc(laptop.partNumber) + ")" : "") + "</td>"
-        + '<td class="specs"><ul>' + (specs.length ? specs.map(function (s) { return "<li>" + esc(s) + "</li>"; }).join("") : "<li>" + esc(line.code) + "</li>") + "</ul></td>"
+        + esc(laptop.model) + (laptop.partNumber ? "<br>(" + esc(laptop.partNumber) + ")" : "") + stockNote(product) + "</td>"
+        + '<td class="specs"><ul>' + (specs.length ? specs.map(function (s) { return "<li>" + esc(s) + "</li>"; }).join("") : "<li>" + esc(line.code) + "</li>") + "</ul>" + changeNote(line, product, i) + "</td>"
         + '<td class="deal" colspan="3"><div class="deal-row">'
         + '<div class="price-cell' + (deal.off ? " has-disc" : "") + '" data-cell="' + i + '">'
         + '<span class="pc-lbl first only-disc">Regular price</span>'
@@ -723,11 +890,16 @@
         + '<span class="disc-wrap no-print"><span class="disc-field"><label for="disc' + i + '">Discount</label><span class="disc-input"><input id="disc' + i + '" class="disc" data-k="discount" data-i="' + i + '" value="' + esc(line.discount || "") + '" placeholder="0" title="Discount on this laptop: type 2000 for ₱2,000 off, or 5% for five percent off"><button type="button" class="disc-clear" data-clear="' + i + '" title="Remove the discount" aria-label="Remove the discount">✕</button></span></span><span class="disc-hint">2000 or 5%</span></span></div>'
         + '<input class="plain" data-k="qty" data-i="' + i + '" value="' + esc(line.qty) + '" inputmode="numeric" aria-label="Quantity">'
         + '<span class="total" data-total="' + i + '">' + money(total) + "</span></div>"
-        + '<div class="terms">Exclusive price for:' + lineOptions(line, laptop, i) + esc((window.QuotationTerms ? QuotationTerms.get(line.term) : { text: "Cash on Hand, Bank Transfer or Check Payment only." }).text) + "</div></td></tr>"
+        + '<div class="terms">Exclusive price for:' + lineOptions(line, laptop, i) + esc((window.QuotationTerms ? QuotationTerms.get(line.term) : { text: "Cash on Hand, Bank Transfer or Check Payment only." }).text)
+        + (perMonth ? '<div class="monthly" data-monthly="' + i + '">' + monthlyText(line, perMonth) + "</div>" : "") + "</div></td></tr>"
         + '<tr class="free"><td class="lbl">Bundle/worth of freebie:</td><td colspan="4"><input class="plain" data-k="freebie" data-i="' + i + '" value="' + esc(line.freebie) + '" placeholder="None" aria-label="Freebie"></td></tr>';
     // (the freebie spans the rest of the row)
     }).join("");
     renderTotal();
+  }
+  // "PHP 4,166.58 a month for 12 months (per unit)".
+  function monthlyText(line, perMonth) {
+    return "PHP " + money(perMonth) + " a month for " + QuotationTerms.months[line.term] + " months" + ((Number(line.qty) || 0) > 1 ? " (per unit)" : "");
   }
   // A laptop's price after its own discount: { off, net, label } (quotation-discount.js).
   function lineDeal(line) {
@@ -752,6 +924,9 @@
     }
     var cell = document.querySelector('[data-total="' + i + '"]');
     if (cell) cell.textContent = money(deal.net * (Number(line.qty) || 0));
+    var monthly = document.querySelector('[data-monthly="' + i + '"]');
+    var perMonth = window.QuotationTerms && QuotationTerms.monthly ? QuotationTerms.monthly(line.term, deal.net) : null;
+    if (monthly && perMonth) monthly.textContent = monthlyText(line, perMonth);
   }
   function renderTotal() {
     var sum = draft.lines.reduce(function (s, l) { return s + lineDeal(l).net * (Number(l.qty) || 0); }, 0);
@@ -763,6 +938,7 @@
     el("lessAmt").textContent = "-" + money(all.off);
     if (document.activeElement !== el("allDiscount")) el("allDiscount").value = draft.discount || "";
     el("grand").textContent = money(all.net);
+    renderValid();
     showPages();
     el("download").disabled = !draft.lines.length;
     el("print").disabled = !draft.lines.length;
@@ -798,7 +974,7 @@
     line.term = line.term || "cash";
     var price = termPrice(p, line.bundle, line.term);
     if (price == null) { line.term = "cash"; price = termPrice(p, line.bundle, "cash"); }
-    if (price != null) line.price = price;
+    if (price != null) line.price = line.sheetPrice = price;
     if (!isLaptop(laptop) && laptop.kind !== "attachment") line.bundle = "no";
     if (k !== "term" && isLaptop(laptop)) line.freebie = bundleFreebie(p, line.bundle);
     saveDraft();
@@ -827,6 +1003,20 @@
       saveDraft(); updateLine(Number(ci)); renderTotal();
       return;
     }
+    // "Use the price list's": the line takes the price matrix's current price (and promo) again.
+    var refresh = e.target.closest("[data-refresh]");
+    if (refresh) {
+      var rl = draft.lines[refresh.getAttribute("data-refresh")], rp = rl && byCode[key(rl.code)];
+      if (!rp) return;
+      var now = sheetNow(rl, rp);
+      rl.promo = now.promo ? promoId(now.promo) : "";
+      if (now.price != null) rl.price = rl.sheetPrice = now.price;
+      if (isLaptop(rp)) rl.freebie = bundleFreebie(now.promo, rl.bundle);
+      saveDraft();
+      renderLines();
+      el("status").textContent = "Price updated from the price list";
+      return;
+    }
     var b = e.target.closest("[data-rm]");
     if (!b) return;
     draft.lines.splice(Number(b.getAttribute("data-rm")), 1);
@@ -846,17 +1036,22 @@
   });
 
   // ---------- customer, date, contact ----------
-  ["date", "customer", "contact"].forEach(function (id) {
+  ["date", "customer", "contact", "number", "valid"].forEach(function (id) {
     el(id).addEventListener("input", function () {
       draft[id] = el(id).value;
       if (id === "customer") draft.customerTyped = true;
+      // A typed date stays; an emptied box goes back to the worked-out date.
+      if (id === "valid") draft.validTyped = Boolean(el(id).value.trim());
       saveDraft();
     });
   });
+  el("valid").addEventListener("change", function () { renderValid(); saveDraft(); });
   function renderMeta() {
     el("date").value = draft.date || today();
     el("customer").value = draft.customerTyped ? draft.customer : (recoName || draft.customer || "");
     el("contact").value = draft.contact || "";
+    el("number").value = draft.number || "";
+    renderValid();
   }
 
   // ---------- search ----------
@@ -901,9 +1096,10 @@
     found = found.slice(0, words.length ? 40 : 400);
     active = 0;
     el("results").innerHTML = found.length ? found.map(function (l, i) {
-      var p = priceFor(l);
+      var p = priceFor(l), units = isLaptop(l) ? stockAt(l) : null;
       return '<button type="button" data-pick="' + i + '"' + (i === 0 ? ' class="active"' : "") + '><span class="kind-tag' + (l.kind ? "" : " laptop") + '">' + esc(l.kindLabel || "Laptop") + "</span><b>" + esc(l.model) + "</b> " + esc(l.partNumber)
-        + (p ? " · PHP " + money(p) : "") + "<small>" + esc(l.code) + "</small></button>";
+        + (p ? " · PHP " + money(p) : "") + (units === null ? "" : units > 0 ? ' · <span style="color:#166534">' + units + " in stock</span>" : ' · <span style="color:#b91c1c">no stock</span>')
+        + "<small>" + esc(l.code) + "</small></button>";
     }).join("") + (total > found.length ? '<div class="none">Showing ' + found.length + " of " + total + ": type to narrow it down.</div>" : "")
       : '<div class="none">Nothing matches. Try a model, part number or category (e.g. mouse, monitor).</div>';
     el("results").classList.add("open");
@@ -947,6 +1143,116 @@
     if (b) addLine(picks[b.getAttribute("data-tier")]);
   });
 
+  // ---------- History: quotations saved on this laptop ----------
+  // A quotation is kept when it is downloaded or printed (again under the same number: the newer one replaces it).
+  // Open brings one back to change or send again; Copy as new starts a new quotation from it (new number, today's
+  // date). Up to HISTORY_MAX are kept, newest first.
+  var HISTORY_KEY = "saleskit.quotation.history", HISTORY_MAX = 300;
+  function loadHistory() { try { var list = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); return Array.isArray(list) ? list : []; } catch (e) { return []; } }
+  var savedQuotes = loadHistory();
+  function storeHistory() {
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(savedQuotes)); return true; } catch (e) {
+      // Full: the oldest go until it fits.
+      while (savedQuotes.length > 20) {
+        savedQuotes.splice(Math.floor(savedQuotes.length * 0.8));
+        try { localStorage.setItem(HISTORY_KEY, JSON.stringify(savedQuotes)); return true; } catch (e2) { /* still full */ }
+      }
+      return false;
+    }
+  }
+  function grandTotal() {
+    var sum = draft.lines.reduce(function (s, l) { return s + lineDeal(l).net * (Number(l.qty) || 0); }, 0);
+    return window.QuotationDiscount ? QuotationDiscount.apply(sum, draft.discount).net : sum;
+  }
+  function snapshot() { return JSON.parse(JSON.stringify(draft)); }
+  // The quotation on screen is in History exactly as it is now.
+  function isSaved() {
+    var h = savedQuotes.filter(function (q) { return q.number && q.number === draft.number; })[0];
+    return Boolean(h) && JSON.stringify(h.draft) === JSON.stringify(draft);
+  }
+  function recordHistory() {
+    if (!draft.lines.length) return;
+    assignNumber();
+    // The name shown (typed, or the Reco Table's) is the one kept.
+    draft.customer = el("customer").value || "";
+    saveDraft();
+    var entry = {
+      number: draft.number, customer: el("customer").value || "", contact: draft.contact || "", branch: branch(),
+      date: draft.date || el("date").value, total: grandTotal(), savedAt: new Date().toISOString(),
+      models: draft.lines.map(function (l) { var p = byCode[key(l.code)]; return p ? p.model : l.code; })
+        .filter(function (m, i, all) { return all.indexOf(m) === i; }),
+      draft: snapshot()
+    };
+    savedQuotes =[entry].concat(savedQuotes.filter(function (q) { return q.number !== entry.number; })).slice(0, HISTORY_MAX);
+    storeHistory();
+    renderHistory();
+  }
+  function renderHistory() {
+    var words = el("historySearch").value.toLowerCase().split(/\s+/).filter(Boolean);
+    var list = savedQuotes.filter(function (q) {
+      var hay = [q.number, q.customer, q.contact, q.branch, q.date].concat(q.models || []).join(" ").toLowerCase();
+      return words.every(function (w) { return hay.indexOf(w) !== -1; });
+    });
+    el("historyCount").textContent = savedQuotes.length ? list.length + " of " + savedQuotes.length : "";
+    el("historyList").innerHTML = list.length ? list.map(function (q) {
+      var i = savedQuotes.indexOf(q);
+      var models = q.models || [];
+      return '<div class="h-row' + (q.number === draft.number ? " current" : "") + '">'
+        + '<div class="h-main"><b>' + esc(q.customer || "No customer name") + "</b> · " + esc(q.number || "")
+        + "<small>" + esc(q.date || "") + " · " + esc(q.branch || "") + " · " + esc(models.slice(0, 2).join(", ") + (models.length > 2 ? " +" + (models.length - 2) + " more" : "")) + "</small></div>"
+        + '<div class="h-amt">PHP ' + money(q.total) + "</div>"
+        + '<div class="h-acts"><button type="button" data-h-open="' + i + '"><i class="bi bi-box-arrow-up-right"></i> Open</button>'
+        + '<button type="button" data-h-copy="' + i + '"><i class="bi bi-files"></i> Copy as new</button>'
+        + '<button type="button" class="del" data-h-del="' + i + '" title="Remove from History">✕</button></div></div>';
+    }).join("") : '<div class="h-empty">' + (savedQuotes.length ? "Nothing matches." : "No saved quotations yet. A quotation is kept here when you download or print it.") + "</div>";
+  }
+  function toggleHistory(open) {
+    var show = open === undefined ? !el("history").classList.contains("open") : open;
+    el("history").classList.toggle("open", show);
+    el("historyBtn").setAttribute("aria-expanded", String(show));
+    if (show) { renderHistory(); el("historySearch").focus(); }
+  }
+  // Puts a saved quotation on screen (as it was, or as a new one with a new number and today's date).
+  function openSaved(q, asNew) {
+    if (draft.lines.length && !isSaved() && !confirm("Replace the quotation on screen? It is not in History yet (it is kept there when you download or print it).")) return;
+    var next = JSON.parse(JSON.stringify(q.draft || {}));
+    next.lines = next.lines || [];
+    if (asNew) { next.number = ""; next.date = today(); next.valid = ""; next.validTyped = false; }
+    // Its branch when this laptop may use it, else the current one.
+    if (data.lockBranch || (data.branches.length && data.branches.indexOf(key(next.branch)) === -1)) next.branch = draft.branch;
+    next.customerTyped = true;
+    draft = next;
+    assignNumber();
+    saveDraft();
+    fillBranches();
+    renderHeader();
+    renderMeta();
+    renderLines();
+    toggleHistory(false);
+    el("status").textContent = asNew ? "Copied as " + draft.number + ": check the prices" : "Opened " + (draft.number || "the quotation");
+  }
+  el("historyBtn").addEventListener("click", function () { toggleHistory(); });
+  el("historySearch").addEventListener("input", renderHistory);
+  el("historyList").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    var i = Number(b.getAttribute("data-h-open") || b.getAttribute("data-h-copy") || b.getAttribute("data-h-del"));
+    var q = savedQuotes[i];
+    if (!q) return;
+    if (b.hasAttribute("data-h-del")) {
+      if (!confirm("Remove " + (q.number || "this quotation") + (q.customer ? " for " + q.customer : "") + " from History on this laptop?")) return;
+      savedQuotes.splice(i, 1);
+      storeHistory();
+      renderHistory();
+      return;
+    }
+    openSaved(q, b.hasAttribute("data-h-copy"));
+  });
+  document.addEventListener("mousedown", function (e) {
+    if (el("history").classList.contains("open") && !e.target.closest(".hist-wrap")) toggleHistory(false);
+  });
+  el("history").addEventListener("keydown", function (e) { if (e.key === "Escape") { toggleHistory(false); el("historyBtn").focus(); } });
+
   // ---------- toolbar ----------
   el("branch").addEventListener("change", function () {
     // Unsaved branch details are dropped when another branch is chosen (after asking).
@@ -956,10 +1262,19 @@
     }
     dirty = false;
     draft.branch = el("branch").value;
-    // Prices and freebies follow the branch (an edited price is replaced too).
+    // A number not given out yet (not in History) follows the branch.
+    if (!savedQuotes.some(function (q) { return q.number === draft.number; })) { draft.number = ""; assignNumber(); el("number").value = draft.number; }
+    // Prices and freebies follow the branch (an edited price is replaced too): the same promo, bundle and term when
+    // the branch has them, else the branch's own promo and cash.
     draft.lines.forEach(function (line) {
       var laptop = byCode[key(line.code)];
-      if (laptop) { line.price = priceFor(laptop); line.freebie = freebieFor(laptop); }
+      if (!laptop) return;
+      var p = linePromo(line, laptop), bundle = line.bundle === "no" ? "no" : "with";
+      var price = termPrice(p, bundle, line.term || "cash");
+      if (price == null) { line.term = "cash"; price = termPrice(p, bundle, "cash"); }
+      line.promo = p ? promoId(p) : "";
+      line.price = line.sheetPrice = price != null ? price : priceFor(laptop);
+      line.freebie = !isLaptop(laptop) ? "" : p ? bundleFreebie(p, bundle) : freebieFor(laptop);
     });
     saveDraft();
     renderHeader();
@@ -967,20 +1282,22 @@
     renderQuick();
   });
   el("newQuote").addEventListener("click", function () {
-    if (draft.lines.length && !confirm("Start a new quotation? This one is cleared.")) return;
+    if (draft.lines.length && !isSaved() && !confirm("Start a new quotation? This one is not in History yet (it is kept there when you download or print it) and will be cleared.")) return;
     // Branch details are kept apart (Branch details form), so they stay as they are.
-    draft = { branch: draft.branch, date: today(), customer: "", customerTyped: false, contact: "", lines: [] };
+    draft = blankDraft(draft.branch);
+    assignNumber();
     saveDraft();
     renderMeta();
     renderLines();
   });
-  el("print").addEventListener("click", function () { if (!el("print").disabled) window.print(); });
+  el("print").addEventListener("click", function () { if (!el("print").disabled) { recordHistory(); window.print(); } });
 
   function fileName() {
     var d = new Date(Date.parse(draft.date || el("date").value) || Date.now());
     var stamp = String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0") + String(d.getFullYear()).slice(-2);
     var who = (el("customer").value || "CUSTOMER").toUpperCase().replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim();
-    return "QUOTATION - " + who + " " + stamp;
+    var no = String(draft.number || "").replace(/[\\/:*?"<>|]+/g, " ").trim();
+    return "QUOTATION - " + who + " " + stamp + (no ? " - " + no : "");
   }
   // PDF pages: the copy of the sheet that is drawn gets blank space before the block that would run past the end of
   // an A4 page, so that block starts the next page (below a top margin) and every page is cut in blank space. A page
@@ -1132,6 +1449,7 @@
         pdf.addImage(slice.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, 210, 297);
       }
       var dataUrl = pdf.output("datauristring").replace(/^data:application\/pdf;[^,]*,/, "data:application/pdf;base64,");
+      recordHistory();
       toParent({ channel: "saleskit-quotation-save", files: [{ name: fileName(), dataUrl: dataUrl }] });
     }).catch(function (e) {
       el("status").textContent = "Download failed: " + (e.message || e);
@@ -1156,6 +1474,35 @@
     else if (e.shiftKey && e.code === "KeyL") { e.preventDefault(); el("search").focus(); }
   });
 
+  // ---------- "Add to Quotation" on the Reco Table, Sales Kit, Banner and Pricing Matrix ----------
+  // Requests that come before the price list wait for it.
+  var waitingAdds = [];
+  var justAdded = -1, justAddedTimer;
+  function runAdds(items) {
+    if (!data.laptops.length) { waitingAdds = waitingAdds.concat(items); return; }
+    var said = [];
+    items.forEach(function (r) {
+      var product = byCode[key(r && r.code)];
+      var result = r && addLine(r.code, r);
+      if (!result) { said.push("Not in the price list: " + (r && r.code)); return; }
+      justAdded = draft.lines.indexOf(result.line);
+      said.push((result.merged ? "One more " + product.model + " (now " + result.line.qty + ")" : "Added " + product.model)
+        + (r.from ? " from the " + r.from : "")
+        + (result.promoFound ? "" : ": its promo “" + r.promo + "” is not for " + branch() + ", so " + branch() + "’s price is used"));
+    });
+    renderLines();
+    el("status").textContent = said.join(" · ");
+    // The added line blinks once and is scrolled to.
+    var row = justAdded !== -1 && document.querySelector('tr.line-tools[data-i="' + justAdded + '"]');
+    if (row) {
+      setTimeout(function () { row.scrollIntoView({ block: "center", behavior: "smooth" }); }, 60);
+      // The blink is over: the row goes back to plain.
+      row.addEventListener("animationend", function () { row.classList.remove("just-added"); }, { once: true });
+    }
+    clearTimeout(justAddedTimer);
+    justAddedTimer = setTimeout(function () { justAdded = -1; }, 1700);
+  }
+
   // ---------- messages from the app (quotation-bridge.js) ----------
   window.addEventListener("message", function (event) {
     if (event.source !== window.parent || !event.data) return;
@@ -1164,13 +1511,21 @@
       data = { laptops: m.laptops || [], branchDetails: m.branchDetails || {}, logos: m.logos || {}, homeBranch: m.homeBranch || "", branches: m.branches || [], lockBranch: Boolean(m.lockBranch) };
       byCode = {};
       data.laptops.forEach(function (l) { byCode[key(l.code)] = l; });
+      data.hasStock = Boolean(m.hasStock);
+      data.stockAsOf = m.stockAsOf || "";
       if (data.lockBranch) draft.branch = data.homeBranch;
       else if (!draft.branch || data.branches.indexOf(key(draft.branch)) === -1) draft.branch = data.branches.indexOf(key(data.homeBranch)) !== -1 ? data.homeBranch : (data.branches[0] || "");
+      assignNumber();
+      baselinePrices();
       fillBranches();
       renderHeader();
+      renderMeta();
       renderLines();
       renderQuick();
       renderKinds();
+      if (waitingAdds.length) runAdds(waitingAdds.splice(0));
+    } else if (m.channel === "saleskit-quotation-add") {
+      runAdds(m.items || []);
     } else if (m.channel === "saleskit-quotation-customer") {
       var c = m.customer || {};
       recoName = c.name || "";

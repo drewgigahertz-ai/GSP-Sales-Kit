@@ -76,6 +76,11 @@
     } else if (channel === 'saleskit-banner-hotkey') {
       // Ctrl+1 / Ctrl+2 pressed while the Banner page has the keyboard (see hotkeys.js).
       if (typeof window.runSalesKitHotkey === 'function') window.runSalesKitHotkey(event.data.keys || {});
+    } else if (channel === 'saleskit-banner-quote') {
+      // Add to Quotation: the laptop and promo on the banner (quotation-bridge.js).
+      if (typeof window.addToQuotation === 'function') {
+        window.addToQuotation({ code: String(event.data.code || ''), promo: String(event.data.promo || ''), from: 'Banner' });
+      }
     } else if (channel === 'saleskit-banner-help') {
       // ? pressed on the Banner page: the shortcuts for that page (hotkey-help.js).
       if (typeof window.openHotkeyHelp === 'function') window.openHotkeyHelp('banner');

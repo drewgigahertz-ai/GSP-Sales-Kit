@@ -36,18 +36,40 @@
       bundleWorth: detail.B2 != null ? detail.B2 : undefined
     };
   }
-  // The laptop's promos for the Promo dropdown: every NEW PRICING row (title, the branches it is for, its freebie
-  // and term prices). A laptop with a price but no rows gets one from its regular price.
-  function promoChoices(item) {
+  // "Apr 1, 2026 – Jun 30, 2026" (the Banner's promo dates) → ['2026-04-01', '2026-06-30'].
+  function isoDates(label) {
+    return String(label || '').split('–').map((part) => {
+      const d = new Date(part.trim());
+      return Number.isNaN(d.getTime()) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    });
+  }
+  // The laptop's promos for the Promo dropdown: every NEW PRICING row (title, the branches it is for, its freebie,
+  // term prices and dates). A laptop with a price but no rows gets one from its regular price. extraOf: the price
+  // matrix's dates for a promo (pricingExtras, server 1.0.55), else the Banner's.
+  function promoChoices(item, extraOf) {
     if (!item) return [];
     const rows = (item.promoRows || []).filter((row) => row && row.hasPrice);
     const list = rows.length ? rows : (item.hasPrice ? [Object.assign({ title: (item.promo && item.promo.name) || 'NO PROMO', branch: '' }, item)] : []);
-    return list.map((row) => ({
-      title: clean(row.title) || 'NO PROMO',
-      freebie: (row.promo && row.promo.name) || '',
-      branches: String(row.branch || '').split(',').map(key).filter(Boolean),
-      terms: termsOf(row)
-    }));
+    return list.map((row) => {
+      const title = clean(row.title) || 'NO PROMO';
+      const extra = extraOf('laptop', item.itemCode, title) || {};
+      const [start, end] = extra.start || extra.end ? [extra.start, extra.end] : isoDates(row.dates);
+      return {
+        title,
+        freebie: (row.promo && row.promo.name) || '',
+        branches: String(row.branch || '').split(',').map(key).filter(Boolean),
+        terms: termsOf(row),
+        start: start || '',
+        end: end || ''
+      };
+    });
+  }
+  // Units per branch ({ BRANCH: 3 }): the inventory CSV's (on the Banner data), else LAPTOP DB's.
+  function stockOf(item, db) {
+    const stock = (item && item.stock && Object.keys(item.stock).length ? item.stock : db && db.stock) || {};
+    const out = {};
+    Object.entries(stock).forEach(([branch, units]) => { if (Number(units) > 0) out[key(branch)] = Number(units); });
+    return out;
   }
 
   // Desktops, mobiles and attachments (other-prices.js: ATTACHMENT PRICING, DESKTOP PRICING SUMMARY, PM MOBILE VER 2.5).
@@ -66,8 +88,9 @@
       OS: pick(/\s(WIN(?:DOWS)?\s?1[01]\w*)\s/i).replace(/^WIN\s?(1[01])\w*$/i, 'WINDOWS $1')
     };
   }
-  function otherChoices(products, taken) {
+  function otherChoices(products, taken, extraOf) {
     return products.filter((p) => !taken.has(key(p.item))).map((p) => {
+      const extra = extraOf(p.kind, p.item, clean(p.promo) || 'NO PROMO') || {};
       const terms = p.terms || {};
       const name = clean(p.item);
       const specs = p.kind === 'attachment' ? {} : specsFromName(name);
@@ -89,12 +112,15 @@
         promo: clean(p.promo),
         branchCash: {},
         branchPromo: {},
-        promos: [{ title: clean(p.promo) || 'NO PROMO', freebie: '', branches: [], terms }]
+        promos: [{ title: clean(p.promo) || 'NO PROMO', freebie: '', branches: [], terms, start: extra.start || '', end: extra.end || '' }],
+        stock: {}
       };
     }).sort((a, b) => a.model.localeCompare(b.model));
   }
 
   function build(data) {
+    const extras = data.pricingExtras || {};
+    const extraOf = (kind, item, promo) => extras[`${kind}|${key(item)}|${key(promo === 'NO PROMO' ? '' : promo)}`] || null;
     const bannerData = data.bannerData || {};
     const items = new Map((bannerData.items || []).map((item) => [key(item.itemCode), item]));
     const laptopDb = new Map((data.laptopDatabase || []).map((laptop) => [key(laptop.item), laptop]));
@@ -129,10 +155,11 @@
         promo: (item && item.promo && item.promo.name) || '',
         branchCash,
         branchPromo,
-        promos: promoChoices(item)
+        promos: promoChoices(item, extraOf),
+        stock: stockOf(item, db)
       };
     }).sort((a, b) => a.model.localeCompare(b.model));
-    laptops.push(...otherChoices(data.otherProducts || [], new Set(laptops.map((l) => key(l.code)))));
+    laptops.push(...otherChoices(data.otherProducts || [], new Set(laptops.map((l) => key(l.code))), extraOf));
 
     const branchDetails = data.branchDetails || {};
     const homeBranch = key(data.homeBranch);
@@ -146,7 +173,10 @@
       logos: { header: data.headerLogoUrl || '', blue: data.bannerLogoUrl || '' },
       homeBranch,
       branches,
-      lockBranch
+      lockBranch,
+      // Branch stock is shown only when the server has stock counts at all.
+      hasStock: laptops.some((l) => l.stock && Object.keys(l.stock).length),
+      stockAsOf: data.inventoryAsOf || ''
     };
   }
 
@@ -156,6 +186,19 @@
   window.updateQuotationCustomer = function (next) {
     customer = next || null;
     send(customerMessage());
+  };
+
+  // "Add to Quotation" on the Reco Table, Sales Kit, Banner and Pricing Matrix: adds the product to the quotation
+  // being made and opens the Quotation tab. request: { code (item code), promo (promo title), bundle ('with' / 'no'),
+  // term ('cash', 'm12', …), from (the tab's name) }; only the code is needed. Requests made before the Quotation page
+  // is ready wait for it.
+  let pageReady = false;
+  const waiting = [];
+  window.addToQuotation = function (request) {
+    if (!request || !request.code) return;
+    if (pageReady) send({ channel: 'saleskit-quotation-add', items: [request] });
+    else waiting.push(request);
+    if (typeof window.navigateTo === 'function') window.navigateTo('quotation');
   };
 
   // Called by the page whenever SalesKit data is loaded or refreshed.
@@ -191,6 +234,8 @@
     if (channel === 'saleskit-quotation-ready') {
       if (latest) send(latest);
       send(customerMessage());
+      pageReady = true;
+      if (waiting.length) send({ channel: 'saleskit-quotation-add', items: waiting.splice(0) });
     } else if (channel === 'saleskit-quotation-image') {
       const url = await savedPicture(String(event.data.url || ''));
       send({ channel: 'saleskit-quotation-image', requestId: event.data.requestId, url });
