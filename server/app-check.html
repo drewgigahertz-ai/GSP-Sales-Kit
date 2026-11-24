@@ -139,6 +139,28 @@ textarea{font:inherit;resize:vertical;min-height:38px}
 code{background:var(--ghz-soft);padding:1px 5px;border-radius:5px;font-size:.85em}
 .path{font-size:.78rem;color:var(--muted);margin-top:14px;word-break:break-all}
 
+/* Monitoring */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:16px}
+.card{padding:14px 16px}
+.card .k{margin-bottom:4px}
+.card .big{font-size:1.9rem;font-weight:800;color:var(--ink-strong);line-height:1.1;font-variant-numeric:tabular-nums}
+.card .big small{font-size:.85rem;font-weight:700;color:var(--muted);margin-left:4px}
+.card.on .big{color:var(--ok)}.card.off .big{color:var(--muted)}.card.stale .big{color:var(--warn)}
+.card .sub{white-space:normal}
+.meter{height:8px;border-radius:999px;background:#e8edf6;overflow:hidden;margin-top:8px;display:flex}
+.meter i{display:block;height:100%}
+.meter .m-on{background:#16a34a}.meter .m-inst{background:#93c5a6}.meter .m-no{background:#f3b0b0}
+.mon-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:1100px){.mon-grid{grid-template-columns:1fr}}
+.mon-grid .panel{overflow-x:auto}
+.mon-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:14px 16px 4px}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.num b{font-weight:800;color:var(--ink-strong)}
+.pct{color:var(--muted);font-size:.72rem;margin-left:4px}
+.c-meter{min-width:120px}
+.who{font-size:.76rem;color:var(--muted);line-height:1.5}
+.who b{color:var(--ink);font-weight:700}
+
 /* Sign in */
 .login{max-width:400px;margin:56px auto;padding:30px}
 .login h2{margin:0 0 4px;font-size:1.25rem;color:var(--ink-strong)}
@@ -167,6 +189,7 @@ code{background:var(--ghz-soft);padding:1px 5px;border-radius:5px;font-size:.85e
   </div>
   <nav class="nav-tabs-dashboard" role="tablist" id="tabs" hidden>
     <button class="nav-tab-ghz active" role="tab" data-tab="laptops">Laptops <span class="tab-count" id="countOnline" hidden></span></button>
+    <button class="nav-tab-ghz" role="tab" data-tab="monitor">Monitoring</button>
     <button class="nav-tab-ghz" role="tab" data-tab="apps">Apps to test</button>
     <button class="nav-tab-ghz" role="tab" data-tab="history">History <span class="tab-count alert" id="countCheck" hidden></span></button>
   </nav>
@@ -196,6 +219,26 @@ code{background:var(--ghz-soft);padding:1px 5px;border-radius:5px;font-size:.85e
     <div class="quick" id="quick" role="group" aria-label="Show"></div>
     <div class="panel list"><table id="laptopTable"><thead id="lhead"></thead><tbody id="laptops"></tbody></table></div>
     <div class="legend">Laptops are named by the Laptop SKU branch staff chose in Sales Tools. "SKU check" compares it with the brand and model Windows reports. Click a laptop to see each app's message and file; click a branch to set it yourself.</div>
+  </section>
+
+  <!-- MONITORING: how many laptops have Sales Tools and each tested app, and how many are online -->
+  <section data-view="monitor" hidden>
+    <div class="toolbar">
+      <div><h2 class="section-title">Monitoring</h2><div class="section-sub">Laptops with Gigahertz Sales Tools, how many are online now, and which have each tested app installed.</div></div>
+      <div class="toolbar-right"><label class="field">Branch <select class="branch-filter" id="mBranch"><option value="">All branches</option></select></label></div>
+    </div>
+    <div class="cards" id="mCards"></div>
+    <div class="mon-grid">
+      <div class="panel">
+        <div class="mon-head"><h2 class="section-title">Tested apps</h2><span class="section-sub">From each laptop's latest test of that app</span></div>
+        <table><thead><tr><th>App</th><th class="num">Tested on</th><th class="num">Installed</th><th class="num">Installed &amp; online</th><th class="num">Not installed</th><th class="num">Not tested yet</th><th class="c-meter"></th></tr></thead><tbody id="mApps"></tbody></table>
+      </div>
+      <div class="panel">
+        <div class="mon-head"><h2 class="section-title">By branch</h2><span class="section-sub">Sales Tools installed and online</span></div>
+        <table><thead><tr><th>Branch</th><th class="num">Installed</th><th class="num">Online</th><th class="num">Offline</th><th>Last seen</th></tr></thead><tbody id="mBranches"></tbody></table>
+      </div>
+    </div>
+    <div class="legend">Installed: the laptop has Gigahertz Sales Tools 1.0.30 or later and has connected to this server (it stays listed until removed on the Laptops tab). Online: checked in within the last 20 seconds. An app counts as installed when the laptop's latest test of it found the app, whatever the result (passed, closed early, crashed, no demo file); "Not tested yet" laptops have not been tested on it. Click an app to see which laptops.</div>
   </section>
 
   <!-- APPS TO TEST -->
@@ -304,7 +347,7 @@ $('logout').addEventListener('click',async()=>{await api('logout',{}).catch(()=>
 
 // ---- tabs (remembered in the address, e.g. /app-check#history) ----
 function openTab(name){
-  if(!['laptops','apps','history'].includes(name))name='laptops';
+  if(!['laptops','monitor','apps','history'].includes(name))name='laptops';
   document.querySelectorAll('.nav-tab-ghz').forEach(t=>{const on=t.dataset.tab===name;t.classList.toggle('active',on);t.setAttribute('aria-selected',on)});
   document.querySelectorAll('[data-view]').forEach(v=>v.hidden=v.dataset.view!==name);
   if(location.hash!=='#'+name)history.replaceState(null,'','#'+name);
@@ -515,6 +558,51 @@ $('download').addEventListener('click',async()=>{
   setTimeout(()=>URL.revokeObjectURL(a.href),5000);
 });
 
+// ---- monitoring ----
+// An app is installed when the laptop's latest test of it found it (any result but "not installed").
+const appState=(l,name)=>{const s=l.appStatus&&l.appStatus[name];return!s?'untested':s.status==='not_installed'?'no':'yes'};
+const pctOf=(n,total)=>total?Math.round(n*100/total):0;
+const openApps=new Set();
+function renderMonitor(){
+  const b=$('mBranch').value,all=state.laptops.filter(l=>!b||l.branch===b);
+  const online=all.filter(l=>l.online).length,offline=all.length-online;
+  const stale=all.filter(l=>!l.online&&Date.now()-(l.lastSeen||0)>7*86400000).length;
+  // The newest Sales Tools version among the laptops, and how many have it.
+  const newest=state.laptops.map(l=>l.version).filter(Boolean).reduce((m,v)=>!m||!atLeast(m,v)?v:m,'');
+  const onNewest=newest?all.filter(l=>l.version&&atLeast(l.version,newest)).length:0;
+  const branches=new Set(all.map(l=>l.branch).filter(Boolean)).size;
+  const card=(cls,label,big,sub,meter)=>`<div class="panel card ${cls}"><div class="k">${label}</div><div class="big">${big}</div>${sub?`<div class="sub">${sub}</div>`:''}${meter||''}</div>`;
+  $('mCards').innerHTML=card('','Sales Tools installed',`${all.length}<small>laptop${all.length===1?'':'s'}</small>`,b?esc(b):`${branches} branch${branches===1?'':'es'}`)
+    +card('on','Online now',`${online}<small>${pctOf(online,all.length)}%</small>`,'Checked in within 20 seconds',`<div class="meter" title="${online} of ${all.length} online"><i class="m-on" style="width:${pctOf(online,all.length)}%"></i></div>`)
+    +card('off','Offline',`${offline}`,'Sales Tools closed, or the laptop is off')
+    +card('stale','Not seen in 7 days',`${stale}`,stale?'Check these laptops are still in use':'Every laptop was seen this week')
+    +(newest?card('','On the newest version',`${onNewest}<small>of ${all.length}</small>`,`Sales Tools v${esc(newest)}`):'');
+  // Tested apps: on the laptops each app is tested on (its segments), how many have it, and how many of those are online.
+  const names=appColumns(all.filter(l=>l.last).map(l=>l.last));
+  $('mApps').innerHTML=names.length?names.map(name=>{
+    const on=all.filter(l=>!l.apps||l.apps.includes(name)||(l.appStatus&&l.appStatus[name]));
+    const yes=on.filter(l=>appState(l,name)==='yes'),no=on.filter(l=>appState(l,name)==='no'),untested=on.filter(l=>appState(l,name)==='untested');
+    const yesOnline=yes.filter(l=>l.online).length,open=openApps.has(name);
+    const list=(label,ls)=>ls.length?`<div><b>${label} (${ls.length}):</b> ${ls.sort((x,y)=>(x.branch||'~').localeCompare(y.branch||'~')).map(l=>`${esc(nameOf(l))}${l.branch?` <span class="pct">${esc(l.branch)}</span>`:''}${l.online?' <span class="dot on" title="Online"></span>':''}`).join(' · ')}</div>`:'';
+    return`<tr class="row${open?' open':''}" data-app="${esc(name)}"><td><b>${esc(name)}</b></td><td class="num">${on.length}</td>
+      <td class="num"><b>${yes.length}</b><span class="pct">${pctOf(yes.length,on.length)}%</span></td>
+      <td class="num"><b class="ok-text">${yesOnline}</b></td>
+      <td class="num">${no.length?`<b class="bad-text">${no.length}</b>`:'<span class="none">0</span>'}</td>
+      <td class="num">${untested.length||'<span class="none">0</span>'}</td>
+      <td class="c-meter"><div class="meter" title="Installed and online ${yesOnline} · installed, offline ${yes.length-yesOnline} · not installed ${no.length} · not tested ${untested.length}"><i class="m-on" style="width:${pctOf(yesOnline,on.length)}%"></i><i class="m-inst" style="width:${pctOf(yes.length-yesOnline,on.length)}%"></i><i class="m-no" style="width:${pctOf(no.length,on.length)}%"></i></div></td></tr>`
+      +(open?`<tr class="detail"><td colspan="7"><div class="who">${list('Not installed',no)}${list('Installed',yes)}${list('Not tested yet',untested)}</div></td></tr>`:'');
+  }).join(''):`<tr><td colspan="7"><div class="empty"><strong>No apps to test yet.</strong>Add them on the Apps to test tab.</div></td></tr>`;
+  // By branch: laptops with Sales Tools, online and offline, and when one was last seen.
+  const groups=new Map();
+  for(const l of all){const k=l.branch||'';if(!groups.has(k))groups.set(k,[]);groups.get(k).push(l)}
+  $('mBranches').innerHTML=groups.size?[...groups.entries()].sort((x,y)=>(!x[0]-!y[0])||x[0].localeCompare(y[0])).map(([br,ls])=>{
+    const on=ls.filter(l=>l.online).length,last=Math.max(...ls.map(l=>l.lastSeen||0));
+    return`<tr><td><span class="branch-name">${esc(br||'Branch unknown')}</span></td><td class="num"><b>${ls.length}</b></td><td class="num">${on?`<b class="ok-text">${on}</b>`:'<span class="none">0</span>'}</td><td class="num">${ls.length-on||'<span class="none">0</span>'}</td><td class="sub">${on?'<span class="ok-text">Online now</span>':esc(ago(last))}</td></tr>`;
+  }).join(''):`<tr><td colspan="5"><div class="empty"><strong>No laptop has connected yet.</strong></div></td></tr>`;
+}
+$('mApps').addEventListener('click',e=>{const row=e.target.closest('tr[data-app]');if(!row)return;const n=row.dataset.app;openApps.has(n)?openApps.delete(n):openApps.add(n);renderMonitor()});
+$('mBranch').addEventListener('change',renderMonitor);
+
 function fillBranches(){
   const branches=[...new Set(state.laptops.map(l=>l.branch).filter(Boolean))].sort();
   document.querySelectorAll('.branch-filter').forEach(sel=>{
@@ -533,6 +621,7 @@ async function load(){
   fillBranches();
   // While a branch list is open, the list is not redrawn (that would close it).
   if(!editingBranch)renderLaptops();
+  renderMonitor();
   renderHistory();
 }
 

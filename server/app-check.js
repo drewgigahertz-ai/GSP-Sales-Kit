@@ -358,6 +358,18 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
         if (seen && Date.parse(seen.time) > Date.parse(run.time)) continue; // a late result of an older test
         lastRun.set(run.laptop, { time: run.time, pass: passed(run), stoppedOnLaptop: run.stoppedOnLaptop, stoppedByAdmin: run.stoppedByAdmin, startedAt: run.startedAt, durationMs: run.durationMs, results: run.results });
       }
+      // Monitoring: each laptop's latest known result per app (a test stopped before an app was tested says nothing
+      // about it, so the result before it counts). { laptop: { app: { status, time } } }.
+      const appStatus = new Map();
+      for (const run of history) {
+        const byApp = appStatus.get(run.laptop) || {};
+        for (const r of run.results) {
+          if (!r.target || r.status === 'stopped') continue;
+          const seen = byApp[r.target];
+          if (!seen || Date.parse(seen.time) <= Date.parse(run.time)) byApp[r.target] = { status: r.status, time: run.time };
+        }
+        appStatus.set(run.laptop, byApp);
+      }
       const list = [...laptops.values()]
         .map((l) => ({ l, ...branchOf(l) }))
         .sort((a, b) => (a.branch || '~').localeCompare(b.branch || '~') || a.l.name.localeCompare(b.l.name))
@@ -367,7 +379,7 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
           try { showing = now - l.lastSeen < ONLINE_MS ? showingFor(l.name) : null; } catch { /* not reported */ }
           // Is the banner on screen this laptop's own (its Laptop SKU)?
           if (showing && showing.banner) showing = { ...showing, check: compareBanner(showing, l.sku, skuEntry(l)).status };
-          return { showing, name: l.name, branch, branchSource: source, user: l.user, version: l.version, make: l.make, model: l.model, sku: l.sku || '', skuCheck: skuCheckOf(l), desktop: desktopCheck(l), segment, apps: targetsForSegment(targets, segment).map((t) => t.name), online: now - l.lastSeen < ONLINE_MS, lastSeen: l.lastSeen, current: l.current, waiting: Boolean(l.command), last: lastRun.get(l.name) || null };
+          return { showing, name: l.name, branch, branchSource: source, user: l.user, version: l.version, make: l.make, model: l.model, sku: l.sku || '', skuCheck: skuCheckOf(l), desktop: desktopCheck(l), segment, apps: targetsForSegment(targets, segment).map((t) => t.name), online: now - l.lastSeen < ONLINE_MS, lastSeen: l.lastSeen, current: l.current, waiting: Boolean(l.command), last: lastRun.get(l.name) || null, appStatus: appStatus.get(l.name) || {} };
         });
       let segments = [];
       try { segments = listSegments(); } catch { /* no database yet */ }
