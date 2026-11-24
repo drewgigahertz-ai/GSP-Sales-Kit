@@ -16,6 +16,7 @@
         'Quotation: when a price in the price matrix changes after a laptop was added, the line says so with a button to use the new price. A price you typed yourself stays until you press it.',
         'Reco Table SMT: when a branch’s Exceed, Meet or Budget laptop has no stock there, the card starts on its first alternative in stock (then a laptop other branches pick for that segment) instead of whatever laptop the branch has the most of. The badge says which: Reco Table Selection, Alternative (with the laptop that has no stock), or pick of other branches.',
         'Laptop pictures: the Sales Kit and the presentation now always show them without their white background, also when the picture was still being cleaned up as they appeared. Each picture is cleaned once, so switching laptops back and forth is quicker.',
+        'The PRICING MATRIX tab is marked as under development while it is being tested, like the Quotation: check prices against the price matrix before quoting them, and send your feedback.',
         'Pricing Matrix: Branch stock for each laptop, and Compare to put up to 3 products side by side (all payment terms, freebies, promo dates, stock and specs, with the lowest price in each row marked).'
       ]
     },

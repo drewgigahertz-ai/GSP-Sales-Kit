@@ -33,6 +33,10 @@
     .title .mark { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: linear-gradient(135deg, var(--navy), #2b5cf2); color: #fff; font-size: 18px; }
     .title h1 { margin: 0; font-size: 16px; font-weight: 800; letter-spacing: .4px; color: var(--navy); }
     .title small { display: block; color: var(--muted); font-size: 11.5px; font-weight: 600; }
+    /* Under development: the tab is out for testing and feedback (as on the Quotation tab). */
+    .dev-badge { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: #f59e0b; color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .6px; vertical-align: 2px; }
+    .dev-note { flex-basis: 100%; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 8px; background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; font-size: 12px; }
+    .dev-note i { font-size: 15px; }
     .search { position: relative; flex: 1 1 340px; max-width: 560px; }
     .search i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--soft); }
     .search input { width: 100%; padding: 10px 34px 10px 36px; border: 1.5px solid #cbd5e1; border-radius: 11px; font-size: 13.5px; font-weight: 500; outline: none; background: #f8fafc; transition: border-color .15s, background .15s; }
@@ -190,7 +194,7 @@
   <div class="top">
     <div class="title">
       <div class="mark"><i class="bi bi-tags-fill"></i></div>
-      <div><h1>PRICING MATRIX</h1><small>Prices, promos, bundles &amp; incentives · all branches</small></div>
+      <div><h1>PRICING MATRIX<span class="dev-badge">UNDER DEVELOPMENT</span></h1><small>Prices, promos, bundles &amp; incentives · all branches</small></div>
     </div>
     <div class="search" id="searchBox">
       <i class="bi bi-search"></i>
@@ -213,6 +217,7 @@
       <span id="count"></span>
     </div>
     <div class="tray" id="tray" hidden></div>
+    <div class="dev-note"><i class="bi bi-cone-striped" aria-hidden="true"></i><span><b>Under development:</b> this tab is still being tested. Check the prices against the price matrix before quoting them to a customer, and send your feedback to Process Improvement.</span></div>
   </div>
   <div class="body">
     <div class="detail" id="detail"><div class="placeholder"><div><i class="bi bi-hourglass-split"></i>Loading the price matrix…</div></div></div>
