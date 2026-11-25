@@ -6,6 +6,13 @@
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
+      version: '1.0.42',
+      date: 'November 25, 2026',
+      changes: [
+        'Quotation: the quotation number now uses your own branch (e.g. MEGA-…). A new quotation no longer keeps another branch’s number, and changing the branch gives it a new number and that branch’s prices.'
+      ]
+    },
+    {
       version: '1.0.41',
       date: 'November 24, 2026',
       changes: [
