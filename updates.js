@@ -6,6 +6,13 @@
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
+      version: '1.0.44',
+      date: 'November 25, 2026',
+      changes: [
+        'Scheduled checks: the banner and desktop are checked as soon as the check time starts, even while someone uses the laptop; only the app tests wait until nobody has used it for a while. A check whose time is changed during the day runs again at the new time.'
+      ]
+    },
+    {
       version: '1.0.43',
       date: 'November 25, 2026',
       changes: [

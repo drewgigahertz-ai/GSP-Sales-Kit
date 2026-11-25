@@ -86,9 +86,11 @@ function todayFor(schedules, laptop, checks, now = new Date()) {
     const s = schedules[id];
     if (!s.enabled || !inScope(s, laptop.name, laptop.branch)) continue;
     if (!s.days.includes(now.getDay())) { out[id] = { status: 'off' }; continue; }
-    const mine = checks.filter((c) => c.laptop === laptop.name && c.job === id && c.date === date && c.trigger !== 'now');
+    // Only the reports of today's current window: a window changed during the day starts over.
+    const window = `${s.start}-${s.end}`;
+    const mine = checks.filter((c) => c.laptop === laptop.name && c.job === id && c.date === date && c.trigger !== 'now' && c.window === window);
     const last = mine[mine.length - 1];
-    if (last) { out[id] = { status: last.status, time: last.time, reason: last.reason }; continue; }
+    if (last) { out[id] = { status: last.status, time: last.time, reason: last.reason || last.appsNote }; continue; }
     if (minutes < minutesOf(s.start)) out[id] = { status: 'waiting', from: s.start, to: s.end };
     else if (minutes < minutesOf(s.end)) out[id] = { status: 'running', from: s.start, to: s.end };
     else out[id] = { status: 'nocheck', reason: 'No report: Sales Tools was closed or the laptop was off' };

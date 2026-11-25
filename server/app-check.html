@@ -166,8 +166,14 @@ code{background:var(--ghz-soft);padding:1px 5px;border-radius:5px;font-size:.85e
 .sched{padding:16px 18px}
 .sched-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
 .sched-head h3{margin:0;font-size:1rem;color:var(--ink-strong)}
-.toggle{display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:.8rem;cursor:pointer;white-space:nowrap}
-.toggle input{width:18px;height:18px;margin:0}
+/* The schedule's On / Off switch: a pill that says plainly whether laptops run it. */
+.toggle{display:inline-flex;align-items:center;gap:9px;padding:6px 12px 6px 8px;border-radius:999px;border:1px solid #f0c4c4;background:var(--bad-bg);color:var(--bad);font-weight:800;font-size:.8rem;cursor:pointer;white-space:nowrap}
+.toggle.on{border-color:#a7dcbb;background:var(--ok-bg);color:var(--ok)}
+.toggle input{position:absolute;opacity:0;width:1px;height:1px}
+.toggle .knob{position:relative;width:34px;height:20px;border-radius:999px;background:#d7a3a3;flex:none;transition:background .15s}
+.toggle .knob::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .15s}
+.toggle.on .knob{background:#16a34a}.toggle.on .knob::after{left:17px}
+.toggle:focus-within{outline:2px solid rgba(0,62,203,.35);outline-offset:2px}
 .row2{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end}
 .row2>label{flex:1 1 120px;font-size:.75rem;font-weight:700;color:var(--muted)}
 .row2>label input,.row2>label select{margin-top:4px}
@@ -760,7 +766,7 @@ function schedCard(id){
     :sc.mode==='laptops'?state.laptops.filter(l=>{const q=schedSearch[id].toLowerCase();return!q||[l.branch,nameOf(l),l.name].join(' ').toLowerCase().includes(q)}).map(l=>`<label><input type="checkbox" data-s="${id}" data-laptop="${esc(l.name)}"${sc.laptops.includes(l.name)?' checked':''}> <span class="dot ${l.online?'on':''}"></span> <span><b>${esc(nameOf(l))}</b><div class="sub">${esc([l.branch||'Branch unknown',l.name,l.version&&'v'+l.version].filter(Boolean).join(' · '))}${l.version&&!atLeast(l.version,'1.0.43')?' · needs Sales Tools 1.0.43':''}</div></span></label>`).join('')||'<div class="sub">No laptop matches.</div>':'';
   const n=scopeCount(s);
   return`<div class="panel sched" data-card="${id}">
-    <div class="sched-head"><div><h3>${info.title}</h3><div class="section-sub">${info.sub}</div></div><label class="toggle"><input type="checkbox" data-s="${id}" data-k="enabled"${s.enabled?' checked':''}> ${s.enabled?'On':'Off'}</label></div>
+    <div class="sched-head"><div><h3>${info.title}</h3><div class="section-sub">${info.sub}</div></div><label class="toggle${s.enabled?' on':''}" title="${s.enabled?'Laptops run this check. Click to turn it off.':'No laptop runs this check. Click to turn it on.'}"><input type="checkbox" data-s="${id}" data-k="enabled"${s.enabled?' checked':''}><span class="knob"></span>${s.enabled?'On':'Off: click to turn on'}</label></div>
     <div class="days">${DAYS.map((d,i)=>`<label class="${s.days.includes(i)?'on':''}"><input type="checkbox" data-s="${id}" data-day="${i}"${s.days.includes(i)?' checked':''}> ${d}</label>`).join('')}</div>
     <div class="row2"><label>From<input type="time" data-s="${id}" data-k="start" value="${esc(s.start)}"></label><label>Until<input type="time" data-s="${id}" data-k="end" value="${esc(s.end)}"></label>
       <label>On<select data-s="${id}" data-k="mode"><option value="laptops"${sc.mode==='laptops'?' selected':''}>Chosen laptops</option><option value="branches"${sc.mode==='branches'?' selected':''}>Chosen branches</option><option value="all"${sc.mode==='all'?' selected':''}>All laptops</option></select></label></div>
@@ -783,7 +789,7 @@ function renderToday(){
   const cell=t=>{if(!t)return'<span class="none">—</span>';const at=t.time?` <span class="sub" style="display:inline">${esc(new Date(t.time).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))}</span>`:t.from?` <span class="sub" style="display:inline">${esc(t.from)}–${esc(t.to)}</span>`:'';return`<span class="status s-${esc(t.status)}">${esc(ST_LABEL[t.status]||t.status)}</span>${at}${t.reason?`<div class="sub" style="white-space:normal">${esc(t.reason)}</div>`:''}`};
   const list=state.laptops.filter(l=>l.today&&(l.today.daily||l.today.apps));
   $('todayRows').innerHTML=list.length?list.map(l=>`<tr><td><span class="branch-name">${esc(l.branch||'—')}</span></td><td><div class="laptop-name">${esc(nameOf(l))}</div><div class="sub">${esc(l.name)}${l.online?' · online':''}</div></td><td>${cell(l.today.daily)}</td><td>${cell(l.today.apps)}</td></tr>`).join('')
-    :'<tr><td colspan="4"><div class="empty"><strong>No laptop has a schedule.</strong>Turn a schedule on and choose its laptops above, then save.</div></td></tr>';
+    :`<tr><td colspan="4"><div class="empty"><strong>No laptop has a schedule.</strong>${state.schedules&&!state.schedules.daily.enabled&&!state.schedules.apps.enabled?'Both schedules are Off. Switch one On, choose its laptops, then save.':'Choose the laptops of a schedule that is On, then save.'}</div></td></tr>`;
   const B={match:['ok','✓ Matches'],different:['bad','✗ Different laptop'],nosku:['none','No SKU'],unknown:['none','? Cannot tell'],nobanner:['warn','No banner on screen']};
   const rows=(state.checks||[]).slice(0,60);
   $('checkRows').innerHTML=rows.length?rows.map(c=>{
@@ -818,8 +824,19 @@ $('schedCards').addEventListener('click',async e=>{
 });
 $('idleMinutes').addEventListener('input',()=>{sched.idleMinutes=Number($('idleMinutes').value)||5;schedUnsaved()});
 $('saveSched').addEventListener('click',async()=>{
+  // A schedule left Off but with laptops chosen was most likely meant to be on: ask before saving it off.
+  for(const id of ['daily','apps']){
+    const s=sched[id];
+    if(!s.enabled&&scopeCount(s)>0&&confirm(`${JOB_INFO[id].title} is Off, so no laptop runs it. Turn it on for its ${scopeCount(s)} chosen laptop${scopeCount(s)===1?'':'s'}?`))s.enabled=true;
+  }
   const r=await api('schedules',{schedules:sched}).catch(()=>null);if(!r)return;
-  if(r.ok){sched=JSON.parse(JSON.stringify(r.schedules));schedDirty=false;renderSchedules();$('smsg').textContent='Saved. Laptops get it within a few seconds of their next check-in.';$('smsg').className='msg good'}
+  if(r.ok){
+    sched=JSON.parse(JSON.stringify(r.schedules));schedDirty=false;renderSchedules();
+    const on=['daily','apps'].filter(id=>sched[id].enabled).map(id=>`${JOB_INFO[id].title} on ${scopeCount(sched[id])} laptop${scopeCount(sched[id])===1?'':'s'}`);
+    $('smsg').textContent=on.length?`Saved: ${on.join(', ')}. Laptops get it within a few seconds of their next check-in.`:'Saved. Both schedules are Off, so no laptop runs them.';
+    $('smsg').className='msg '+(on.length?'good':'bad');
+    load();
+  }
   else{$('smsg').textContent=r.error||'Could not save.';$('smsg').className='msg bad'}
 });
 // Export: from the first of the month to today by default.

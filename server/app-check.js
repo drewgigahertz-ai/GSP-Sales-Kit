@@ -315,6 +315,9 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
         date: /^\d{4}-\d{2}-\d{2}$/.test(String(body.date)) ? body.date : localDate(at),
         job,
         trigger: body.trigger === 'now' ? 'now' : 'schedule',
+        // The schedule's time window ("13:45-13:47") and the part: 'basic' (banner and desktop) or 'apps'.
+        window: /^\d\d:\d\d-\d\d:\d\d$/.test(String(body.window)) ? body.window : undefined,
+        part: ['basic', 'apps'].includes(body.part) ? body.part : undefined,
         status: body.phase,
         reason: text(body.reason, 200) || undefined,
         laptop: l.name,

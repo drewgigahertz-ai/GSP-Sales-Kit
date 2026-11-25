@@ -16,10 +16,13 @@ $wifi = $radios | Where-Object { $_.Kind -eq 'WiFi' } | Select-Object -First 1
 if (-not $wifi) { 'none'; exit }
 `;
 
+// Why the last Wi-Fi call failed (PowerShell's message), for the check log.
+let lastError = '';
 function run(script, timeout = 30000) {
   return new Promise((resolve) => {
     execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', PRELUDE + script], { timeout, windowsHide: true }, (error, out) => {
-      resolve(error ? { error: String(error.message || error).split('\n')[0] } : { out: String(out || '').trim().split(/\r?\n/).pop() });
+      lastError = error ? String(error.stderr || error.message || error).replace(/\s+/g, ' ').trim().slice(0, 200) : '';
+      resolve(error ? { error: lastError } : { out: String(out || '').trim().split(/\r?\n/).pop() });
     });
   });
 }
@@ -35,8 +38,12 @@ async function wifiState() {
 async function setWifi(on) {
   if (process.platform !== 'win32') return false;
   const want = on ? 'On' : 'Off';
-  const { out } = await run(`$r = Await ($wifi.SetStateAsync([Windows.Devices.Radios.RadioState]::${want})) ([Windows.Devices.Radios.RadioAccessStatus]); Start-Sleep -Milliseconds 500; $wifi.State.ToString().ToLower()`);
-  return out === want.toLowerCase();
+  // Windows answers Allowed, or why not (DeniedByUser: Settings → Privacy → Radios is off for apps;
+  // DeniedBySystem: a policy, or airplane mode). The state is read again after a moment.
+  const { out } = await run(`$r = Await ($wifi.SetStateAsync([Windows.Devices.Radios.RadioState]::${want})) ([Windows.Devices.Radios.RadioAccessStatus]); Start-Sleep -Milliseconds 800; "$access|$r|" + $wifi.State.ToString().ToLower()`);
+  const [access, result, after] = String(out || '').split('|');
+  if (after !== want.toLowerCase() && !lastError) lastError = `Windows said ${result || access || 'nothing'}${access && access !== 'Allowed' ? ` (radio access: ${access})` : ''}`;
+  return after === want.toLowerCase();
 }
 
-module.exports = { wifiState, setWifi };
+module.exports = { wifiState, setWifi, wifiError: () => lastError };

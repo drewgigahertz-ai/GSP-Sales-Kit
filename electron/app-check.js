@@ -15,7 +15,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { listApps, listDesktop, testTarget, collectSampleFiles } = require('./app-check-tests');
-const { wifiState, setWifi } = require('./wifi');
+const { wifiState, setWifi, wifiError } = require('./wifi');
 // The desktop is read again at most once a minute, and sent only when it changed (or the server asks for it).
 const DESKTOP_READ_MS = 60 * 1000;
 
@@ -36,6 +36,20 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
   const pendingPath = path.join(userDataDir, 'app-check-pending.json');
   const schedulePath = path.join(userDataDir, 'app-check-schedule.json');
   const doneTodayPath = path.join(userDataDir, 'app-check-jobs.json');
+  // What the scheduled checks did and why (Wi-Fi, in use, reports), for looking into a check that did not run.
+  const logPath = path.join(userDataDir, 'app-check-log.txt');
+  const logged = new Map();
+  // key: only logged again when the message for that key changes (the checks are looked at every 30 seconds).
+  function note(message, key) {
+    if (key) {
+      if (logged.get(key) === message) return;
+      logged.set(key, message);
+    }
+    try {
+      if (fs.existsSync(logPath) && fs.statSync(logPath).size > 256 * 1024) fs.renameSync(logPath, `${logPath}.old`);
+      fs.appendFileSync(logPath, `${new Date().toLocaleString()}  ${message}\r\n`);
+    } catch { /* only a log */ }
+  }
   const laptop = os.hostname();
   let state = { running: false };
   let stopRequested = false;
@@ -192,7 +206,15 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
   function saveSchedule(next) {
     schedule = { key: String(next.key || ''), idleMinutes: Number(next.idleMinutes) || 5, jobs: Array.isArray(next.jobs) ? next.jobs : [] };
     writeJson(schedulePath, schedule);
+    note(`New schedule: ${schedule.jobs.length ? schedule.jobs.map((j) => `${j.id} ${j.start}-${j.end} days ${(j.days || []).join(',')} (${(j.checks || []).join(', ')})`).join('; ') : 'none'}; apps after ${schedule.idleMinutes} idle minutes`);
   }
+  // A check's parts, each done once a day per time window (a new window the same day runs again):
+  // 'basic' (banner and desktop, at once, in use or not) and 'apps' (only while nobody uses the laptop).
+  const partsOf = (spec) => {
+    const basic = (spec.checks || []).filter((c) => c !== 'apps');
+    return [...(basic.length ? [{ part: 'basic', checks: basic }] : []), ...((spec.checks || []).includes('apps') ? [{ part: 'apps', checks: ['apps'] }] : [])];
+  };
+  const partKey = (spec, part) => `${spec.id}|${spec.start}-${spec.end}|${part}`;
   const pad = (n) => String(n).padStart(2, '0');
   const dateOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const minutesOf = (hhmm) => Number(String(hhmm).slice(0, 2)) * 60 + Number(String(hhmm).slice(3, 5));
@@ -212,18 +234,27 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
   async function goOnline() {
     const wifiBefore = await wifiState();
     let turnedOn = false;
-    if (wifiBefore === 'off') turnedOn = await setWifi(true);
+    if (wifiBefore === 'off') {
+      turnedOn = await setWifi(true);
+      note(turnedOn ? 'Wi-Fi was off: turned it on' : `Wi-Fi was off and could not be turned on${wifiError() ? `: ${wifiError()}` : ''}`);
+    } else note(`Wi-Fi is ${wifiBefore}${wifiBefore === 'unknown' && wifiError() ? ` (${wifiError()})` : ''}`);
     const until = Date.now() + ONLINE_WAIT_MS;
     while (Date.now() < until) {
-      if (await post('poll', { laptop, version, busy: true, scheduleKey: schedule.key || '' }, 5000)) return { wifiBefore, turnedOn, online: true };
+      const reply = await post('poll', { laptop, version, busy: true, scheduleKey: schedule.key || '' }, 5000);
+      if (reply) {
+        if (reply.schedule && typeof reply.schedule === 'object') saveSchedule(reply.schedule);
+        return { wifiBefore, turnedOn, online: true };
+      }
       await new Promise((r) => setTimeout(r, 5000));
     }
+    note('The SalesKit Server did not answer within 2 minutes');
     return { wifiBefore, turnedOn, online: false };
   }
   // Wi-Fi back off when this check turned it on: now if nobody uses the laptop, else once it is idle (tick).
   async function restoreWifi(net) {
     if (!net.turnedOn) return;
-    if (getIdleSeconds() >= WIFI_OFF_IDLE_S && await setWifi(false)) return;
+    if (getIdleSeconds() >= WIFI_OFF_IDLE_S && await setWifi(false)) { note('Wi-Fi turned off again'); return; }
+    note('Wi-Fi stays on until nobody has used the laptop for a minute');
     todayState().wifiOff = true;
     saveToday();
   }
@@ -233,18 +264,21 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
 
   // One check: Wi-Fi on, the apps to test (when the check has them), the report, Wi-Fi back off.
   // trigger: 'schedule' or 'now' ("Run now" on the Schedules tab, which does not count for the day).
-  async function runJob(spec, trigger) {
+  // key: the part being run (partKey) for a scheduled check; appsLater: the apps part still waits for an idle laptop.
+  async function runJob(spec, trigger, key = '', appsLater = false) {
     if (job || state.running) return;
     job = { id: spec.id, trigger };
     const day = todayState();
     const user = getUser();
-    const base = { laptop, job: spec.id, trigger, date: day.date, version, user: user ? user.username || '' : '' };
+    const base = { laptop, job: spec.id, trigger, date: day.date, window: `${spec.start}-${spec.end}`, part: key ? key.split('|')[2] : '', version, user: user ? user.username || '' : '' };
+    note(`${trigger === 'now' ? 'Run now' : 'Scheduled'}: ${spec.id} (${(spec.checks || []).join(', ')}) starts`);
     try {
       const net = await goOnline();
       if (!net.online) {
         const reason = net.wifiBefore === 'off' && !net.turnedOn ? 'Wi-Fi could not be turned on' : 'Could not reach the SalesKit Server';
-        day.tries[spec.id] = { reason, retryAt: Date.now() + RETRY_MS };
+        if (key) day.tries[key] = { reason, retryAt: Date.now() + RETRY_MS };
         saveToday();
+        note(`${spec.id}: ${reason}; tried again in 10 minutes`);
         await restoreWifi(net);
         return;
       }
@@ -277,11 +311,12 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
         showing: (spec.checks || []).includes('banner') ? getActivity() : undefined,
         desktop: desktopList,
         apps,
-        appsNote
+        appsNote: appsNote || (appsLater ? 'App tests start once nobody has used the laptop for a while' : '')
       });
-      if (trigger === 'schedule') {
-        if (interrupted) day.tries[spec.id] = { reason: 'in use', retryAt: Date.now() + 60 * 1000 };
-        else day.jobs[spec.id] = { status: 'done' };
+      note(`${spec.id}: ${interrupted ? 'app test stopped, someone used the laptop' : 'done and reported'}`);
+      if (key) {
+        if (interrupted) day.tries[key] = { reason: 'in use', retryAt: Date.now() + 60 * 1000 };
+        else day.jobs[key] = { status: 'done' };
         saveToday();
       }
       await restoreWifi(net);
@@ -300,27 +335,37 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
     const now = new Date();
     const minutes = now.getHours() * 60 + now.getMinutes();
     for (const spec of schedule.jobs || []) {
-      if (!spec || !spec.id || day.jobs[spec.id] || !(spec.days || []).includes(now.getDay())) continue;
-      if (minutes < minutesOf(spec.start)) continue;
-      const tried = day.tries[spec.id];
-      if (minutes >= minutesOf(spec.end)) {
-        // The window is over: not checked, and why.
-        const reason = !tried ? 'Sales Tools was not open during the check time'
-          : tried.reason === 'in use' ? 'The laptop was in use the whole time' : tried.reason;
-        day.jobs[spec.id] = { status: 'missed', reason };
-        saveToday();
-        await report({ laptop, job: spec.id, trigger: 'schedule', date: day.date, phase: 'missed', time: now.toISOString(), reason, version });
-        continue;
+      if (!spec || !spec.id) continue;
+      if (!(spec.days || []).includes(now.getDay())) { note(`${spec.id}: not scheduled today`, `${spec.id}|day`); continue; }
+      if (minutes < minutesOf(spec.start)) { note(`${spec.id}: waiting for ${spec.start}`, `${spec.id}|wait`); continue; }
+      const parts = partsOf(spec);
+      for (const { part, checks } of parts) {
+        const key = partKey(spec, part);
+        if (day.jobs[key]) continue;
+        const tried = day.tries[key];
+        if (minutes >= minutesOf(spec.end)) {
+          // The window is over: not checked, and why.
+          const reason = !tried ? 'Sales Tools was not open during the check time'
+            : tried.reason === 'in use' ? `Someone used the laptop the whole time (app tests need ${Number(schedule.idleMinutes) || 5} minutes without use)` : tried.reason;
+          day.jobs[key] = { status: 'missed', reason };
+          saveToday();
+          note(`${spec.id} ${part}: not checked, ${reason}`);
+          await report({ laptop, job: spec.id, part, window: `${spec.start}-${spec.end}`, trigger: 'schedule', date: day.date, phase: 'missed', time: now.toISOString(), reason, version });
+          continue;
+        }
+        if (tried && tried.retryAt && Date.now() < tried.retryAt) continue;
+        // Apps are tested only while nobody uses the laptop (the banner and desktop part runs at once).
+        const idleNeeded = (Number(schedule.idleMinutes) || 5) * 60;
+        if (part === 'apps' && getIdleSeconds() < idleNeeded) {
+          day.tries[key] = { reason: 'in use' };
+          saveToday();
+          note(`${spec.id} apps: waiting until nobody has used the laptop for ${Math.round(idleNeeded / 60)} minutes`, `${key}|idle`);
+          continue;
+        }
+        const appsLater = part === 'basic' && parts.some((p) => p.part === 'apps');
+        await runJob({ ...spec, checks }, 'schedule', key, appsLater);
+        return; // one check at a time
       }
-      if (tried && tried.retryAt && Date.now() < tried.retryAt) continue;
-      // Apps are tested only while nobody uses the laptop.
-      if ((spec.checks || []).includes('apps') && getIdleSeconds() < (Number(schedule.idleMinutes) || 5) * 60) {
-        day.tries[spec.id] = { reason: 'in use' };
-        saveToday();
-        continue;
-      }
-      await runJob(spec, 'schedule');
-      return; // one check at a time
     }
   }
   let ticking = false;
