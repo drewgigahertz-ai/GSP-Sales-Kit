@@ -1,6 +1,7 @@
 // Laptop SKU (electron/laptop-sku.js): which laptop this is. When a branch account is signed in and the laptop has
 // no SKU yet, a window asks for it and cannot be closed until one is chosen (HO and ALL accounts are not asked).
-// The SKU is picked from SalesKit's SKU list (a SKU that is not in it can still be used). It becomes the laptop's
+// The SKU must be picked from SalesKit's SKU list (LAPTOP DB and the Reco Table): one typed that is not in it cannot
+// be saved, here or in electron/main.js. It becomes the laptop's
 // name on the SalesKit Server. "SKU: ... · Change" next to the signed-in name changes it later.
 (function () {
   const api = window.saleskit;
@@ -80,12 +81,12 @@
     const chosenLabel = backdrop.querySelector('.laptop-sku-chosen');
     const save = backdrop.querySelector('.laptop-sku-save');
     const error = backdrop.querySelector('.laptop-sku-error');
-    let chosen = null; // { sku, inList }
+    let chosen = null; // { sku } from the list
 
     function choose(value) {
       chosen = value;
       save.disabled = !chosen;
-      chosenLabel.textContent = chosen ? `${chosen.inList ? 'Chosen' : 'Not in the list'}: ${chosen.sku}` : '';
+      chosenLabel.textContent = chosen ? `Chosen: ${chosen.sku}` : 'Pick a SKU from the list.';
       [...list.querySelectorAll('button[data-sku]')].forEach((b) => b.setAttribute('aria-selected', String(Boolean(chosen) && b.dataset.sku === chosen.sku)));
     }
 
@@ -98,9 +99,9 @@
       }).slice(0, 80);
       list.replaceChildren();
       if (!choices.length) {
-        list.innerHTML = '<li class="laptop-sku-note">Loading the SKU list... You can also type the SKU above.</li>';
+        list.innerHTML = '<li class="laptop-sku-note">Loading the SKU list...</li>';
       } else if (!matches.length) {
-        list.innerHTML = '<li class="laptop-sku-note">No SKU in SalesKit\'s list matches. Check the SKU, or use what you typed.</li>';
+        list.innerHTML = '<li class="laptop-sku-note">No SKU in SalesKit\'s list matches. Check the SKU, brand or model you typed. Only a SKU from the list can be saved.</li>';
       }
       for (const c of matches) {
         const item = document.createElement('li');
@@ -113,18 +114,17 @@
         const sub = document.createElement('span');
         sub.textContent = [c.brand, c.model].filter(Boolean).join(' · ');
         button.append(title, sub);
-        button.addEventListener('click', () => choose({ sku: c.sku, inList: true }));
-        button.addEventListener('dblclick', () => { choose({ sku: c.sku, inList: true }); save.click(); });
+        button.addEventListener('click', () => choose({ sku: c.sku }));
+        button.addEventListener('dblclick', () => { choose({ sku: c.sku }); save.click(); });
         item.append(button);
         list.append(item);
       }
-      // What was typed, when it is not exactly a SKU in the list.
-      const typed = search.value.trim();
-      const exact = choices.find((c) => c.sku.toLowerCase() === typed.toLowerCase());
-      if (exact) choose({ sku: exact.sku, inList: true });
-      else if (typed.length >= 3) choose({ sku: typed, inList: false });
-      else if (chosen && !chosen.inList) choose(null);
-      if (chosen) choose(chosen);
+      // Typing a SKU in the list exactly chooses it; a choice no longer in the matches is dropped.
+      const typed = search.value.trim().toLowerCase();
+      const exact = choices.find((c) => c.sku.toLowerCase() === typed);
+      if (exact) choose({ sku: exact.sku });
+      else if (chosen && !matches.some((c) => c.sku === chosen.sku)) choose(null);
+      else choose(chosen);
     }
 
     search.addEventListener('input', () => { error.textContent = ''; render(); });
@@ -139,7 +139,6 @@
 
     save.addEventListener('click', async () => {
       if (!chosen) return;
-      if (!chosen.inList && !window.confirm(`"${chosen.sku}" is not in SalesKit's SKU list. Use it anyway?`)) return;
       save.disabled = true;
       try {
         const result = await api.setLaptopSku(chosen.sku);

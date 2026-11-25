@@ -212,7 +212,7 @@
         <option value="ending">Promo ending soonest</option>
       </select></label>
       <label class="switch"><input type="checkbox" id="promoOnly"><span class="track"></span> With a promo only</label>
-      <label class="switch" title="Salesman incentives are for staff only: they are never copied"><input type="checkbox" id="showStaff" checked><span class="track"></span> <i class="bi bi-lock-fill"></i> Show incentives</label>
+      <label class="switch" title="Vendor promos are for staff only: they are never copied"><input type="checkbox" id="showStaff" checked><span class="track"></span> <i class="bi bi-lock-fill"></i> Vendor promo</label>
       <span class="spacer"></span>
       <span id="count"></span>
     </div>
@@ -499,7 +499,7 @@
     }
     if (promo.incentive) {
       var amount = /^[\d,.]+$/.test(promo.incentive) ? peso(Number(promo.incentive.replace(/,/g, ""))) : esc(promo.incentive);
-      side += '<div class="card box staff"><h3><i class="bi bi-lock-fill"></i> Salesman incentive<span class="lock">STAFF ONLY</span></h3><div class="amount">' + amount + "</div>"
+      side += '<div class="card box staff"><h3><i class="bi bi-lock-fill"></i> Vendor promo<span class="lock">STAFF ONLY</span></h3><div class="amount">' + amount + "</div>"
         + (promo.incentiveValidity ? '<span class="valid">Valid ' + esc(promo.incentiveValidity) + "</span>" : "") + "</div>";
     }
     if (!side) side = '<div class="card box"><div class="muted"><i class="bi bi-info-circle"></i> No freebies, dates or vendor promos for this one.</div></div>';
@@ -610,9 +610,9 @@
         h += row(esc(label), cols.map(function (c) { var s = c.p.specs.filter(function (x) { return x[0] === label; })[0]; return "<td>" + (s ? esc(s[1]) : '<span style="color:#cbd5e1">—</span>') + "</td>"; }));
       });
     }
-    // Staff only: hidden with Show incentives off (body.hide-staff .staff).
+    // Staff only: hidden with the Vendor promo switch off (body.hide-staff .staff).
     if (cols.some(function (c) { return c.promo.incentive; })) {
-      h += row('<i class="bi bi-lock-fill"></i> Incentive', cols.map(function (c) { return '<td class="staff" style="color:var(--violet);font-weight:800">' + esc(c.promo.incentive || "—") + "</td>"; }), "staff");
+      h += row('<i class="bi bi-lock-fill"></i> Vendor promo', cols.map(function (c) { return '<td class="staff" style="color:var(--violet);font-weight:800">' + esc(c.promo.incentive || "—") + "</td>"; }), "staff");
     }
     h += "</tbody></table></div>";
     el("detail").innerHTML = h;
