@@ -292,14 +292,11 @@ code{background:var(--ghz-soft);padding:1px 5px;border-radius:5px;font-size:.85e
   <!-- SCHEDULES: the daily check and the app tests, run by the laptops themselves (Sales Tools 1.0.43+) -->
   <section data-view="schedules" hidden>
     <div class="toolbar">
-      <div><h2 class="section-title">Schedules</h2><div class="section-sub">The laptops run these checks by themselves. At the check time, Sales Tools turns Wi-Fi on if it is off, checks, sends the results, and turns Wi-Fi off again once nobody uses the laptop. Laptops that already had Wi-Fi on keep it on. Needs Sales Tools 1.0.43 or later.</div></div>
+      <div><h2 class="section-title">Schedules</h2><div class="section-sub">The laptops run these checks by themselves. At the check time, Sales Tools turns Wi-Fi on if it is off, checks, sends the results, and turns Wi-Fi off again once nobody uses the laptop. Laptops that already had Wi-Fi on keep it on. Needs Sales Tools 1.0.46 or later (older ones wait until nobody uses the laptop before testing apps).</div></div>
       <div class="toolbar-right"><span class="msg" id="smsg"></span><button class="btn" id="saveSched">Save schedules</button></div>
     </div>
     <div class="sched-grid" id="schedCards"></div>
-    <div class="panel" style="margin-bottom:16px"><div class="row2" style="padding:14px 18px 2px;margin:0">
-      <label style="flex:0 0 260px">Test apps only after nobody used the laptop for (minutes)<input id="idleMinutes" type="number" min="1" max="60"></label>
-      <div class="sched-sum" style="flex:1 1 300px;margin:0 0 6px">While someone uses a laptop its apps are not tested, and using it during a test stops the test (it is tried again later in the window). The banner and desktop check runs anyway: it only reads what is on screen and on the desktop.</div>
-    </div></div>
+    <div class="legend" style="margin:-4px 0 16px">At the check time the banner and desktop are checked first, then the apps are tested right away, whether or not someone is using the laptop (the apps open and close on screen). Only Stop test on the laptop, or Cancel test on the Laptops tab, stops a test.</div>
 
     <div class="panel list" style="margin-bottom:16px">
       <div class="mon-head"><h2 class="section-title">Today</h2><span class="section-sub">Laptops with a schedule today</span></div>
@@ -770,7 +767,7 @@ function schedCard(id){
     <div class="days">${DAYS.map((d,i)=>`<label class="${s.days.includes(i)?'on':''}"><input type="checkbox" data-s="${id}" data-day="${i}"${s.days.includes(i)?' checked':''}> ${d}</label>`).join('')}</div>
     <div class="row2"><label>From<input type="time" data-s="${id}" data-k="start" value="${esc(s.start)}"></label><label>Until<input type="time" data-s="${id}" data-k="end" value="${esc(s.end)}"></label>
       <label>On<select data-s="${id}" data-k="mode"><option value="laptops"${sc.mode==='laptops'?' selected':''}>Chosen laptops</option><option value="branches"${sc.mode==='branches'?' selected':''}>Chosen branches</option><option value="all"${sc.mode==='all'?' selected':''}>All laptops</option></select></label></div>
-    ${id==='daily'?`<label class="inc"><input type="checkbox" data-s="daily" data-k="includeApps"${s.includeApps?' checked':''}><span><b>Include app tests</b><div class="sub" style="white-space:normal">Also test the apps in the daily check (only while nobody uses the laptop). Leave off when App tests has its own schedule.</div></span></label>`:''}
+    ${id==='daily'?`<label class="inc"><input type="checkbox" data-s="daily" data-k="includeApps"${s.includeApps?' checked':''}><span><b>Include app tests</b><div class="sub" style="white-space:normal">Also test the apps in the daily check, right after the banner and desktop. Leave off when App tests has its own schedule.</div></span></label>`:''}
     ${sc.mode==='laptops'?`<input type="search" data-search="${id}" placeholder="Search laptop or branch" value="${esc(schedSearch[id])}">`:''}
     ${sc.mode!=='all'?`<div class="picklist">${pick}</div>`:''}
     <div class="sched-sum">${s.enabled?`On <b>${s.days.length?s.days.map(d=>DAYS[d]).join(', '):'no days'}</b>, ${esc(s.start)}–${esc(s.end)}, on <b>${n} laptop${n===1?'':'s'}</b>.`:'Off: no laptop runs it.'}</div>
@@ -783,7 +780,6 @@ function renderSchedules(){
   const focus=document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.search;
   $('schedCards').innerHTML=schedCard('daily')+schedCard('apps');
   if(focus){const el=document.querySelector(`[data-search="${focus}"]`);if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length)}}
-  $('idleMinutes').value=sched.idleMinutes;
 }
 function renderToday(){
   const cell=t=>{if(!t)return'<span class="none">—</span>';const at=t.time?` <span class="sub" style="display:inline">${esc(new Date(t.time).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))}</span>`:t.from?` <span class="sub" style="display:inline">${esc(t.from)}–${esc(t.to)}</span>`:'';return`<span class="status s-${esc(t.status)}">${esc(ST_LABEL[t.status]||t.status)}</span>${at}${t.reason?`<div class="sub" style="white-space:normal">${esc(t.reason)}</div>`:''}`};
@@ -822,7 +818,6 @@ $('schedCards').addEventListener('click',async e=>{
   const r=await api('checknow',{job:id,laptops:names}).catch(()=>null);
   $('smsg').textContent=r&&r.ok?`Started on ${r.started} laptop${r.started>1?'s':''}. Results show under Latest checks.`:(r&&r.error)||'Could not start.';$('smsg').className='msg '+(r&&r.ok?'good':'bad');
 });
-$('idleMinutes').addEventListener('input',()=>{sched.idleMinutes=Number($('idleMinutes').value)||5;schedUnsaved()});
 $('saveSched').addEventListener('click',async()=>{
   // A schedule left Off but with laptops chosen was most likely meant to be on: ask before saving it off.
   for(const id of ['daily','apps']){

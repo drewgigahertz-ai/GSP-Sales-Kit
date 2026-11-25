@@ -8,9 +8,9 @@
 // Scheduled checks (1.0.43): the server sends this laptop's schedule on a check-in (app-check-schedule.js) and it is
 // kept on the laptop, because the laptop may be offline when a check is due. Within a check's window, SalesKit turns
 // Wi-Fi on when it is off (wifi.js), reports the banner on screen and the desktop ("Daily check") and tests the apps
-// when the check includes them, but only once nobody has used the laptop for the set minutes; using the laptop
-// stops an app test, which is tried again later in the window. Wi-Fi is turned off again when it was off before,
-// once the laptop is idle. A check that could not run in its window is reported as not checked.
+// when the check includes them, right away, whether or not someone is using the laptop (only Stop test on the
+// laptop or Cancel test on the App Tests page stops them). Wi-Fi is turned off again when it was off before, once
+// nobody has used the laptop for a minute. A check that could not run in its window is reported as not checked.
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -209,7 +209,7 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
     note(`New schedule: ${schedule.jobs.length ? schedule.jobs.map((j) => `${j.id} ${j.start}-${j.end} days ${(j.days || []).join(',')} (${(j.checks || []).join(', ')})`).join('; ') : 'none'}; apps after ${schedule.idleMinutes} idle minutes`);
   }
   // A check's parts, each done once a day per time window (a new window the same day runs again):
-  // 'basic' (banner and desktop, at once, in use or not) and 'apps' (only while nobody uses the laptop).
+  // 'basic' (banner and desktop) and 'apps', run one after the other, so the banner and desktop are reported first.
   const partsOf = (spec) => {
     const basic = (spec.checks || []).filter((c) => c !== 'apps');
     return [...(basic.length ? [{ part: 'basic', checks: basic }] : []), ...((spec.checks || []).includes('apps') ? [{ part: 'apps', checks: ['apps'] }] : [])];
@@ -275,7 +275,7 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
 
   // One check: Wi-Fi on, the apps to test (when the check has them), the report, Wi-Fi back off.
   // trigger: 'schedule' or 'now' ("Run now" on the Schedules tab, which does not count for the day).
-  // key: the part being run (partKey) for a scheduled check; appsLater: the apps part still waits for an idle laptop.
+  // key: the part being run (partKey) for a scheduled check; appsLater: the apps part runs right after this one.
   async function runJob(spec, trigger, key = '', appsLater = false) {
     if (job || state.running) return;
     job = { id: spec.id, trigger };
@@ -301,7 +301,7 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
         const targets = start && Array.isArray(start.targets) ? start.targets : [];
         if (!targets.length) appsNote = 'No apps to test';
         else {
-          const run = await runTest({ targets, demoFolder: start.demoFolder, job: spec.id, watchInput: trigger === 'schedule' });
+          const run = await runTest({ targets, demoFolder: start.demoFolder, job: spec.id });
           apps = run.results;
           interrupted = run.stoppedBy === 'inuse';
           if (run.stoppedBy === 'admin') appsNote = 'Cancelled from the App Tests page';
@@ -322,7 +322,7 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
         showing: (spec.checks || []).includes('banner') ? getActivity() : undefined,
         desktop: desktopList,
         apps,
-        appsNote: appsNote || (appsLater ? 'App tests start once nobody has used the laptop for a while' : '')
+        appsNote: appsNote || (appsLater ? 'App tests start next' : '')
       });
       note(`${spec.id}: ${interrupted ? 'app test stopped, someone used the laptop' : 'done and reported'}`);
       if (key) {
@@ -357,7 +357,7 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
         if (minutes >= minutesOf(spec.end)) {
           // The window is over: not checked, and why.
           const reason = !tried ? 'Sales Tools was not open during the check time'
-            : tried.reason === 'in use' ? `Someone used the laptop the whole time (app tests need ${Number(schedule.idleMinutes) || 5} minutes without use)` : tried.reason;
+            : tried.reason;
           day.jobs[key] = { status: 'missed', reason };
           saveToday();
           note(`${spec.id} ${part}: not checked, ${reason}`);
@@ -365,17 +365,8 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
           continue;
         }
         if (tried && tried.retryAt && Date.now() < tried.retryAt) continue;
-        // Apps are tested only while nobody uses the laptop (the banner and desktop part runs at once).
-        const idleNeeded = (Number(schedule.idleMinutes) || 5) * 60;
-        if (part === 'apps' && getIdleSeconds() < idleNeeded) {
-          day.tries[key] = { reason: 'in use' };
-          saveToday();
-          note(`${spec.id} apps: waiting until nobody has used the laptop for ${Math.round(idleNeeded / 60)} minutes`, `${key}|idle`);
-          continue;
-        }
-        const appsLater = part === 'basic' && parts.some((p) => p.part === 'apps');
-        await runJob({ ...spec, checks }, 'schedule', key, appsLater);
-        return; // one check at a time
+        // One part after the other (the app tests start right after the banner and desktop, in use or not).
+        await runJob({ ...spec, checks }, 'schedule', key, part === 'basic' && parts.some((p) => p.part === 'apps'));
       }
     }
   }
