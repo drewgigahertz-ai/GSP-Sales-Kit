@@ -6,6 +6,15 @@
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
+      version: '1.0.43',
+      date: 'November 25, 2026',
+      changes: [
+        'Laptop SKU: only a SKU from SalesKit’s list can be saved. Search by SKU, brand or model and pick it; a SKU typed that is not in the list can no longer be used.',
+        'Pricing Matrix: the Show incentives switch is now called Vendor promo, and so are the STAFF ONLY box and the row in Compare. They are still never copied.',
+        'Scheduled checks: at the times head office sets, Sales Tools checks the banner on screen and the desktop, and tests the apps while nobody is using the laptop. Wi-Fi is turned on for the check when it is off, and off again afterwards. Using the laptop during an app test stops it; it is tried again later.'
+      ]
+    },
+    {
       version: '1.0.42',
       date: 'November 25, 2026',
       changes: [

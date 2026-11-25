@@ -161,6 +161,33 @@ code{background:var(--ghz-soft);padding:1px 5px;border-radius:5px;font-size:.85e
 .who{font-size:.76rem;color:var(--muted);line-height:1.5}
 .who b{color:var(--ink);font-weight:700}
 
+/* Schedules */
+.sched-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;margin-bottom:16px}
+.sched{padding:16px 18px}
+.sched-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+.sched-head h3{margin:0;font-size:1rem;color:var(--ink-strong)}
+.toggle{display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:.8rem;cursor:pointer;white-space:nowrap}
+.toggle input{width:18px;height:18px;margin:0}
+.row2{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end}
+.row2>label{flex:1 1 120px;font-size:.75rem;font-weight:700;color:var(--muted)}
+.row2>label input,.row2>label select{margin-top:4px}
+.days{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.days label{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border:1px solid var(--ghz-border);border-radius:999px;font-size:.78rem;font-weight:700;cursor:pointer}
+.days input{width:auto;margin:0}
+.days label.on{background:var(--ghz-soft);border-color:#9db1f0;color:var(--ghz-btn)}
+.inc{display:flex;gap:8px;align-items:flex-start;font-size:.82rem;margin-bottom:12px;cursor:pointer}
+.inc input{width:auto;margin:3px 0 0}
+.picklist{max-height:230px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:6px 8px;margin-top:6px}
+.picklist label{display:flex;align-items:center;gap:8px;padding:4px 2px;font-size:.8rem;cursor:pointer}
+.picklist input[type=checkbox]{width:auto;margin:0}
+.picklist .sub{margin:0}
+.sched-foot{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.sched-sum{font-size:.78rem;color:var(--muted);margin-top:8px;line-height:1.45}
+.s-done{background:var(--ok-bg);color:var(--ok)}.s-interrupted,.s-running,.s-waiting{background:#e4e9fb;color:var(--ghz-btn)}.s-missed,.s-nocheck{background:var(--bad-bg);color:var(--bad)}.s-off{background:#eef1f6;color:var(--muted)}
+.export{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:14px 18px}
+.export label{font-size:.75rem;font-weight:700;color:var(--muted)}
+.export input,.export select{width:auto;margin-top:4px;display:block}
+
 /* Sign in */
 .login{max-width:400px;margin:56px auto;padding:30px}
 .login h2{margin:0 0 4px;font-size:1.25rem;color:var(--ink-strong)}
@@ -191,6 +218,7 @@ code{background:var(--ghz-soft);padding:1px 5px;border-radius:5px;font-size:.85e
     <button class="nav-tab-ghz active" role="tab" data-tab="laptops">Laptops <span class="tab-count" id="countOnline" hidden></span></button>
     <button class="nav-tab-ghz" role="tab" data-tab="monitor">Monitoring</button>
     <button class="nav-tab-ghz" role="tab" data-tab="apps">Apps to test</button>
+    <button class="nav-tab-ghz" role="tab" data-tab="schedules">Schedules</button>
     <button class="nav-tab-ghz" role="tab" data-tab="history">History <span class="tab-count alert" id="countCheck" hidden></span></button>
   </nav>
 </div>
@@ -252,6 +280,40 @@ code{background:var(--ghz-soft);padding:1px 5px;border-radius:5px;font-size:.85e
         <div class="toolbar-right" style="flex:none"><button class="btn light" id="addTarget">Add app</button><button class="btn" id="saveTargets">Save</button></div>
       </div>
       <div class="hint">Separate alternatives with | (for example <code>assassin|mirage</code>). "Open a demo file" opens a file of that type and checks its name shows in the app's window. Each laptop looks on its desktop, Documents, Downloads, OneDrive and its drives, and prefers files or folders named after the app or with "demo" or "sample" in the name (like <code>APPLICATION DEMO</code>). To open one exact file, put its name in "Specific file", or press <b>Choose…</b> to pick it on this computer and fill in its name (only the name is used; the file is not sent), for example <code>Price list.xlsx</code>, found anywhere on each laptop, or a full path (<code>D:\APPLICATION DEMO\Price list.xlsx</code>). The result says which file was opened. <span class="msg" id="tmsg"></span></div>
+    </div>
+  </section>
+
+  <!-- SCHEDULES: the daily check and the app tests, run by the laptops themselves (Sales Tools 1.0.43+) -->
+  <section data-view="schedules" hidden>
+    <div class="toolbar">
+      <div><h2 class="section-title">Schedules</h2><div class="section-sub">The laptops run these checks by themselves. At the check time, Sales Tools turns Wi-Fi on if it is off, checks, sends the results, and turns Wi-Fi off again once nobody uses the laptop. Laptops that already had Wi-Fi on keep it on. Needs Sales Tools 1.0.43 or later.</div></div>
+      <div class="toolbar-right"><span class="msg" id="smsg"></span><button class="btn" id="saveSched">Save schedules</button></div>
+    </div>
+    <div class="sched-grid" id="schedCards"></div>
+    <div class="panel" style="margin-bottom:16px"><div class="row2" style="padding:14px 18px 2px;margin:0">
+      <label style="flex:0 0 260px">Test apps only after nobody used the laptop for (minutes)<input id="idleMinutes" type="number" min="1" max="60"></label>
+      <div class="sched-sum" style="flex:1 1 300px;margin:0 0 6px">While someone uses a laptop its apps are not tested, and using it during a test stops the test (it is tried again later in the window). The banner and desktop check runs anyway: it only reads what is on screen and on the desktop.</div>
+    </div></div>
+
+    <div class="panel list" style="margin-bottom:16px">
+      <div class="mon-head"><h2 class="section-title">Today</h2><span class="section-sub">Laptops with a schedule today</span></div>
+      <table><thead><tr><th>Branch</th><th>Laptop</th><th>Daily check</th><th>App tests</th></tr></thead><tbody id="todayRows"></tbody></table>
+    </div>
+
+    <div class="panel list" style="margin-bottom:16px">
+      <div class="mon-head"><h2 class="section-title">Latest checks</h2><span class="section-sub">Newest first</span></div>
+      <table><thead><tr><th>When</th><th>Check</th><th>Branch</th><th>Laptop</th><th>Status</th><th>Banner</th><th>Desktop</th><th>Apps</th><th>Wi-Fi</th></tr></thead><tbody id="checkRows"></tbody></table>
+    </div>
+
+    <div class="panel">
+      <div class="mon-head"><h2 class="section-title">Export CSV</h2><span class="section-sub">Every check and test, one row per app, for Excel</span></div>
+      <div class="export">
+        <label>From<input type="date" id="xFrom"></label>
+        <label>To<input type="date" id="xTo"></label>
+        <label>Branch<select class="branch-filter" id="xBranch"><option value="">All branches</option></select></label>
+        <label>Check<select id="xType"><option value="">All checks</option><option value="daily">Daily check</option><option value="apps">App tests (scheduled)</option><option value="manual">Manual app tests</option></select></label>
+        <button class="btn" id="xGo">Export CSV</button>
+      </div>
     </div>
   </section>
 
@@ -347,7 +409,7 @@ $('logout').addEventListener('click',async()=>{await api('logout',{}).catch(()=>
 
 // ---- tabs (remembered in the address, e.g. /app-check#history) ----
 function openTab(name){
-  if(!['laptops','monitor','apps','history'].includes(name))name='laptops';
+  if(!['laptops','monitor','apps','schedules','history'].includes(name))name='laptops';
   document.querySelectorAll('.nav-tab-ghz').forEach(t=>{const on=t.dataset.tab===name;t.classList.toggle('active',on);t.setAttribute('aria-selected',on)});
   document.querySelectorAll('[data-view]').forEach(v=>v.hidden=v.dataset.view!==name);
   if(location.hash!=='#'+name)history.replaceState(null,'','#'+name);
@@ -618,6 +680,8 @@ async function load(){
   state=r;
   $('me').textContent=' · Signed in: '+(state.me||'');
   if(!targets){targets=state.targets.map(t=>({...t}));$('demoFolder').value=state.demoFolder||'';$('desktopAllowed').value=state.desktopAllowed||'';renderTargets()}
+  if(!sched||!schedDirty){const next=JSON.parse(JSON.stringify(state.schedules||{}));const changed=JSON.stringify(next)!==JSON.stringify(sched);sched=next;if(changed&&!document.activeElement?.closest?.('#schedCards'))renderSchedules();else if(!$('schedCards').innerHTML)renderSchedules()}
+  renderToday();
   fillBranches();
   // While a branch list is open, the list is not redrawn (that would close it).
   if(!editingBranch)renderLaptops();
@@ -682,6 +746,92 @@ $('saveTargets').addEventListener('click',async()=>{
 });
 $('demoFolder').addEventListener('input',unsaved);
 $('desktopAllowed').addEventListener('input',unsaved);
+
+// ---- schedules ----
+const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const JOB_INFO={daily:{title:'Daily check',sub:'Banner on screen and desktop. Tick "Include app tests" to test the apps too.'},apps:{title:'App tests',sub:'The apps on the Apps to test tab, on their own schedule.'}};
+let sched=null,schedDirty=false;const schedSearch={daily:'',apps:''};
+const ST_LABEL={done:'Done',interrupted:'Stopped: laptop used',missed:'Not checked',nocheck:'Not checked',waiting:'Waiting',running:'Check time now',off:'Not today'};
+const schedUnsaved=()=>{schedDirty=true;$('smsg').textContent='Not saved yet.';$('smsg').className='msg'};
+function scopeCount(s){return s.scope.mode==='all'?state.laptops.length:state.laptops.filter(l=>s.scope.mode==='branches'?s.scope.branches.includes(l.branch):s.scope.laptops.includes(l.name)).length}
+function schedCard(id){
+  const s=sched[id],info=JOB_INFO[id],sc=s.scope;
+  const pick=sc.mode==='branches'?state.branches.map(b=>`<label><input type="checkbox" data-s="${id}" data-branch="${esc(b)}"${sc.branches.includes(b)?' checked':''}> <b>${esc(b)}</b> <span class="sub">${state.laptops.filter(l=>l.branch===b).length} laptops</span></label>`).join('')||'<div class="sub">No branches yet.</div>'
+    :sc.mode==='laptops'?state.laptops.filter(l=>{const q=schedSearch[id].toLowerCase();return!q||[l.branch,nameOf(l),l.name].join(' ').toLowerCase().includes(q)}).map(l=>`<label><input type="checkbox" data-s="${id}" data-laptop="${esc(l.name)}"${sc.laptops.includes(l.name)?' checked':''}> <span class="dot ${l.online?'on':''}"></span> <span><b>${esc(nameOf(l))}</b><div class="sub">${esc([l.branch||'Branch unknown',l.name,l.version&&'v'+l.version].filter(Boolean).join(' · '))}${l.version&&!atLeast(l.version,'1.0.43')?' · needs Sales Tools 1.0.43':''}</div></span></label>`).join('')||'<div class="sub">No laptop matches.</div>':'';
+  const n=scopeCount(s);
+  return`<div class="panel sched" data-card="${id}">
+    <div class="sched-head"><div><h3>${info.title}</h3><div class="section-sub">${info.sub}</div></div><label class="toggle"><input type="checkbox" data-s="${id}" data-k="enabled"${s.enabled?' checked':''}> ${s.enabled?'On':'Off'}</label></div>
+    <div class="days">${DAYS.map((d,i)=>`<label class="${s.days.includes(i)?'on':''}"><input type="checkbox" data-s="${id}" data-day="${i}"${s.days.includes(i)?' checked':''}> ${d}</label>`).join('')}</div>
+    <div class="row2"><label>From<input type="time" data-s="${id}" data-k="start" value="${esc(s.start)}"></label><label>Until<input type="time" data-s="${id}" data-k="end" value="${esc(s.end)}"></label>
+      <label>On<select data-s="${id}" data-k="mode"><option value="laptops"${sc.mode==='laptops'?' selected':''}>Chosen laptops</option><option value="branches"${sc.mode==='branches'?' selected':''}>Chosen branches</option><option value="all"${sc.mode==='all'?' selected':''}>All laptops</option></select></label></div>
+    ${id==='daily'?`<label class="inc"><input type="checkbox" data-s="daily" data-k="includeApps"${s.includeApps?' checked':''}><span><b>Include app tests</b><div class="sub" style="white-space:normal">Also test the apps in the daily check (only while nobody uses the laptop). Leave off when App tests has its own schedule.</div></span></label>`:''}
+    ${sc.mode==='laptops'?`<input type="search" data-search="${id}" placeholder="Search laptop or branch" value="${esc(schedSearch[id])}">`:''}
+    ${sc.mode!=='all'?`<div class="picklist">${pick}</div>`:''}
+    <div class="sched-sum">${s.enabled?`On <b>${s.days.length?s.days.map(d=>DAYS[d]).join(', '):'no days'}</b>, ${esc(s.start)}–${esc(s.end)}, on <b>${n} laptop${n===1?'':'s'}</b>.`:'Off: no laptop runs it.'}</div>
+    <div class="sched-foot"><button class="btn light sm" data-now="${id}" title="Run this check now on the chosen laptops that are online, whatever the time (for trying it out). It does not count as the day's check.">Run now on chosen laptops</button></div>
+  </div>`;
+}
+function renderSchedules(){
+  if(!sched)return;
+  if(document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#schedCards')&&document.activeElement.type==='search'){/* keep typing */}
+  const focus=document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.search;
+  $('schedCards').innerHTML=schedCard('daily')+schedCard('apps');
+  if(focus){const el=document.querySelector(`[data-search="${focus}"]`);if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length)}}
+  $('idleMinutes').value=sched.idleMinutes;
+}
+function renderToday(){
+  const cell=t=>{if(!t)return'<span class="none">—</span>';const at=t.time?` <span class="sub" style="display:inline">${esc(new Date(t.time).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))}</span>`:t.from?` <span class="sub" style="display:inline">${esc(t.from)}–${esc(t.to)}</span>`:'';return`<span class="status s-${esc(t.status)}">${esc(ST_LABEL[t.status]||t.status)}</span>${at}${t.reason?`<div class="sub" style="white-space:normal">${esc(t.reason)}</div>`:''}`};
+  const list=state.laptops.filter(l=>l.today&&(l.today.daily||l.today.apps));
+  $('todayRows').innerHTML=list.length?list.map(l=>`<tr><td><span class="branch-name">${esc(l.branch||'—')}</span></td><td><div class="laptop-name">${esc(nameOf(l))}</div><div class="sub">${esc(l.name)}${l.online?' · online':''}</div></td><td>${cell(l.today.daily)}</td><td>${cell(l.today.apps)}</td></tr>`).join('')
+    :'<tr><td colspan="4"><div class="empty"><strong>No laptop has a schedule.</strong>Turn a schedule on and choose its laptops above, then save.</div></td></tr>';
+  const B={match:['ok','✓ Matches'],different:['bad','✗ Different laptop'],nosku:['none','No SKU'],unknown:['none','? Cannot tell'],nobanner:['warn','No banner on screen']};
+  const rows=(state.checks||[]).slice(0,60);
+  $('checkRows').innerHTML=rows.length?rows.map(c=>{
+    const b=c.banner&&B[c.banner.status],d=c.desktop;
+    const apps=c.apps&&c.apps.length?`${c.apps.filter(a=>a.status==='ok').length}/${c.apps.length} passed`:c.appsNote||'';
+    return`<tr><td style="white-space:nowrap">${esc(when(c.time))}</td><td>${esc(JOB_INFO[c.job]?JOB_INFO[c.job].title:c.job)}${c.trigger==='now'?'<div class="sub">Run now</div>':''}</td><td><span class="branch-name">${esc(c.branch||'—')}</span></td><td><div class="laptop-name">${esc(nameOf(c))}</div></td>
+      <td><span class="status s-${esc(c.status)}">${esc(ST_LABEL[c.status]||c.status)}</span>${c.reason?`<div class="sub" style="white-space:normal">${esc(c.reason)}</div>`:''}</td>
+      <td>${b?`<span class="check ${b[0]}" title="${esc(c.banner.item||'')}">${b[1]}</span>`:'<span class="none">—</span>'}</td>
+      <td>${d?(d.status==='ok'?'<span class="check ok">✓ Correct</span>':d.status==='check'?`<span class="check bad" title="${esc([d.extra.length&&'Not allowed: '+d.extra.join(', '),d.missing.length&&'Missing: '+d.missing.join(', ')].filter(Boolean).join('\n'))}">✗ Not correct</span>`:'<span class="none">Not reported</span>'):'<span class="none">—</span>'}</td>
+      <td>${apps?esc(apps):'<span class="none">—</span>'}</td><td class="sub" style="white-space:normal">${esc(c.wifi||'')}</td></tr>`;
+  }).join(''):'<tr><td colspan="9"><div class="empty"><strong>No checks yet.</strong></div></td></tr>';
+}
+$('schedCards').addEventListener('change',e=>{
+  const el=e.target,id=el.dataset.s;if(!id)return;const s=sched[id];
+  if(el.dataset.day!==undefined){const d=+el.dataset.day;s.days=el.checked?[...new Set([...s.days,d])].sort():s.days.filter(x=>x!==d)}
+  else if(el.dataset.branch!==undefined){s.scope.branches=el.checked?[...s.scope.branches,el.dataset.branch]:s.scope.branches.filter(b=>b!==el.dataset.branch)}
+  else if(el.dataset.laptop!==undefined){s.scope.laptops=el.checked?[...s.scope.laptops,el.dataset.laptop]:s.scope.laptops.filter(n=>n!==el.dataset.laptop)}
+  else if(el.dataset.k==='mode')s.scope.mode=el.value;
+  else if(el.dataset.k==='enabled'||el.dataset.k==='includeApps')s[el.dataset.k]=el.checked;
+  else if(el.dataset.k==='start'||el.dataset.k==='end')s[el.dataset.k]=el.value;
+  schedUnsaved();renderSchedules();
+});
+$('schedCards').addEventListener('input',e=>{const id=e.target.dataset.search;if(id){schedSearch[id]=e.target.value;renderSchedules()}});
+$('schedCards').addEventListener('click',async e=>{
+  const b=e.target.closest('[data-now]');if(!b)return;
+  const id=b.dataset.now,s=sched[id];
+  const names=state.laptops.filter(l=>l.online&&(s.scope.mode==='all'||(s.scope.mode==='branches'?s.scope.branches.includes(l.branch):s.scope.laptops.includes(l.name)))).map(l=>l.name);
+  if(!names.length){alert('None of the chosen laptops is online.');return}
+  if(!confirm(`Run the ${JOB_INFO[id].title.toLowerCase()} now on ${names.length} online laptop${names.length>1?'s':''}?${(id==='apps'||s.includeApps)?' The apps will open on them.':''}`))return;
+  const r=await api('checknow',{job:id,laptops:names}).catch(()=>null);
+  $('smsg').textContent=r&&r.ok?`Started on ${r.started} laptop${r.started>1?'s':''}. Results show under Latest checks.`:(r&&r.error)||'Could not start.';$('smsg').className='msg '+(r&&r.ok?'good':'bad');
+});
+$('idleMinutes').addEventListener('input',()=>{sched.idleMinutes=Number($('idleMinutes').value)||5;schedUnsaved()});
+$('saveSched').addEventListener('click',async()=>{
+  const r=await api('schedules',{schedules:sched}).catch(()=>null);if(!r)return;
+  if(r.ok){sched=JSON.parse(JSON.stringify(r.schedules));schedDirty=false;renderSchedules();$('smsg').textContent='Saved. Laptops get it within a few seconds of their next check-in.';$('smsg').className='msg good'}
+  else{$('smsg').textContent=r.error||'Could not save.';$('smsg').className='msg bad'}
+});
+// Export: from the first of the month to today by default.
+{const t=new Date(),p=n=>String(n).padStart(2,'0'),d=x=>`${x.getFullYear()}-${p(x.getMonth()+1)}-${p(x.getDate())}`;$('xTo').value=d(t);$('xFrom').value=d(new Date(t.getFullYear(),t.getMonth(),1))}
+$('xGo').addEventListener('click',async()=>{
+  const q=new URLSearchParams({from:$('xFrom').value,to:$('xTo').value,branch:$('xBranch').value,type:$('xType').value});
+  const r=await fetch('/app-check/api/checks.csv?'+q,{headers:{'X-SalesKit-Session':key}});
+  if(r.status===401)return showSignin('Please sign in again.');
+  const a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());
+  a.download=`app-checks-${$('xFrom').value||'all'}-to-${$('xTo').value||'today'}.csv`;document.body.append(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+});
 
 if(key)showApp();else showSignin();
 </script></body></html>

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Notification, dialog, ipcMain, nativeImage, net, protocol, shell } = require('electron');
+const { app, BrowserWindow, Menu, Notification, dialog, ipcMain, nativeImage, net, powerMonitor, protocol, shell } = require('electron');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -15,7 +15,7 @@ const { createPriceStream } = require('./price-stream');
 const { createRememberLogin } = require('./remember-login');
 const { createZoom } = require('./zoom');
 const { createAppCheck } = require('./app-check');
-const { createLaptopSkuStore, skuChoices } = require('./laptop-sku');
+const { createLaptopSkuStore, skuChoices, skuKey } = require('./laptop-sku');
 
 // SalesKit is a client: it loads its data from the SalesKit Server, which does the Google Sheets sync.
 
@@ -450,8 +450,14 @@ ipcMain.handle('laptopsku:get', () => {
   const branch = String((session && session.user && session.user.branch) || '').trim().toUpperCase();
   return { sku: saved ? saved.sku : '', required: Boolean(session) && !!branch && !FULL_ACCESS.includes(branch) && !saved };
 });
+// Only a SKU in SalesKit's list (skuChoices) can be saved, with the list's spelling.
 ipcMain.handle('laptopsku:set', (_event, sku) => {
-  const saved = laptopSku.set(sku, session && session.user ? session.user.username : '');
+  let choices = [];
+  try { choices = skuChoices(dataLoader.savedDataFor(session && session.user)); } catch { /* no data yet */ }
+  if (!choices.length) throw new Error('The SKU list has not loaded yet. Try again once SalesKit has its data.');
+  const picked = choices.find((choice) => skuKey(choice.sku) === skuKey(sku));
+  if (!picked) throw new Error('That SKU is not in SalesKit\'s list. Pick one from the list.');
+  const saved = laptopSku.set(picked.sku, session && session.user ? session.user.username : '');
   return { sku: saved.sku };
 });
 // The SKUs to pick from, from the saved SalesKit data ([] until it has downloaded once).
@@ -589,7 +595,10 @@ app.whenReady().then(() => {
     readShortcutLink: (file) => shell.readShortcutLink(file),
     userDataDir: app.getPath('userData'),
     places: { desktop: app.getPath('desktop'), documents: app.getPath('documents'), downloads: app.getPath('downloads') },
-    version: app.getVersion()
+    version: app.getVersion(),
+    // Scheduled checks: app tests wait until nobody uses the laptop; the daily check reports the banner on screen.
+    getIdleSeconds: () => powerMonitor.getSystemIdleTime(),
+    getActivity: () => (activityReporter ? activityReporter.get() : null)
   });
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

@@ -53,6 +53,10 @@ function createActivityReporter({ send, getWindow, isSignedIn }) {
       };
       schedule();
     },
+    // What the window shows now ({ page, kind, item, code, ... } or null), for the daily check's banner.
+    get() {
+      return current ? { ...current, idle } : null;
+    },
     // After signing in again, send the current screen even if it did not change.
     reset() {
       lastSent = '';

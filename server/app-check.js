@@ -2,11 +2,13 @@
 // - Web page: http://SERVER:3000/app-check, signed in with a SalesKit account of a full-access branch (HO / ALL).
 // - Laptops (Gigahertz Sales Tools 1.0.30+, electron/app-check.js) check in every 5 seconds on /api/app-check/poll,
 //   get the list of apps when the admin pressed "Run test", and send each step and the results back.
-// Everything is kept in <userData>/app-check: settings.json (apps to test, demo folder), laptops.json, runs.jsonl
-// (every result) and results.csv (one row per test, for Excel).
+// Everything is kept in <userData>/app-check: settings.json (apps to test, demo folder, schedules), laptops.json,
+// runs.jsonl (every result), checks.jsonl (every scheduled check, app-check-schedule.js) and results.csv (one row
+// per test, for Excel).
 const fs = require('node:fs');
 const path = require('node:path');
 const { compareSku, compareBanner } = require('../electron/laptop-sku');
+const { cleanSchedules, scheduleFor, todayFor, csvRows, localDate } = require('./app-check-schedule');
 
 const ONLINE_MS = 20 * 1000;
 const DEFAULT_TARGETS = [
@@ -91,7 +93,8 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
     settings: path.join(dataDir, 'settings.json'),
     laptops: path.join(dataDir, 'laptops.json'),
     runs: path.join(dataDir, 'runs.jsonl'),
-    csv: path.join(dataDir, 'results.csv')
+    csv: path.join(dataDir, 'results.csv'),
+    checks: path.join(dataDir, 'checks.jsonl')
   };
   const pagePath = path.join(__dirname, 'app-check.html');
 
@@ -102,7 +105,14 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
   // Desktop check: besides the apps to test, what else may sit on a laptop's desktop (names or words, one per line
   // or comma; | for alternatives). Sales Tools itself always may.
   let desktopAllowed = typeof settings.desktopAllowed === 'string' ? settings.desktopAllowed : DEFAULT_DESKTOP_ALLOWED;
-  const saveSettings = () => fs.writeFileSync(F.settings, JSON.stringify({ targets, demoFolder, desktopAllowed }, null, 2));
+  // Daily check and App tests schedules (app-check-schedule.js).
+  let schedules = cleanSchedules(settings.schedules, settings.schedules);
+  const saveSettings = () => fs.writeFileSync(F.settings, JSON.stringify({ targets, demoFolder, desktopAllowed, schedules }, null, 2));
+  const readLines = (file) => {
+    try { return fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line)); } catch { return []; }
+  };
+  // The scheduled checks reported lately (all of them stay in checks.jsonl).
+  let checks = readLines(F.checks).slice(-2000);
 
   // The laptop's desktop against the rules: { status: 'ok' | 'check' | 'unknown', extra: [names of apps and website
   // links that are not allowed], missing: [apps to test for its segment with no shortcut], other: [files and
@@ -205,12 +215,23 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
         l.desktop = { items: cleanDesktop(body.desktop), at: Date.now() };
         laptopsDirty = true;
       }
-      const reply = (answer) => ({ status: 200, body: { ...answer, needDesktop: !l.desktop } });
+      // The laptop's schedule (Sales Tools 1.0.43+), sent when it is not the one the laptop already has.
+      const mine = scheduleFor(schedules, l.name, branchOf(l).branch);
+      const scheduleKey = JSON.stringify(mine);
+      const reply = (answer) => ({ status: 200, body: { ...answer, needDesktop: !l.desktop, ...(body.scheduleKey !== scheduleKey ? { schedule: { ...mine, key: scheduleKey } } : {}) } });
       // Cancel test on the page: a testing laptop (1.0.36+) stops after the app it is on; one that already
       // finished has nothing to stop.
       if (l.command === 'stop') {
         l.command = null;
         return reply({ command: body.busy ? 'stop' : null });
+      }
+      // "Run now" on the Schedules tab: the laptop runs that check at once (any time, idle or not).
+      if (!body.busy && typeof l.command === 'string' && l.command.startsWith('check:')) {
+        const id = l.command.slice(6);
+        l.command = null;
+        const s = schedules[id];
+        const checksOf = id === 'daily' ? ['banner', 'desktop', ...(s.includeApps ? ['apps'] : [])] : ['apps'];
+        return reply({ command: 'check', job: { id, days: [0, 1, 2, 3, 4, 5, 6], start: s.start, end: s.end, checks: checksOf } });
       }
       // A laptop busy with a test gets the command on its next check-in after the test.
       if (body.busy || l.command !== 'run') return reply({ command: null });
@@ -250,6 +271,8 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
         time: Number.isNaN(Date.parse(body.time)) ? new Date().toISOString() : new Date(body.time).toISOString(),
         stoppedOnLaptop: Boolean(body.stoppedOnLaptop),
         stoppedByAdmin: Boolean(body.stoppedByAdmin) || undefined,
+        // A scheduled check's app tests ('daily' or 'apps'); none for a test started from the Laptops tab.
+        job: ['daily', 'apps'].includes(body.job) ? body.job : undefined,
         results: body.results.slice(0, 40).map((r) => ({ target: text(r && r.target), app: text(r && r.app, 120), status: text(r && r.status, 20), detail: text(r && r.detail, 300) }))
       };
       // How long it ran: the server timed this test while it ran (results come just before the "finish" step).
@@ -269,6 +292,59 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
       appendCsv(run);
       const brandModel = [run.make, run.model].filter(Boolean).join(' ');
       log(passed(run) ? 'success' : 'warning', `App test on ${[run.branch, brandModel].filter(Boolean).join(' - ') || run.laptop} (${run.laptop}): ${run.results.map((r) => `${r.target} ${r.status}`).join(', ')}`);
+      return { status: 200, body: { ok: true } };
+    }
+    // Scheduled checks (Sales Tools 1.0.43+, electron/app-check.js):
+    // { phase: 'start', job } → the apps to test when the check includes them;
+    // { phase: 'done' | 'interrupted' | 'missed', job, date, trigger, wifi, reason, showing, desktop, apps } → saved.
+    if (route === 'check') {
+      const l = touch(body, user, device, body.phase !== 'missed');
+      const job = ['daily', 'apps'].includes(body.job) ? body.job : '';
+      if (!job) return { status: 400, body: { error: 'Unknown check.' } };
+      if (body.phase === 'start') {
+        return { status: 200, body: { ok: true, targets: targetsForSegment(targets, segmentOf(l)).map(({ segments, ...t }) => t), demoFolder } };
+      }
+      if (!['done', 'interrupted', 'missed'].includes(body.phase)) return { status: 400, body: { error: 'Bad request.' } };
+      if (Array.isArray(body.desktop)) {
+        l.desktop = { items: cleanDesktop(body.desktop), at: Date.now() };
+        laptopsDirty = true;
+      }
+      const at = Number.isNaN(Date.parse(body.time)) ? new Date() : new Date(body.time);
+      const check = {
+        time: at.toISOString(),
+        date: /^\d{4}-\d{2}-\d{2}$/.test(String(body.date)) ? body.date : localDate(at),
+        job,
+        trigger: body.trigger === 'now' ? 'now' : 'schedule',
+        status: body.phase,
+        reason: text(body.reason, 200) || undefined,
+        laptop: l.name,
+        branch: branchOf(l).branch,
+        sku: l.sku || undefined,
+        make: l.make,
+        model: l.model,
+        user: text(body.user),
+        version: text(body.version, 20),
+        wifi: text(body.wifi, 120) || undefined
+      };
+      if (body.phase !== 'missed') {
+        if (job === 'daily') {
+          // The banner on screen at the check (what Sales Tools reported), against the laptop's SKU.
+          const s = body.showing && typeof body.showing === 'object' ? body.showing : {};
+          const banner = { banner: Boolean(s.kind), code: text(s.code), item: text(s.item, 160) };
+          check.banner = { status: banner.banner ? compareBanner(banner, l.sku, skuEntry(l)).status : 'nobanner', item: banner.item || undefined };
+          const d = desktopCheck(l);
+          check.desktop = { status: d.status, extra: d.extra, missing: d.missing };
+        }
+        if (Array.isArray(body.apps)) {
+          check.apps = body.apps.slice(0, 40).map((r) => ({ target: text(r && r.target), status: text(r && r.status, 20), detail: text(r && r.detail, 300), ...(Number.isFinite(r && r.ms) ? { ms: r.ms } : {}) }));
+        }
+        check.appsNote = text(body.appsNote, 160) || undefined;
+      }
+      fs.appendFileSync(F.checks, `${JSON.stringify(check)}\n`);
+      checks.push(check);
+      if (checks.length > 2000) checks = checks.slice(-2000);
+      const what = { daily: 'Daily check', apps: 'Scheduled app tests' }[job];
+      log(check.status === 'done' ? 'info' : 'warning', `${what} on ${[check.branch, l.name].filter(Boolean).join(' - ')}: ${check.status}${check.reason ? ` (${check.reason})` : ''}`);
       return { status: 200, body: { ok: true } };
     }
     return { status: 404, body: { error: 'Not found.' } };
@@ -349,6 +425,16 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
       response.end(`﻿${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`);
       return;
     }
+    // Every check and test between two dates, one row per app: ?from=YYYY-MM-DD&to=YYYY-MM-DD&branch=&type=.
+    if (route === '/app-check/api/checks.csv' && request.method === 'GET') {
+      const q = url.searchParams;
+      const day = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? v : '');
+      const list = [...laptops.values()].map((l) => ({ name: l.name, branch: branchOf(l).branch, sku: l.sku, make: l.make, model: l.model }));
+      const rows = csvRows({ checks: readLines(F.checks), runs: readLines(F.runs), schedules, laptops: list, from: day(q.get('from')), to: day(q.get('to')), branch: text(q.get('branch'), 40).toUpperCase(), type: ['daily', 'apps', 'manual'].includes(q.get('type')) ? q.get('type') : '' });
+      response.writeHead(200, { 'Cache-Control': 'no-store', 'Content-Type': 'text/csv; charset=utf-8' });
+      response.end(`\ufeff${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`);
+      return;
+    }
     if (route === '/app-check/api/state' && request.method === 'GET') {
       const now = Date.now();
       const lastRun = new Map();
@@ -379,7 +465,7 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
           try { showing = now - l.lastSeen < ONLINE_MS ? showingFor(l.name) : null; } catch { /* not reported */ }
           // Is the banner on screen this laptop's own (its Laptop SKU)?
           if (showing && showing.banner) showing = { ...showing, check: compareBanner(showing, l.sku, skuEntry(l)).status };
-          return { showing, name: l.name, branch, branchSource: source, user: l.user, version: l.version, make: l.make, model: l.model, sku: l.sku || '', skuCheck: skuCheckOf(l), desktop: desktopCheck(l), segment, apps: targetsForSegment(targets, segment).map((t) => t.name), online: now - l.lastSeen < ONLINE_MS, lastSeen: l.lastSeen, current: l.current, waiting: Boolean(l.command), last: lastRun.get(l.name) || null, appStatus: appStatus.get(l.name) || {} };
+          return { today: todayFor(schedules, { name: l.name, branch }, checks), showing, name: l.name, branch, branchSource: source, user: l.user, version: l.version, make: l.make, model: l.model, sku: l.sku || '', skuCheck: skuCheckOf(l), desktop: desktopCheck(l), segment, apps: targetsForSegment(targets, segment).map((t) => t.name), online: now - l.lastSeen < ONLINE_MS, lastSeen: l.lastSeen, current: l.current, waiting: Boolean(l.command), last: lastRun.get(l.name) || null, appStatus: appStatus.get(l.name) || {} };
         });
       let segments = [];
       try { segments = listSegments(); } catch { /* no database yet */ }
@@ -388,7 +474,7 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
       let branches = [];
       try { branches = listBranches(); } catch { /* no database yet */ }
       branches = [...new Set(['HO', ...branches, ...list.map((l) => l.branch)].filter(Boolean).map((b) => String(b).toUpperCase()))].sort();
-      return send(response, 200, { now: Date.now(), me: user.displayName, laptops: list, branches, history: [...history].sort((a, b) => Date.parse(b.time) - Date.parse(a.time)).slice(0, 100), targets, segments, demoFolder, desktopAllowed, dataDir });
+      return send(response, 200, { now: Date.now(), me: user.displayName, laptops: list, branches, history: [...history].sort((a, b) => Date.parse(b.time) - Date.parse(a.time)).slice(0, 100), targets, segments, demoFolder, desktopAllowed, dataDir, schedules, checks: checks.slice(-300).reverse() });
     }
     if (request.method !== 'POST') return send(response, 404, { error: 'Not found.' });
     const body = await readBody(request);
@@ -443,9 +529,32 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
       log('info', `${user.displayName} changed the apps to test`);
       return send(response, 200, { ok: true, targets, demoFolder, desktopAllowed });
     }
+    // { schedules: { daily, apps, idleMinutes } } from the Schedules tab.
+    if (route === '/app-check/api/schedules') {
+      schedules = cleanSchedules(body.schedules, schedules);
+      saveSettings();
+      const say = (id, label) => {
+        const s = schedules[id];
+        if (!s.enabled) return `${label} off`;
+        const who = s.scope.mode === 'all' ? 'all laptops' : s.scope.mode === 'branches' ? `${s.scope.branches.length} branch(es)` : `${s.scope.laptops.length} laptop(s)`;
+        return `${label} ${s.start}-${s.end} on ${who}`;
+      };
+      log('info', `${user.displayName} changed the schedules: ${say('daily', 'Daily check')}; ${say('apps', 'App tests')}`);
+      return send(response, 200, { ok: true, schedules });
+    }
+    // { job, laptops }: run that check now on online laptops (for trying a schedule out).
+    if (route === '/app-check/api/checknow') {
+      const job = ['daily', 'apps'].includes(body.job) ? body.job : '';
+      const names = (Array.isArray(body.laptops) ? body.laptops : []).map((n) => text(n, 80));
+      const started = job ? names.filter((n) => laptops.has(n) && !running(laptops.get(n))) : [];
+      for (const n of started) laptops.get(n).command = `check:${job}`;
+      if (started.length) log('info', `${user.displayName} ran the ${job === 'daily' ? 'daily check' : 'scheduled app tests'} now on ${started.length === 1 ? started[0] : `${started.length} laptops`}`);
+      return send(response, started.length ? 200 : 404, started.length ? { ok: true, started: started.length } : { error: 'No laptop to run it on.' });
+    }
     if (route === '/app-check/api/clear') {
-      for (const file of [F.runs, F.csv]) fs.rmSync(file, { force: true });
+      for (const file of [F.runs, F.csv, F.checks]) fs.rmSync(file, { force: true });
       history = [];
+      checks = [];
       for (const l of laptops.values()) l.current = null;
       log('warning', `${user.displayName} cleared the app test history`);
       return send(response, 200, { ok: true });
