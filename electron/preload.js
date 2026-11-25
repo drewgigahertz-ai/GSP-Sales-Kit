@@ -52,6 +52,8 @@ contextBridge.exposeInMainWorld('saleskit', {
   // App test from the App Check Server's admin page: { running, stopping, targets: [{ name, status, detail }] }.
   getAppCheckState: () => ipcRenderer.invoke('appcheck:state'),
   stopAppCheck: () => ipcRenderer.invoke('appcheck:stop'),
+  // Scheduled checks this laptop has: [{ id, days, start, end, checks, today, status, reason }].
+  getAppCheckSchedule: () => ipcRenderer.invoke('appcheck:schedule'),
   onAppCheckState: (callback) => {
     const listener = (_event, state) => callback(state);
     ipcRenderer.on('appcheck:state', listener);

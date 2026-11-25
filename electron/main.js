@@ -467,6 +467,8 @@ ipcMain.handle('laptopsku:choices', () => {
 // App tests started from the App Check Server's admin page (see app-check.js).
 ipcMain.handle('appcheck:state', () => (appCheck ? appCheck.getState() : { running: false }));
 ipcMain.handle('appcheck:stop', () => { if (appCheck) appCheck.stop(); return true; });
+// This laptop's scheduled checks, for the header chip (app-check-notice.js).
+ipcMain.handle('appcheck:schedule', () => (appCheck && appCheck.getSchedule ? appCheck.getSchedule() : []));
 ipcMain.handle('app:version', () => app.getVersion());
 ipcMain.handle('update:status', () => getUpdateStatus());
 ipcMain.handle('update:install', () => installUpdateNow());

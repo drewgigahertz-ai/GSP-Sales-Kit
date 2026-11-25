@@ -15,7 +15,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { listApps, listDesktop, testTarget, collectSampleFiles } = require('./app-check-tests');
-const { wifiState, setWifi, wifiError } = require('./wifi');
+const { wifiState, setWifi, wifiError, savedNetworks, connectTo } = require('./wifi');
 // The desktop is read again at most once a minute, and sent only when it changed (or the server asks for it).
 const DESKTOP_READ_MS = 60 * 1000;
 
@@ -238,14 +238,25 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
       turnedOn = await setWifi(true);
       note(turnedOn ? 'Wi-Fi was off: turned it on' : `Wi-Fi was off and could not be turned on${wifiError() ? `: ${wifiError()}` : ''}`);
     } else note(`Wi-Fi is ${wifiBefore}${wifiBefore === 'unknown' && wifiError() ? ` (${wifiError()})` : ''}`);
-    const until = Date.now() + ONLINE_WAIT_MS;
+    const startedAt = Date.now();
+    const until = startedAt + ONLINE_WAIT_MS;
+    // Saved networks still to try, when Windows has not connected by itself 30 seconds after Wi-Fi came on.
+    let toTry = null;
     while (Date.now() < until) {
       const reply = await post('poll', { laptop, version, busy: true, scheduleKey: schedule.key || '' }, 5000);
       if (reply) {
         if (reply.schedule && typeof reply.schedule === 'object') saveSchedule(reply.schedule);
         return { wifiBefore, turnedOn, online: true };
       }
-      await new Promise((r) => setTimeout(r, 5000));
+      if (turnedOn && Date.now() - startedAt > 30 * 1000) {
+        if (!toTry) {
+          toTry = await savedNetworks();
+          note(toTry.length ? `Not connected after 30 seconds: trying the saved networks (${toTry.join(', ')})` : 'Not connected after 30 seconds, and this laptop has no saved Wi-Fi network');
+        }
+        const name = toTry.shift();
+        if (name) note(`Connecting to ${name}: ${(await connectTo(name)) ? 'asked Windows to connect' : 'Windows refused'}`);
+      }
+      await new Promise((r) => setTimeout(r, toTry && toTry.length ? 10000 : 5000));
     }
     note('The SalesKit Server did not answer within 2 minutes');
     return { wifiBefore, turnedOn, online: false };
@@ -394,7 +405,20 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
     getState: () => state,
     stop: () => stop('laptop'),
     // Looks at the schedule now instead of at the next 30-second tick (used by tests).
-    checkSchedule: () => tick()
+    checkSchedule: () => tick(),
+    // This laptop's scheduled checks for the header (app-check-notice.js): [{ id, days, start, end, checks,
+    // today: true when it runs today, status: 'done' | 'missed' | 'partial' | '' (today's window), reason }].
+    getSchedule() {
+      const day = todayState();
+      const weekday = new Date().getDay();
+      return (schedule.jobs || []).filter((spec) => spec && spec.id).map((spec) => {
+        const parts = partsOf(spec).map(({ part }) => day.jobs[partKey(spec, part)]);
+        const done = parts.filter((p) => p && p.status === 'done').length;
+        const missed = parts.find((p) => p && p.status === 'missed');
+        const status = !parts.length ? '' : done === parts.length ? 'done' : missed && parts.every(Boolean) ? (done ? 'partial' : 'missed') : done ? 'partial' : '';
+        return { id: spec.id, days: spec.days || [], start: spec.start, end: spec.end, checks: spec.checks || [], today: (spec.days || []).includes(weekday), status, reason: missed ? missed.reason : '' };
+      });
+    }
   };
 }
 

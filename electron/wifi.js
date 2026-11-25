@@ -46,4 +46,22 @@ async function setWifi(on) {
   return after === want.toLowerCase();
 }
 
-module.exports = { wifiState, setWifi, wifiError: () => lastError };
+// Wi-Fi networks saved on this laptop (netsh wlan show profiles), in the order Windows lists them.
+function savedNetworks() {
+  return new Promise((resolve) => {
+    execFile('netsh', ['wlan', 'show', 'profiles'], { timeout: 15000, windowsHide: true }, (error, out) => {
+      if (error) return resolve([]);
+      // "    All User Profile     : MyNetwork" (the label is in Windows' language, so only the part after " : ").
+      resolve(String(out || '').split(/\r?\n/).filter((line) => /^\s{4}\S.*\s:\s/.test(line)).map((line) => line.split(/\s:\s/).slice(1).join(' : ').trim()).filter(Boolean));
+    });
+  });
+}
+
+// Asks Windows to connect to a saved network (when it did not by itself after Wi-Fi came on). No admin needed.
+function connectTo(name) {
+  return new Promise((resolve) => {
+    execFile('netsh', ['wlan', 'connect', `name=${name}`], { timeout: 15000, windowsHide: true }, (error) => resolve(!error));
+  });
+}
+
+module.exports = { wifiState, setWifi, wifiError: () => lastError, savedNetworks, connectTo };

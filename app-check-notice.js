@@ -51,6 +51,13 @@
       cursor: pointer;
     }
     .app-check-notice-foot button:disabled { opacity: .6; cursor: default; }
+    /* Header chip: this laptop's scheduled check (from head office's App Tests page). */
+    .app-check-chip { display: inline-flex; align-items: center; gap: 5px; margin-left: 8px; padding: 1px 9px; border-radius: 999px;
+      background: rgba(255, 255, 255, .16); border: 1px solid rgba(255, 255, 255, .35); color: #fff; font-size: .72rem; font-weight: 700;
+      white-space: nowrap; vertical-align: middle; cursor: default; }
+    .app-check-chip.done { background: rgba(34, 197, 94, .25); border-color: rgba(134, 239, 172, .7); }
+    .app-check-chip.missed { background: rgba(239, 68, 68, .25); border-color: rgba(252, 165, 165, .7); }
+    .app-check-chip.now { background: rgba(250, 204, 21, .25); border-color: rgba(253, 224, 71, .75); }
   `;
   document.head.appendChild(style);
 
@@ -110,10 +117,58 @@
     card.hidden = false;
   }
 
+  // ---- Header chip: "Daily check today 1:45–1:55 PM", "Checked today ✓", "Next check Sat 1:00 PM" ----
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const NAMES = { daily: 'Daily check', apps: 'App tests' };
+  const clock = (hhmm) => {
+    const [h, m] = String(hhmm).split(':').map(Number);
+    return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+  };
+  const minutesOf = (hhmm) => Number(String(hhmm).slice(0, 2)) * 60 + Number(String(hhmm).slice(3, 5));
+  // The next day (from tomorrow) the check runs.
+  const nextDay = (days) => { const today = new Date().getDay(); for (let i = 1; i <= 7; i += 1) if (days.includes((today + i) % 7)) return i === 1 ? 'tomorrow' : DAYS[(today + i) % 7]; return ''; };
+  function chipFor(job) {
+    const now = new Date();
+    const minutes = now.getHours() * 60 + now.getMinutes();
+    const what = `${NAMES[job.id] || 'Check'} (${job.checks.map((c) => ({ banner: 'banner', desktop: 'desktop', apps: 'apps' }[c] || c)).join(', ')})`;
+    const days = job.days.length === 7 ? 'every day' : job.days.map((d) => DAYS[d]).join(', ');
+    const tip = `${what}, ${days}, ${clock(job.start)} to ${clock(job.end)}. Set by head office. Wi-Fi is turned on for the check if it is off, and app tests wait until nobody uses the laptop.`;
+    if (job.today && job.status === 'done') return { tone: 'done', text: `${NAMES[job.id]} done today ✓`, tip };
+    if (job.today && (job.status === 'missed' || job.status === 'partial')) return { tone: 'missed', text: `${NAMES[job.id]}: ${job.status === 'partial' ? 'apps not tested' : 'not checked'} today`, tip: `${job.reason || ''}\n${tip}`.trim() };
+    if (job.today && minutes < minutesOf(job.end)) {
+      return minutes >= minutesOf(job.start)
+        ? { tone: 'now', text: `${NAMES[job.id]} now (until ${clock(job.end)})`, tip }
+        : { tone: '', text: `${NAMES[job.id]} today ${clock(job.start)}`, tip };
+    }
+    const next = nextDay(job.days);
+    return next ? { tone: '', text: `Next ${NAMES[job.id].toLowerCase()} ${next} ${clock(job.start)}`, tip } : null;
+  }
+  const chip = document.createElement('span');
+  chip.className = 'app-check-chip';
+  chip.hidden = true;
+  async function renderChip() {
+    if (typeof api.getAppCheckSchedule !== 'function') return;
+    const anchor = document.getElementById('laptopSkuLabel') || document.getElementById('signedInUser');
+    if (!anchor) return;
+    let jobs = [];
+    try { jobs = await api.getAppCheckSchedule(); } catch { jobs = []; }
+    // The one that matters most: running now, then today's, then the next.
+    const chips = (jobs || []).map(chipFor).filter(Boolean);
+    const pick = chips.find((c) => c.tone === 'now') || chips.find((c) => c.tone === 'missed') || chips.find((c) => /today/.test(c.text) && c.tone === '') || chips[0];
+    if (!pick) { chip.hidden = true; return; }
+    if (chip.previousElementSibling !== anchor) anchor.insertAdjacentElement('afterend', chip);
+    chip.className = `app-check-chip ${pick.tone}`;
+    chip.textContent = `🗓 ${pick.text}${chips.length > 1 ? ` · +${chips.length - 1}` : ''}`;
+    chip.title = chips.map((c) => c.tip).join('\n\n');
+    chip.hidden = false;
+  }
+
   function start() {
     document.body.appendChild(card);
     api.onAppCheckState(render);
     api.getAppCheckState().then(render).catch(() => {});
+    renderChip();
+    setInterval(renderChip, 30 * 1000);
   }
   if (document.body) start();
   else document.addEventListener('DOMContentLoaded', start);

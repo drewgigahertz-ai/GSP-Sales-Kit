@@ -6,6 +6,14 @@
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
+      version: '1.0.45',
+      date: 'November 25, 2026',
+      changes: [
+        'Scheduled checks: the header shows this laptop’s check set by head office, next to your name: when it is ("Daily check today 1:45 PM"), while it runs, and whether it was done today. Point at it for the details.',
+        'Scheduled checks: when Windows does not connect to Wi-Fi by itself after the check turned it on, Sales Tools tries the laptop’s saved Wi-Fi networks.'
+      ]
+    },
+    {
       version: '1.0.44',
       date: 'November 25, 2026',
       changes: [
