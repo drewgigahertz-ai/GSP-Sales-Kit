@@ -6,6 +6,13 @@
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
+      version: '1.0.47',
+      date: 'November 25, 2026',
+      changes: [
+        'Scheduled checks: Wi-Fi is turned on once for all the checks that are due (banner and desktop first, then the app tests) and turned off right after them, even while someone is using the laptop. Before, it went off between the checks and stayed on after the app tests.'
+      ]
+    },
+    {
       version: '1.0.46',
       date: 'November 25, 2026',
       changes: [

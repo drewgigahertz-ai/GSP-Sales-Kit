@@ -132,7 +132,7 @@
     const minutes = now.getHours() * 60 + now.getMinutes();
     const what = `${NAMES[job.id] || 'Check'} (${job.checks.map((c) => ({ banner: 'banner', desktop: 'desktop', apps: 'apps' }[c] || c)).join(', ')})`;
     const days = job.days.length === 7 ? 'every day' : job.days.map((d) => DAYS[d]).join(', ');
-    const tip = `${what}, ${days}, ${clock(job.start)} to ${clock(job.end)}. Set by head office. Wi-Fi is turned on for the check if it is off. App tests open and close apps on this laptop by themselves.`;
+    const tip = `${what}, ${days}, ${clock(job.start)} to ${clock(job.end)}. Set by head office. Wi-Fi is turned on for the check if it is off, and off again right after. App tests open and close apps on this laptop by themselves.`;
     if (job.today && job.status === 'done') return { tone: 'done', text: `${NAMES[job.id]} done today ✓`, tip };
     if (job.today && (job.status === 'missed' || job.status === 'partial')) return { tone: 'missed', text: `${NAMES[job.id]}: ${job.status === 'partial' ? 'apps not tested' : 'not checked'} today`, tip: `${job.reason || ''}\n${tip}`.trim() };
     if (job.today && minutes < minutesOf(job.end)) {

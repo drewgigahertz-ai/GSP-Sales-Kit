@@ -9,8 +9,8 @@
 // kept on the laptop, because the laptop may be offline when a check is due. Within a check's window, SalesKit turns
 // Wi-Fi on when it is off (wifi.js), reports the banner on screen and the desktop ("Daily check") and tests the apps
 // when the check includes them, right away, whether or not someone is using the laptop (only Stop test on the
-// laptop or Cancel test on the App Tests page stops them). Wi-Fi is turned off again when it was off before, once
-// nobody has used the laptop for a minute. A check that could not run in its window is reported as not checked.
+// laptop or Cancel test on the App Tests page stops them). Wi-Fi is turned off again right after the checks when it
+// was off before (all the checks that are due run in one Wi-Fi session). A check that could not run in its window is reported as not checked.
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -21,11 +21,10 @@ const DESKTOP_READ_MS = 60 * 1000;
 
 const POLL_MS = 5000;
 // Scheduled checks: looked at every 30 seconds; the server must answer within 2 minutes of Wi-Fi coming on; a check
-// that could not reach the server is tried again after 10 minutes; Wi-Fi goes off after 1 idle minute.
+// that could not reach the server is tried again after 10 minutes; Wi-Fi goes off as soon as the checks are done.
 const SCHEDULE_TICK_MS = 30 * 1000;
 const ONLINE_WAIT_MS = 2 * 60 * 1000;
 const RETRY_MS = 10 * 60 * 1000;
-const WIFI_OFF_IDLE_S = 60;
 
 // request(route, body, timeoutMs): POSTs to /api/app-check/<route> on the SalesKit Server (same addresses, token
 // and sign-in as the rest of SalesKit) and resolves to the reply, or rejects.
@@ -192,7 +191,7 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
     // Not awaited: the check-ins carry on while the test runs.
     if (reply.command === 'run' && !job) runTest(reply).catch(() => setState({ running: false }));
     // "Run now" on the App Tests page's Schedules tab: the check at once, idle or not.
-    if (reply.command === 'check' && reply.job && !job) runJob(reply.job, 'now').catch(() => {});
+    if (reply.command === 'check' && reply.job && !job) runSession(partsOf(reply.job).map((p) => ({ spec: reply.job, ...p, key: '' })), 'now').catch(() => {});
   }
 
   // ---------- Scheduled checks ----------
@@ -261,74 +260,75 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
     note('The SalesKit Server did not answer within 2 minutes');
     return { wifiBefore, turnedOn, online: false };
   }
-  // Wi-Fi back off when this check turned it on: now if nobody uses the laptop, else once it is idle (tick).
+  // Wi-Fi back off right after the check when the check turned it on. If Windows does not do it, it is tried again
+  // every 30 seconds (tick).
   async function restoreWifi(net) {
     if (!net.turnedOn) return;
-    if (getIdleSeconds() >= WIFI_OFF_IDLE_S && await setWifi(false)) { note('Wi-Fi turned off again'); return; }
-    note('Wi-Fi stays on until nobody has used the laptop for a minute');
+    if (await setWifi(false)) { note('Wi-Fi turned off again'); return; }
+    note(`Wi-Fi could not be turned off${wifiError() ? `: ${wifiError()}` : ''}; trying again`);
     todayState().wifiOff = true;
     saveToday();
   }
-  const wifiText = (net, off) => (net.wifiBefore === 'on' ? 'Was on, left on'
-    : net.wifiBefore === 'off' ? (net.turnedOn ? `Was off: turned on for the check${off ? ', then off' : ''}` : 'Was off: could not turn it on')
+  const wifiText = (net) => (net.wifiBefore === 'on' ? 'Was on, left on'
+    : net.wifiBefore === 'off' ? (net.turnedOn ? 'Was off: turned on for the check, then off' : 'Was off: could not turn it on')
       : net.wifiBefore === 'none' ? 'No Wi-Fi (network cable)' : 'Unknown');
 
-  // One check: Wi-Fi on, the apps to test (when the check has them), the report, Wi-Fi back off.
+  // One Wi-Fi session for every check that is due: Wi-Fi on once, each check (banner and desktop first, then the
+  // apps) reported as it finishes, Wi-Fi off once at the end.
+  // items: [{ spec, part, checks, key }] (key: partKey for a scheduled check, '' for "Run now").
   // trigger: 'schedule' or 'now' ("Run now" on the Schedules tab, which does not count for the day).
-  // key: the part being run (partKey) for a scheduled check; appsLater: the apps part runs right after this one.
-  async function runJob(spec, trigger, key = '', appsLater = false) {
-    if (job || state.running) return;
-    job = { id: spec.id, trigger };
+  async function runSession(items, trigger) {
+    if (job || state.running || !items.length) return;
+    job = { id: items[0].spec.id, trigger };
     const day = todayState();
     const user = getUser();
-    const base = { laptop, job: spec.id, trigger, date: day.date, window: `${spec.start}-${spec.end}`, part: key ? key.split('|')[2] : '', version, user: user ? user.username || '' : '' };
-    note(`${trigger === 'now' ? 'Run now' : 'Scheduled'}: ${spec.id} (${(spec.checks || []).join(', ')}) starts`);
+    note(`${trigger === 'now' ? 'Run now' : 'Scheduled'}: ${items.map((i) => `${i.spec.id} (${i.checks.join(', ')})`).join(', then ')}`);
     try {
       const net = await goOnline();
       if (!net.online) {
         const reason = net.wifiBefore === 'off' && !net.turnedOn ? 'Wi-Fi could not be turned on' : 'Could not reach the SalesKit Server';
-        if (key) day.tries[key] = { reason, retryAt: Date.now() + RETRY_MS };
+        for (const { key } of items) if (key) day.tries[key] = { reason, retryAt: Date.now() + RETRY_MS };
         saveToday();
-        note(`${spec.id}: ${reason}; tried again in 10 minutes`);
+        note(`${reason}; tried again in 10 minutes`);
         await restoreWifi(net);
         return;
       }
-      const start = await post('check', { ...base, phase: 'start' }, 10000);
-      let apps;
-      let appsNote = '';
-      let interrupted = false;
-      if ((spec.checks || []).includes('apps')) {
-        const targets = start && Array.isArray(start.targets) ? start.targets : [];
-        if (!targets.length) appsNote = 'No apps to test';
-        else {
-          const run = await runTest({ targets, demoFolder: start.demoFolder, job: spec.id });
-          apps = run.results;
-          interrupted = run.stoppedBy === 'inuse';
-          if (run.stoppedBy === 'admin') appsNote = 'Cancelled from the App Tests page';
-          if (run.stoppedBy === 'laptop') appsNote = 'Stopped on the laptop';
+      for (const [index, { spec, part, checks, key }] of items.entries()) {
+        job = { id: spec.id, trigger };
+        const base = { laptop, job: spec.id, trigger, date: day.date, window: `${spec.start}-${spec.end}`, part, version, user: user ? user.username || '' : '' };
+        const start = await post('check', { ...base, phase: 'start' }, 10000);
+        let apps;
+        let appsNote = '';
+        if (checks.includes('apps')) {
+          const targets = start && Array.isArray(start.targets) ? start.targets : [];
+          if (!targets.length) appsNote = 'No apps to test';
+          else {
+            const run = await runTest({ targets, demoFolder: start.demoFolder, job: spec.id });
+            apps = run.results;
+            if (run.stoppedBy === 'admin') appsNote = 'Cancelled from the App Tests page';
+            if (run.stoppedBy === 'laptop') appsNote = 'Stopped on the laptop';
+          }
         }
-      }
-      let desktopList;
-      if ((spec.checks || []).includes('desktop')) {
-        try { desktopList = listDesktop(readShortcutLink, [places.desktop, path.join(process.env.PUBLIC || 'C:\\Users\\Public', 'Desktop')].filter(Boolean)); } catch { desktopList = []; }
-      }
-      const willTurnOff = net.turnedOn;
-      await report({
-        ...base,
-        phase: interrupted ? 'interrupted' : 'done',
-        time: new Date().toISOString(),
-        reason: interrupted ? 'Someone used the laptop during the app test; tried again later' : undefined,
-        wifi: wifiText(net, willTurnOff),
-        showing: (spec.checks || []).includes('banner') ? getActivity() : undefined,
-        desktop: desktopList,
-        apps,
-        appsNote: appsNote || (appsLater ? 'App tests start next' : '')
-      });
-      note(`${spec.id}: ${interrupted ? 'app test stopped, someone used the laptop' : 'done and reported'}`);
-      if (key) {
-        if (interrupted) day.tries[key] = { reason: 'in use', retryAt: Date.now() + 60 * 1000 };
-        else day.jobs[key] = { status: 'done' };
-        saveToday();
+        let desktopList;
+        if (checks.includes('desktop')) {
+          try { desktopList = listDesktop(readShortcutLink, [places.desktop, path.join(process.env.PUBLIC || 'C:\\Users\\Public', 'Desktop')].filter(Boolean)); } catch { desktopList = []; }
+        }
+        const appsNext = items.slice(index + 1).some((i) => i.spec.id === spec.id && i.checks.includes('apps'));
+        await report({
+          ...base,
+          phase: 'done',
+          time: new Date().toISOString(),
+          wifi: wifiText(net),
+          showing: checks.includes('banner') ? getActivity() : undefined,
+          desktop: desktopList,
+          apps,
+          appsNote: appsNote || (appsNext ? 'App tests start next' : '')
+        });
+        note(`${spec.id} ${part}: done and reported`);
+        if (key) {
+          day.jobs[key] = { status: 'done' };
+          saveToday();
+        }
       }
       await restoreWifi(net);
     } finally {
@@ -336,28 +336,27 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
     }
   }
 
-  // Every 30 seconds: Wi-Fi back off when due, and the scheduled checks whose time has come.
+  // Every 30 seconds: Wi-Fi back off when it could not be turned off before, and the checks whose time has come.
   async function tick() {
     const day = todayState();
-    if (day.wifiOff && !job && !state.running && getIdleSeconds() >= WIFI_OFF_IDLE_S) {
-      if ((await wifiState()) !== 'on' || await setWifi(false)) { day.wifiOff = false; saveToday(); }
+    if (day.wifiOff && !job && !state.running) {
+      if ((await wifiState()) !== 'on' || await setWifi(false)) { day.wifiOff = false; saveToday(); note('Wi-Fi turned off again'); }
     }
     if (job || state.running) return;
     const now = new Date();
     const minutes = now.getHours() * 60 + now.getMinutes();
+    const due = [];
     for (const spec of schedule.jobs || []) {
       if (!spec || !spec.id) continue;
       if (!(spec.days || []).includes(now.getDay())) { note(`${spec.id}: not scheduled today`, `${spec.id}|day`); continue; }
       if (minutes < minutesOf(spec.start)) { note(`${spec.id}: waiting for ${spec.start}`, `${spec.id}|wait`); continue; }
-      const parts = partsOf(spec);
-      for (const { part, checks } of parts) {
+      for (const { part, checks } of partsOf(spec)) {
         const key = partKey(spec, part);
         if (day.jobs[key]) continue;
         const tried = day.tries[key];
         if (minutes >= minutesOf(spec.end)) {
           // The window is over: not checked, and why.
-          const reason = !tried ? 'Sales Tools was not open during the check time'
-            : tried.reason;
+          const reason = !tried ? 'Sales Tools was not open during the check time' : tried.reason;
           day.jobs[key] = { status: 'missed', reason };
           saveToday();
           note(`${spec.id} ${part}: not checked, ${reason}`);
@@ -365,10 +364,12 @@ function createAppCheck({ request, getUser, getWindow, readShortcutLink, userDat
           continue;
         }
         if (tried && tried.retryAt && Date.now() < tried.retryAt) continue;
-        // One part after the other (the app tests start right after the banner and desktop, in use or not).
-        await runJob({ ...spec, checks }, 'schedule', key, part === 'basic' && parts.some((p) => p.part === 'apps'));
+        due.push({ spec, part, checks, key });
       }
     }
+    // Banner and desktop checks first, then the app tests, all in one Wi-Fi session.
+    due.sort((a, b) => (a.checks.includes('apps') ? 1 : 0) - (b.checks.includes('apps') ? 1 : 0));
+    await runSession(due, 'schedule');
   }
   let ticking = false;
   setInterval(async () => {

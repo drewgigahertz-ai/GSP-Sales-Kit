@@ -292,7 +292,7 @@ code{background:var(--ghz-soft);padding:1px 5px;border-radius:5px;font-size:.85e
   <!-- SCHEDULES: the daily check and the app tests, run by the laptops themselves (Sales Tools 1.0.43+) -->
   <section data-view="schedules" hidden>
     <div class="toolbar">
-      <div><h2 class="section-title">Schedules</h2><div class="section-sub">The laptops run these checks by themselves. At the check time, Sales Tools turns Wi-Fi on if it is off, checks, sends the results, and turns Wi-Fi off again once nobody uses the laptop. Laptops that already had Wi-Fi on keep it on. Needs Sales Tools 1.0.46 or later (older ones wait until nobody uses the laptop before testing apps).</div></div>
+      <div><h2 class="section-title">Schedules</h2><div class="section-sub">The laptops run these checks by themselves. At the check time, Sales Tools turns Wi-Fi on if it is off, runs every check that is due (banner and desktop first, then the apps), sends the results, and turns Wi-Fi off again right after. Laptops that already had Wi-Fi on keep it on. Needs Sales Tools 1.0.46 or later (older ones wait until nobody uses the laptop before testing apps).</div></div>
       <div class="toolbar-right"><span class="msg" id="smsg"></span><button class="btn" id="saveSched">Save schedules</button></div>
     </div>
     <div class="sched-grid" id="schedCards"></div>
