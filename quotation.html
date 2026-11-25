@@ -1040,6 +1040,8 @@
     el(id).addEventListener("input", function () {
       draft[id] = el(id).value;
       if (id === "customer") draft.customerTyped = true;
+      // A number typed by hand stays as typed (it no longer follows the branch).
+      if (id === "number") draft.numberTyped = Boolean(el(id).value.trim());
       // A typed date stays; an emptied box goes back to the worked-out date.
       if (id === "valid") draft.validTyped = Boolean(el(id).value.trim());
       saveDraft();
@@ -1217,7 +1219,7 @@
     if (draft.lines.length && !isSaved() && !confirm("Replace the quotation on screen? It is not in History yet (it is kept there when you download or print it).")) return;
     var next = JSON.parse(JSON.stringify(q.draft || {}));
     next.lines = next.lines || [];
-    if (asNew) { next.number = ""; next.date = today(); next.valid = ""; next.validTyped = false; }
+    if (asNew) { next.number = ""; next.numberTyped = false; next.date = today(); next.valid = ""; next.validTyped = false; }
     // Its branch when this laptop may use it, else the current one.
     if (data.lockBranch || (data.branches.length && data.branches.indexOf(key(next.branch)) === -1)) next.branch = draft.branch;
     next.customerTyped = true;
@@ -1262,10 +1264,17 @@
     }
     dirty = false;
     draft.branch = el("branch").value;
-    // A number not given out yet (not in History) follows the branch.
-    if (!savedQuotes.some(function (q) { return q.number === draft.number; })) { draft.number = ""; assignNumber(); el("number").value = draft.number; }
-    // Prices and freebies follow the branch (an edited price is replaced too): the same promo, bundle and term when
-    // the branch has them, else the branch's own promo and cash.
+    followBranch();
+    saveDraft();
+    renderHeader();
+    renderLines();
+    renderQuick();
+  });
+  // The quotation's branch changed (picked here, or set by the account that signed in): a number not given out yet
+  // (not in History) follows the branch, and prices and freebies follow it (an edited price is replaced too): the
+  // same promo, bundle and term when the branch has them, else the branch's own promo and cash.
+  function followBranch() {
+    if (!draft.numberTyped && !savedQuotes.some(function (q) { return q.number === draft.number; })) { draft.number = ""; assignNumber(); el("number").value = draft.number; }
     draft.lines.forEach(function (line) {
       var laptop = byCode[key(line.code)];
       if (!laptop) return;
@@ -1276,11 +1285,7 @@
       line.price = line.sheetPrice = price != null ? price : priceFor(laptop);
       line.freebie = !isLaptop(laptop) ? "" : p ? bundleFreebie(p, bundle) : freebieFor(laptop);
     });
-    saveDraft();
-    renderHeader();
-    renderLines();
-    renderQuick();
-  });
+  }
   el("newQuote").addEventListener("click", function () {
     if (draft.lines.length && !isSaved() && !confirm("Start a new quotation? This one is not in History yet (it is kept there when you download or print it) and will be cleared.")) return;
     // Branch details are kept apart (Branch details form), so they stay as they are.
@@ -1513,8 +1518,16 @@
       data.laptops.forEach(function (l) { byCode[key(l.code)] = l; });
       data.hasStock = Boolean(m.hasStock);
       data.stockAsOf = m.stockAsOf || "";
+      var branchBefore = key(draft.branch);
       if (data.lockBranch) draft.branch = data.homeBranch;
       else if (!draft.branch || data.branches.indexOf(key(draft.branch)) === -1) draft.branch = data.branches.indexOf(key(data.homeBranch)) !== -1 ? data.homeBranch : (data.branches[0] || "");
+      // Another account (another branch) on this laptop: the draft follows its branch, like picking it in the list.
+      // A number made for another branch (e.g. one made before this fix) is renumbered the same way.
+      // A number typed by hand, or one already in History (an opened quotation), is never changed here.
+      var prefix = branch().replace(/[^A-Z0-9]/g, "") + "-";
+      var otherBranchNumber = draft.number && !draft.numberTyped && draft.number.indexOf(prefix) !== 0
+        && !savedQuotes.some(function (q) { return q.number === draft.number; });
+      if ((branchBefore && branchBefore !== branch()) || otherBranchNumber) followBranch();
       assignNumber();
       baselinePrices();
       fillBranches();
