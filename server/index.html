@@ -1374,6 +1374,13 @@
               <input class="form-control form-control-sm" id="pricingSpreadsheetId" spellcheck="false" placeholder="Link or ID · blank = the NEW PRICING tab of the spreadsheet above">
             </div>
             <div class="col-12">
+              <label class="label" for="stockSource">Branch stock from</label>
+              <select class="form-select form-select-sm" id="stockSource">
+                <option value="csv">Inventory CSV (Stock Status - YYYYMMDD.csv)</option>
+                <option value="laptopdb">LAPTOP DB (branch stock columns in the sheet)</option>
+              </select>
+            </div>
+            <div class="col-12">
               <label class="label" for="inventoryFolder">Inventory CSV folder (Stock Status - YYYYMMDD.csv)</label>
               <input class="form-control form-control-sm" id="inventoryFolder" spellcheck="false" placeholder="e.g. Z:\ · blank = branch stock from LAPTOP DB">
               <div class="inventory-status" id="inventoryStatus"></div>

@@ -130,7 +130,9 @@ function loadSettings() {
     dataUpdatedAt: saved?.dataUpdatedAt || null,
     allowWithoutLogin: saved?.allowWithoutLogin !== false,
     // Where "Stock Status - YYYYMMDD.csv" is uploaded (the folder or one folder down); blank = no inventory CSV.
-    inventoryFolder: typeof saved?.inventoryFolder === 'string' ? saved.inventoryFolder : 'Z:\\'
+    inventoryFolder: typeof saved?.inventoryFolder === 'string' ? saved.inventoryFolder : 'Z:\\',
+    // Where branch stock comes from: 'csv' (the inventory CSV above) or 'laptopdb' (LAPTOP DB's branch columns).
+    stockSource: saved?.stockSource === 'laptopdb' ? 'laptopdb' : 'csv'
   };
   if (!saved) writeSettings(loaded);
   return loaded;
@@ -202,6 +204,7 @@ function getState() {
     serverUpdate: serverUpdater ? serverUpdater.get() : null,
     dataHealth: dataHealth ? { total: dataHealth.total, checkedAt: dataHealth.checkedAt } : null,
     inventoryFolder: settings.inventoryFolder,
+    stockSource: settings.stockSource,
     inventory: inventoryStatus
   };
 }
@@ -574,9 +577,10 @@ function startPriceWatch() {
 }
 
 // The newest inventory CSV as the inventory_stock collection, or null when it cannot be read (logged once per
-// new problem; the last stock read stays). No folder set: an empty one (LAPTOP DB's stock is used again).
+// new problem; the last stock read stays). Stock from LAPTOP DB, or no folder set: an empty one (LAPTOP DB's
+// branch stock columns are used again).
 function readInventory() {
-  if (!settings.inventoryFolder) {
+  if (settings.stockSource === 'laptopdb' || !settings.inventoryFolder) {
     inventoryStatus = null;
     return { collection: 'inventory_stock', columns: ['item_key', 'item', 'stock', 'as_of', 'file'], rows: [] };
   }
@@ -872,6 +876,10 @@ handle('server:update-settings', async (_event, changes = {}) => {
   if (changes.inventoryFolder !== undefined) {
     settings.inventoryFolder = String(changes.inventoryFolder || '').trim().slice(0, 300);
   }
+  if (changes.stockSource !== undefined) {
+    if (changes.stockSource !== 'csv' && changes.stockSource !== 'laptopdb') throw new Error('Choose where branch stock comes from.');
+    settings.stockSource = changes.stockSource;
+  }
   if (changes.syncIntervalMinutes !== undefined) {
     const minutes = Number(changes.syncIntervalMinutes);
     if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440) throw new Error('Sync interval must be 1–1440 minutes.');
@@ -900,10 +908,14 @@ handle('server:update-settings', async (_event, changes = {}) => {
   if (settings.spreadsheetId !== previous.spreadsheetId) log('info', 'Spreadsheet ID updated.');
   if (settings.pricingSpreadsheetId !== previous.pricingSpreadsheetId) log('info', 'Pricing spreadsheet updated.');
   if (settings.priceMatrixSpreadsheetId !== previous.priceMatrixSpreadsheetId) log('info', 'Price matrix spreadsheet updated.');
-  if (settings.inventoryFolder !== previous.inventoryFolder) {
+  if (settings.stockSource !== previous.stockSource) {
+    log('info', settings.stockSource === 'laptopdb'
+      ? 'Branch stock now comes from LAPTOP DB (the inventory CSV is not read).'
+      : `Branch stock now comes from the inventory CSV${settings.inventoryFolder ? ` in ${settings.inventoryFolder}` : ' (set its folder)'}.`);
+  } else if (settings.inventoryFolder !== previous.inventoryFolder && settings.stockSource === 'csv') {
     log('info', settings.inventoryFolder ? `Inventory folder: ${settings.inventoryFolder}` : 'Inventory CSV turned off: LAPTOP DB stock is used again.');
-    checkInventory().catch(() => {});
   }
+  if (settings.stockSource !== previous.stockSource || settings.inventoryFolder !== previous.inventoryFolder) checkInventory().catch(() => {});
   pushState();
   return getState();
 });

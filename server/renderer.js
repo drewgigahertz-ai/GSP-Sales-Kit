@@ -149,7 +149,9 @@ function renderInventory() {
   const info = state.inventory;
   const day = (iso) => (iso ? new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '');
   box.className = 'inventory-status';
-  if (!state.inventoryFolder) {
+  if (state.stockSource === 'laptopdb') {
+    box.textContent = 'Not used: branch stock comes from LAPTOP DB.';
+  } else if (!state.inventoryFolder) {
     box.textContent = 'Off: branch stock comes from LAPTOP DB.';
   } else if (!info) {
     box.textContent = 'Read at the next sync.';
@@ -173,6 +175,8 @@ function renderSettings() {
   $('pricingSpreadsheetId').value = state.pricingSpreadsheetId || '';
   $('priceMatrixSpreadsheetId').value = state.priceMatrixSpreadsheetId || '';
   $('inventoryFolder').value = state.inventoryFolder || '';
+  $('stockSource').value = state.stockSource === 'laptopdb' ? 'laptopdb' : 'csv';
+  $('inventoryFolder').disabled = state.stockSource === 'laptopdb';
   const interval = $('syncInterval');
   if (![...interval.options].some((option) => Number(option.value) === state.syncIntervalMinutes)) {
     interval.add(new Option(`${state.syncIntervalMinutes} minutes`, state.syncIntervalMinutes));
@@ -1212,6 +1216,8 @@ $('newToken').addEventListener('click', (event) => {
 });
 
 $('settingsForm').addEventListener('input', () => { settingsDirty = true; });
+// The CSV folder only matters while branch stock comes from the CSV.
+$('stockSource').addEventListener('change', (event) => { $('inventoryFolder').disabled = event.target.value === 'laptopdb'; });
 $('settingsForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const button = event.submitter;
@@ -1220,6 +1226,7 @@ $('settingsForm').addEventListener('submit', async (event) => {
     pricingSpreadsheetId: $('pricingSpreadsheetId').value,
     priceMatrixSpreadsheetId: $('priceMatrixSpreadsheetId').value,
     inventoryFolder: $('inventoryFolder').value,
+    stockSource: $('stockSource').value,
     syncIntervalMinutes: Number($('syncInterval').value),
     port: Number($('port').value),
     autoStart: $('autoStart').checked,
