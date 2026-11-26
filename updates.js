@@ -6,6 +6,19 @@
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
+      version: '1.0.48',
+      date: 'November 26, 2026',
+      changes: [
+        'Quotation: add your e-signature in Branch details (E-SIGNATURE): Draw it with the mouse, touchpad or a pen, or Upload a picture of it (a white background is made see-through). It is saved at once (a new one replaces the old) and shows over your name on the quotation, the PDF and the print.',
+        'Quotation: the Viber and FB page QR codes and the branch logo are no longer at the bottom of the quotation, and the note above now points to the Viber number and email under the name.',
+        'Quotation: a Remarks box under TOTAL for notes to the customer. It is kept with the quotation (also in History), printed and in the PDF, and left out when empty.',
+        'Pricing Matrix: the LOWEST tag beside the monthly amounts is removed.',
+        'Pricing Matrix: the BUNDLE box shows the bundle’s name (the BUNDLE CODE in the price matrix, e.g. BUND739), also in Copy prices.',
+        'Quotation: desktops, mobiles and accessories show their key selling points from the NON-LAPTOP KSP sheet in the Specs column (each with its title in bold and its description). A product not in that sheet keeps its specs as before. Needs SalesKit Server 1.0.62.',
+        'Quotation: no more quotation number on the quotation, the PDF file name or History. Customer Name and Date share the first line, Contact No. and Valid until the second.'
+      ]
+    },
+    {
       version: '1.0.47',
       date: 'November 25, 2026',
       changes: [

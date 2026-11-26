@@ -27,6 +27,13 @@
     const pick = (pairs) => Object.fromEntries(pairs.filter(([, value]) => value != null));
     return { noBundle: {}, withBundle: pick([['cash', view && view.cash], ['m12', view && view.twelveMonths]]) };
   }
+  // The bundle's name: the price matrix's BUNDLE CODE ("BUND739", "BUND1013 SET B"), sent in the price details as CF.
+  // A plain number there is not a name.
+  function bundleOf(view) {
+    const cf = ((view && view.priceDetails) || []).find((d) => d.title === 'CF');
+    const name = clean(cf && cf.value);
+    return name && !/^[\d.,\s]+$/.test(name) ? name : '';
+  }
   // "Apr 1, 2026 – Jun 30, 2026" (the Banner's promo dates) → ['2026-04-01', '2026-06-30'].
   function isoDates(label) {
     return String(label || '').split('–').map((part) => {
@@ -84,6 +91,7 @@
             title,
             branches: String(row.branch || '').split(',').map(key).filter(Boolean),
             freebies,
+            bundle: bundleOf(row),
             terms: termsOf(row),
             start: start || '',
             end: end || '',

@@ -11,6 +11,7 @@ const { makeBranchDetails } = require('./branch-details');
 const { makeLaptopDatabase, specsRowsFromLaptopDb } = require('./laptop-database');
 const { otherProducts } = require('./other-prices');
 const { pricingExtras } = require('./pricing-extras');
+const { nonLaptopKsp } = require('./non-laptop-ksp');
 const { inventoryStock, itemKey: inventoryKey } = require('./inventory-csv');
 
 const SHEET_TABLES = new Set([
@@ -23,6 +24,7 @@ const SHEET_TABLES = new Set([
   'ageing_monitoring',
   'other_prices',
   'pricing_extras',
+  'non_laptop_ksp',
   'usability',
   'branch_details',
   'branch_qr',
@@ -597,6 +599,8 @@ function getInitialData() {
     otherProducts: otherProducts(getRows('other_prices')),
     // PRICING MATRIX tab: each promo's dates, incentives and vendor freebies' claiming, by 'kind|ITEM|PROMO'.
     pricingExtras: pricingExtras(getRows('pricing_extras')),
+    // Quotation: desktops', mobiles' and accessories' key selling points (NON-LAPTOP KSP), by ITEM DESC in upper case.
+    nonLaptopKsp: nonLaptopKsp(getRows('non_laptop_ksp')),
     ukspPerSkuData,
     ukspBannerData,
     appUkspData: applicationMatrix,

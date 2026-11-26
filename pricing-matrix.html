@@ -122,7 +122,6 @@
     table.terms .none { color: #cbd5e1; }
     table.terms tr.cash td { background: #f8faff; }
     table.terms tr.cash .amt { color: var(--navy); font-size: 15px; }
-    table.terms .best { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--green-soft); color: var(--green); font-size: 9.5px; font-weight: 800; vertical-align: 2px; }
 
     .side { display: grid; gap: 12px; }
     .box { padding: 14px 16px; }
@@ -133,6 +132,8 @@
     .box li i { color: var(--blue); margin-top: 1px; }
     .box .worth { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); display: flex; justify-content: space-between; font-weight: 700; }
     .box .worth b { color: var(--green); }
+    .box .bundle-name { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 8px; font-weight: 700; }
+    .box .bundle-name b { color: var(--blue); text-align: right; word-break: break-word; }
     .box .muted { color: var(--muted); font-size: 12px; }
     .dates { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-weight: 700; }
     .dates .arrow { color: var(--soft); }
@@ -460,14 +461,8 @@
       h += '<div class="section-label"><i class="bi bi-gift"></i> ' + esc(hasPromo(promo) ? promo.title : "No promo") + (promo.branches.length ? " · " + esc(promo.branches.join(", ")) : "") + "</div>";
     }
 
-    // Payment terms: every term with a price in any set, in the price matrix's order; the lowest monthly marked.
+    // Payment terms: every term with a price in any set, in the price matrix's order.
     var rows = TERMS.filter(function (t) { return sets.some(function (s) { return s.prices[t.key] != null; }); });
-    var best = {};
-    sets.forEach(function (s) {
-      var low = Infinity;
-      rows.forEach(function (t) { if (MONTHS[t.key] && s.prices[t.key] != null) low = Math.min(low, s.prices[t.key] / MONTHS[t.key]); });
-      best[s.key] = low;
-    });
     var table = '<table class="terms"><thead><tr><th>Payment term</th>' + sets.map(function (s) { return "<th>" + esc(s.label) + "</th>"; }).join("") + "</tr></thead><tbody>"
       + rows.map(function (t) {
         var banks = t.text.replace(/^[^:]*:\s*/, "").replace(/\.$/, "");
@@ -476,14 +471,16 @@
             var v = s.prices[t.key];
             if (v == null) return '<td><span class="none">—</span></td>';
             var mo = MONTHS[t.key] ? v / MONTHS[t.key] : null;
-            return '<td class="pick" data-term="' + t.key + '" data-set="' + s.key + '" title="Add to the quotation: ' + esc(t.label) + (sets.length > 1 ? ", " + esc(s.label.toLowerCase()) : "") + '"><div class="amt">' + peso(v) + "</div>" + (mo ? '<div class="mo">' + peso(mo) + "/mo" + (Math.abs(mo - best[s.key]) < 0.005 ? '<span class="best">LOWEST</span>' : "") + "</div>" : "") + "</td>";
+            return '<td class="pick" data-term="' + t.key + '" data-set="' + s.key + '" title="Add to the quotation: ' + esc(t.label) + (sets.length > 1 ? ", " + esc(s.label.toLowerCase()) : "") + '"><div class="amt">' + peso(v) + "</div>" + (mo ? '<div class="mo">' + peso(mo) + "/mo" + "</div>" : "") + "</td>";
           }).join("") + "</tr>";
       }).join("") + "</tbody></table>";
 
     var side = "";
     var worth = promo.terms && promo.terms.bundleWorth;
-    if (promo.freebies.length || worth) {
+    if (promo.freebies.length || worth || promo.bundle) {
       side += '<div class="card box"><h3><i class="bi bi-box2-heart" style="color:var(--blue)"></i> ' + (promo.freebies.length ? "Bundle freebies" : "Bundle") + "</h3>"
+        // The bundle's name (BUNDLE CODE in the price matrix).
+        + (promo.bundle ? '<div class="bundle-name"><span>Bundle</span><b>' + esc(promo.bundle) + "</b></div>" : "")
         + (promo.freebies.length ? "<ul>" + promo.freebies.map(function (f) { return '<li><i class="bi bi-check-circle-fill"></i><span>' + esc(f) + "</span></li>"; }).join("") + "</ul>" : "")
         + (worth ? '<div class="worth"' + (promo.freebies.length ? "" : ' style="margin-top:0;padding-top:0;border-top:0"') + "><span>Total worth</span><b>" + peso(worth) + "</b></div>" : "") + "</div>";
     }
@@ -631,7 +628,11 @@
       var parts = sets.filter(function (s) { return s.prices[t.key] != null; }).map(function (s) { return (sets.length > 1 ? s.label + " " : "") + peso(s.prices[t.key]); });
       if (parts.length) lines.push(t.label + ": " + parts.join(" · "));
     });
-    if (promo.freebies.length) lines.push("", "Freebies: " + promo.freebies.join(", ") + (promo.terms.bundleWorth ? " (worth " + peso(promo.terms.bundleWorth) + ")" : ""));
+    if (promo.bundle) lines.push("", "Bundle: " + promo.bundle + (!promo.freebies.length && promo.terms.bundleWorth ? " (worth " + peso(promo.terms.bundleWorth) + ")" : ""));
+    if (promo.freebies.length) {
+      if (!promo.bundle) lines.push("");
+      lines.push("Freebies: " + promo.freebies.join(", ") + (promo.terms.bundleWorth ? " (worth " + peso(promo.terms.bundleWorth) + ")" : ""));
+    }
     if (promo.vendor.length) lines.push("Vendor freebies: " + promo.vendor.map(function (v) { return v.text; }).join("; "));
     if (promo.end) lines.push("Promo until " + dayLabel(promo.end));
     lines.push("", "Prices are subject to change without prior notice.");

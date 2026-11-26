@@ -29,6 +29,7 @@ const { BRANCH_QR_SHEET, BRANCH_QR_RANGE, branchQrCollection } = require('./bran
 const { readAgeingMonitoring } = require('./ageing-monitoring');
 const { readOtherPrices } = require('./other-prices');
 const { readPricingExtras } = require('./pricing-extras');
+const { NON_LAPTOP_KSP_SHEET, readNonLaptopKsp } = require('./non-laptop-ksp');
 const {
   LAPTOP_DATABASE_SHEET, LAPTOP_DATABASE_RANGE, UKSP_ICON_SHEET, UKSP_ICON_RANGE,
   parseLaptopDb, laptopDatabaseCollection, bannerSpecsCollection, bannerLaptopsCollection
@@ -258,6 +259,19 @@ async function fetchSpreadsheetData({ credentialsPath, spreadsheetId = DEFAULT_S
     const extras = await readPricingExtras(sheets, priceMatrixSpreadsheetId, (message) => onProgress({ phase: 'warning', message: `${message}; skipped for the Pricing Matrix.` }))
       .catch((error) => { onProgress({ phase: 'warning', message: `Pricing Matrix extras: ${error.message}` }); return null; });
     if (extras && extras.rows.length) result.pricing_extras = extras;
+  }
+
+  // Quotation: the key selling points of desktops, mobiles and accessories (NON-LAPTOP KSP, see non-laptop-ksp.js),
+  // from the main spreadsheet, else the pricing or price matrix one. When it cannot be read, the last synced ones stay.
+  try {
+    const ksp = await readNonLaptopKsp(sheets, [
+      { spreadsheetId, titles },
+      pricingSpreadsheetId && pricingSpreadsheetId !== spreadsheetId ? { spreadsheetId: pricingSpreadsheetId, titles: pricingTitles } : null,
+      priceMatrixSpreadsheetId && priceMatrixSpreadsheetId !== spreadsheetId && priceMatrixSpreadsheetId !== pricingSpreadsheetId ? { spreadsheetId: priceMatrixSpreadsheetId } : null
+    ]);
+    if (ksp && ksp.rows.length) result.non_laptop_ksp = ksp;
+  } catch (error) {
+    onProgress({ phase: 'warning', message: `${NON_LAPTOP_KSP_SHEET}: ${error.message}; the last synced specs are kept for the Quotation.` });
   }
 
   // Clearance banners for ageing laptops (see ageing-monitoring.js): AGEING BANNER MONITORING in PROMO MONITORING,

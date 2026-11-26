@@ -88,11 +88,13 @@
       OS: pick(/\s(WIN(?:DOWS)?\s?1[01]\w*)\s/i).replace(/^WIN\s?(1[01])\w*$/i, 'WINDOWS $1')
     };
   }
-  function otherChoices(products, taken, extraOf) {
+  // NON-LAPTOP KSP (server 1.0.62): { 'ITEM DESC': [{ title, text }] }; a product in it shows those as its specs.
+  function otherChoices(products, taken, extraOf, kspOf = {}) {
     return products.filter((p) => !taken.has(key(p.item))).map((p) => {
       const extra = extraOf(p.kind, p.item, clean(p.promo) || 'NO PROMO') || {};
       const terms = p.terms || {};
       const name = clean(p.item);
+      const ksp = kspOf[name.replace(/\s+/g, ' ').toUpperCase()] || null;
       const specs = p.kind === 'attachment' ? {} : specsFromName(name);
       // A desktop's model is its name up to its processor (the specs are listed beside it).
       let model = name.replace(/^[A-Z]{2,12}-(?=\S)/, '');
@@ -106,8 +108,9 @@
         // "DESKTOP-ACER AIO C24-195ES ULTRA 5 125U …" → "ACER AIO C24-195ES"
         model,
         partNumber: '',
-        specs,
-        details: p.kind === 'attachment' ? [clean(p.category) && `Category - ${clean(p.category)}`].filter(Boolean) : [],
+        specs: ksp ? {} : specs,
+        ksp: ksp || undefined,
+        details: ksp ? [] : p.kind === 'attachment' ? [clean(p.category) && `Category - ${clean(p.category)}`].filter(Boolean) : [],
         cash: (terms.noBundle && terms.noBundle.cash) || (terms.withBundle && terms.withBundle.cash) || null,
         promo: clean(p.promo),
         branchCash: {},
@@ -159,7 +162,7 @@
         stock: stockOf(item, db)
       };
     }).sort((a, b) => a.model.localeCompare(b.model));
-    laptops.push(...otherChoices(data.otherProducts || [], new Set(laptops.map((l) => key(l.code))), extraOf));
+    laptops.push(...otherChoices(data.otherProducts || [], new Set(laptops.map((l) => key(l.code))), extraOf, data.nonLaptopKsp || {}));
 
     const branchDetails = data.branchDetails || {};
     const homeBranch = key(data.homeBranch);
