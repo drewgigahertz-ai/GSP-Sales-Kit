@@ -234,7 +234,7 @@
   var peso = function (n) { return n == null ? "" : "₱" + money(n); };
   function toParent(message) { if (window.parent && window.parent !== window) window.parent.postMessage(message, "*"); }
 
-  var KINDS = [["laptop", "Laptop", "bi-laptop"], ["desktop", "Desktop", "bi-pc-display"], ["attachment", "Accessories", "bi-mouse2"], ["mobile", "Mobile", "bi-phone"]];
+  var KINDS = [["laptop", "Laptop", "bi-laptop"], ["desktop", "Desktop", "bi-pc-display"], ["attachment", "Attachment / Peripherals / Accessories", "bi-mouse2"], ["mobile", "Mobile", "bi-phone"]];
   // Months for the monthly figure ("₱4,166.58/mo"): quotation-terms.js.
   var MONTHS = (window.QuotationTerms && window.QuotationTerms.months) || {};
   var TERMS = (window.QuotationTerms && window.QuotationTerms.list) || [];

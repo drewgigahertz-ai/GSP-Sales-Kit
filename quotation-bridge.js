@@ -75,7 +75,7 @@
   // Desktops, mobiles and attachments (other-prices.js: ATTACHMENT PRICING, DESKTOP PRICING SUMMARY, PM MOBILE VER 2.5).
   // Their specs are read from the name ("… i5-1240P 1TB + 256GB SSD 8GB WIN11s", "CEL-… (12+256GB) …"); an
   // attachment shows its category. Attachments have two price sets: with a laptop (withBundle) and regular (noBundle).
-  const KIND_LABELS = { desktop: 'Desktop', mobile: 'Mobile', attachment: 'Accessory' };
+  const KIND_LABELS = { desktop: 'Desktop', mobile: 'Mobile', attachment: 'Attachment / Peripheral / Accessory' };
   function specsFromName(name) {
     const n = ` ${name} `;
     const pick = (re) => (n.match(re) || [])[1] || '';

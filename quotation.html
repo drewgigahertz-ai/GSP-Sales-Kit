@@ -307,10 +307,11 @@
     <div id="results" role="listbox"></div>
   </div>
   <button id="newQuote" type="button" class="btn light" title="Start a new quotation"><i class="bi bi-file-earmark-plus"></i> New</button>
+  <button id="clearLines" type="button" class="btn light" title="Remove all products from this quotation (the customer and dates stay)" disabled><i class="bi bi-x-circle"></i> Clear</button>
   <span class="hist-wrap">
     <button id="historyBtn" type="button" class="btn light" title="Quotations saved on this laptop (kept when you download or print one)" aria-expanded="false" aria-controls="history"><i class="bi bi-clock-history"></i> History</button>
     <div id="history" role="dialog" aria-label="Saved quotations">
-      <div class="h-top"><input id="historySearch" type="search" placeholder="Search customer, quotation no., branch or model" autocomplete="off" spellcheck="false" aria-label="Search saved quotations"><small id="historyCount"></small></div>
+      <div class="h-top"><input id="historySearch" type="search" placeholder="Search customer, branch or model" autocomplete="off" spellcheck="false" aria-label="Search saved quotations"><small id="historyCount"></small></div>
       <div class="h-list" id="historyList"></div>
     </div>
   </span>
@@ -1063,6 +1064,7 @@
     renderValid();
     showPages();
     el("download").disabled = !draft.lines.length;
+    el("clearLines").disabled = !draft.lines.length;
     el("print").disabled = !draft.lines.length;
   }
 
@@ -1195,9 +1197,9 @@
 
   // ---------- search ----------
   var found = [], active = 0;
-  // The category chips under the search: Laptops, Desktops, Mobiles, Accessories (only the ones there are), with
+  // The category chips under the search: Laptops, Desktops, Mobiles, Attachment / Peripherals / Accessories (only the ones there are), with
   // counts. A chip lists every product of its kind (typing narrows it down); clicking it again shows all kinds.
-  var KINDS = [["laptop", "Laptops", "bi-laptop"], ["desktop", "Desktops", "bi-pc-display"], ["mobile", "Mobiles", "bi-phone"], ["attachment", "Accessories", "bi-mouse"]];
+  var KINDS = [["laptop", "Laptops", "bi-laptop"], ["desktop", "Desktops", "bi-pc-display"], ["mobile", "Mobiles", "bi-phone"], ["attachment", "Attachment / Peripherals / Accessories", "bi-mouse"]];
   var kindFilter = "";
   var kindOf = function (l) { return l.kind || "laptop"; };
   function renderKinds() {
@@ -1431,6 +1433,18 @@
     saveDraft();
     renderMeta();
     renderLines();
+  });
+  // Clear: every product off this quotation (and the discount on the total); the customer, dates and remarks stay.
+  el("clearLines").addEventListener("click", function () {
+    var n = draft.lines.length;
+    if (!n || !confirm("Remove " + (n === 1 ? "the product" : "all " + n + " products") + " from this quotation?")) return;
+    draft.lines = [];
+    draft.discount = "";
+    saveDraft();
+    renderLines();
+    renderTotal();
+    el("status").textContent = n === 1 ? "Product removed" : n + " products removed";
+    el("search").focus();
   });
   el("print").addEventListener("click", function () { if (!el("print").disabled) { recordHistory(); window.print(); } });
 

@@ -19,7 +19,7 @@
   };
   // "HP HP LAPTOP" (brand + a model that already starts with it) → "HP LAPTOP".
   const modelName = (value) => clean(value).replace(/^(\S+)\s+\1(?=\s|$)/i, '$1');
-  const KIND_LABELS = { laptop: 'Laptop', desktop: 'Desktop', attachment: 'Accessory', mobile: 'Mobile' };
+  const KIND_LABELS = { laptop: 'Laptop', desktop: 'Desktop', attachment: 'Attachment / Peripheral / Accessory', mobile: 'Mobile' };
 
   // A price row's term prices: { noBundle: { cash, m3, … }, withBundle: { … }, bundleWorth }.
   function termsOf(view) {
@@ -28,11 +28,13 @@
     return { noBundle: {}, withBundle: pick([['cash', view && view.cash], ['m12', view && view.twelveMonths]]) };
   }
   // The bundle's name: the price matrix's BUNDLE CODE ("BUND739", "BUND1013 SET B"), sent in the price details as CF.
-  // A plain number there is not a name.
-  function bundleOf(view) {
+  // Some promos (MIX & MATCH PROMO) have an amount there instead of a code: their bundle is named by the promo.
+  function bundleOf(view, promoTitle) {
     const cf = ((view && view.priceDetails) || []).find((d) => d.title === 'CF');
     const name = clean(cf && cf.value);
-    return name && !/^[\d.,\s]+$/.test(name) ? name : '';
+    if (name && !/^[\d.,\s]+$/.test(name)) return name;
+    const worth = view && view.terms && view.terms.bundleWorth;
+    return worth && promoTitle && !/^no promo$/i.test(promoTitle) ? promoTitle : '';
   }
   // "Apr 1, 2026 – Jun 30, 2026" (the Banner's promo dates) → ['2026-04-01', '2026-06-30'].
   function isoDates(label) {
@@ -91,7 +93,7 @@
             title,
             branches: String(row.branch || '').split(',').map(key).filter(Boolean),
             freebies,
-            bundle: bundleOf(row),
+            bundle: bundleOf(row, title),
             terms: termsOf(row),
             start: start || '',
             end: end || '',

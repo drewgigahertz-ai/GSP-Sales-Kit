@@ -13,8 +13,10 @@
         'Quotation: the Viber and FB page QR codes and the branch logo are no longer at the bottom of the quotation, and the note above now points to the Viber number and email under the name.',
         'Quotation: a Remarks box under TOTAL for notes to the customer. It is kept with the quotation (also in History), printed and in the PDF, and left out when empty.',
         'Pricing Matrix: the LOWEST tag beside the monthly amounts is removed.',
-        'Pricing Matrix: the BUNDLE box shows the bundle’s name (the BUNDLE CODE in the price matrix, e.g. BUND739), also in Copy prices.',
+        'Pricing Matrix: the BUNDLE box shows the bundle’s name: its BUNDLE CODE in the price matrix (e.g. BUND739), or the promo’s name (e.g. MIX & MATCH PROMO) when there is no code. Also in Copy prices.',
+        'Quotation and Pricing Matrix: Accessories is now called Attachment / Peripherals / Accessories.',
         'Quotation: desktops, mobiles and accessories show their key selling points from the NON-LAPTOP KSP sheet in the Specs column (each with its title in bold and its description). A product not in that sheet keeps its specs as before. Needs SalesKit Server 1.0.62.',
+        'Quotation: a Clear button beside New removes all products from the quotation at once (after asking). The customer, dates and remarks stay.',
         'Quotation: no more quotation number on the quotation, the PDF file name or History. Customer Name and Date share the first line, Contact No. and Valid until the second.'
       ]
     },
