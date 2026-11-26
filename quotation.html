@@ -1587,7 +1587,10 @@
           var fw = original.naturalWidth * scale, fh = original.naturalHeight * scale;
           copy.style.width = fw + "px"; copy.style.height = fh + "px"; copy.style.maxWidth = "none";
           copy.style.objectFit = "fill";
-          copy.style.margin = ((h - fh) / 2) + "px " + ((w - fw) / 2) + "px";
+          // Centred in its box, keeping its own margins (the e-signature's -10px that tucks it over the name).
+          var cs = getComputedStyle(original), dy = (h - fh) / 2, dx = (w - fw) / 2;
+          copy.style.margin = (parseFloat(cs.marginTop) + dy) + "px " + (parseFloat(cs.marginRight) + dx) + "px "
+            + (parseFloat(cs.marginBottom) + dy) + "px " + (parseFloat(cs.marginLeft) + dx) + "px";
         });
         unpaginate(doc.getElementById("sheet"));
         contentPx = paginate(doc.getElementById("sheet"));
