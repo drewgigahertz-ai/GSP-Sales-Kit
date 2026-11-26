@@ -213,7 +213,8 @@
 
     .sign { margin-top: 18px; }
     /* The e-signature sits just over the personnel's name, overlapping the name a little like a real signature. */
-    .sign .esign { display: block; height: 54px; max-width: 230px; object-fit: contain; margin: 0 0 -10px -4px; }
+    /* Kept on the left, over the start of the name, whatever its size (it was centred in a 320px box, so a bigger one moved right). */
+    .sign .esign { display: block; height: var(--sig-h, 66px); max-width: 100%; object-fit: contain; object-position: left bottom; margin: 0 0 calc(var(--sig-gap, 18px) * -1) -4px; }
     /* Name (bold), position, Viber and email, one per line. */
     .sign .name { font-weight: 800; font-size: 13px; line-height: 1.4; }
     .sign .line { font-size: 13px; line-height: 1.4; }
@@ -239,6 +240,7 @@
     .side-sub { font-size: .66rem; color: #64748b; font-weight: 500; line-height: 1.25; }
     .side-sub.unsaved { color: #b45309; font-weight: 700; }
     .card { display: flex; flex-direction: column; gap: 3px; background: #f4f8fd; border: 1px solid #cfe0f5; border-radius: 8px; padding: 6px 8px 7px; }
+    .card[hidden] { display: none; }
     .card-label { display: flex; align-items: center; gap: 4px; font-size: .62rem; font-weight: 800; color: #334155; letter-spacing: .4px; text-transform: uppercase; }
     .card-label .bi { font-size: .7rem; color: #475569; }
     .card input, .card select { width: 100%; font: 600 12.5px inherit; font-family: inherit; color: #0f172a; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 7px; background: #fff; }
@@ -261,6 +263,11 @@
     .pic.wide .prev { height: 70px; background: #fff; border: 1px dashed #dbe5f3; }
     .pic.wide .prev img { max-height: 66px; }
     .pic.wide .acts button { width: auto; padding: 2px 9px; }
+    /* Size and position of the e-signature on the quotation, shown once there is a signature. */
+    .sig-adj { display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; align-items: center; margin-top: 6px; font-size: .68rem; font-weight: 600; color: #334155; }
+    .sig-adj[hidden] { display: none; }
+    .sig-adj input[type=range] { width: 100%; accent-color: #0012b3; }
+    .sig-adj .sig-reset { grid-column: 1 / -1; justify-self: end; font: 600 11px inherit; font-family: inherit; border: 1px solid #cbd5e1; background: #fff; border-radius: 5px; padding: 1px 9px; cursor: pointer; }
     /* Drawing the signature: a pad over the page. */
     #signPad { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(15, 23, 42, .55); }
     #signPad[hidden] { display: none; }
@@ -347,9 +354,14 @@
     <label class="card"><span class="card-label"><i class="bi bi-receipt"></i> TIN</span><input id="f_tin" autocomplete="off" placeholder="e.g. 229-918-217-0004"><span class="from-sheet" data-sheet="tin"></span></label>
     <label class="card"><span class="card-label"><i class="bi bi-phone"></i> MOBILE</span><input id="f_mobile" autocomplete="off" placeholder="e.g. 09178789511"><span class="from-sheet" data-sheet="mobile"></span></label>
     <label class="card"><span class="card-label"><i class="bi bi-person-badge"></i> BRANCH PERSONNEL</span><input id="f_manager" autocomplete="off" placeholder="Name"><span class="from-sheet" data-sheet="manager"></span></label>
-    <div class="card">
+    <div class="card" id="sigCard" hidden>
       <div class="card-label"><i class="bi bi-pen"></i> E-SIGNATURE</div>
       <div class="pics"><div class="pic wide" data-pic="signature"><div class="pic-name">Shown over the personnel's name</div><div class="prev"></div><div class="acts"><button type="button" data-draw title="Draw the signature with the mouse, touchpad or a pen"><i class="bi bi-pencil"></i> Draw</button><button type="button" data-choose title="Upload a picture of the signature (a white background is made see-through)"><i class="bi bi-upload"></i> Upload</button><button type="button" data-remove title="Remove the signature" aria-label="Remove the signature">✕</button></div></div></div>
+      <div class="sig-adj" id="sigAdj" hidden>
+        <label for="sigSize">Size</label><input type="range" id="sigSize" min="36" max="120" step="2" title="Make the signature bigger or smaller">
+        <label for="sigGap">Closer to name</label><input type="range" id="sigGap" min="0" max="44" step="1" title="Move the signature down onto the name, or up away from it">
+        <button type="button" class="sig-reset" id="sigReset">Reset</button>
+      </div>
     </div>
     <label class="card"><span class="card-label"><i class="bi bi-person-vcard"></i> POSITION</span><input id="f_position" autocomplete="off" placeholder="Branch Personnel"><span class="from-sheet">Shown under the name · blank = Branch Personnel</span></label>
     <label class="card"><span class="card-label"><i class="bi bi-telephone"></i> PERSONNEL NO. (VIBER)</span><input id="f_managerNo" autocomplete="off" placeholder="e.g. 0926-624-0483"><span class="from-sheet" data-sheet="managerNo"></span></label>
@@ -443,7 +455,7 @@
 
   // ---------- state ----------
   var DRAFT_KEY = "saleskit.quotation.draft";
-  var data = { laptops: [], branchDetails: {}, logos: {}, homeBranch: "", branches: [], lockBranch: false };
+  var data = { laptops: [], branchDetails: {}, logos: {}, homeBranch: "", branches: [], lockBranch: false, headOffice: false };
   var byCode = {};
   var picks = { exceed: "", meet: "", budget: "" };
   var recoName = "";
@@ -592,7 +604,9 @@
     });
     markEmpty();
     // The personnel's e-signature over the name (Branch details → E-signature); nothing when there is none.
-    setImage(el("esign"), branchValue("signature"), "esign", "Signature", "");
+    setImage(el("esign"), signatureUrl(), "esign", "Signature", "");
+    sigLayout();
+    cleanOldSignature();
     // The branch's BDO account for checks and transfers (LOGO sheet BANK DETAILS / ACCOUNT NAME); GHERTZ's without one.
     var acct = d.bankAccount ? String(d.bankAccount).replace(/^(\d{5})(\d{3})(\d+)$/, "$1 $2 $3") : "00402 802 2005";
     var acctName = d.bankAccount && d.accountName ? d.accountName : "GHERTZ Computer Corp.";
@@ -684,7 +698,7 @@
   // could still say "Branch details saved" from before). Other unsaved changes in the panel stay unsaved.
   function keepSignature(url) {
     var next = Object.assign({}, savedInfo);
-    var entry = Object.assign({}, next[branch()] || {}, { signature: url, savedAt: new Date().toISOString() });
+    var entry = Object.assign({}, next[branch()] || {}, { signature: url, signatureClean: 1, savedAt: new Date().toISOString() });
     var anything = TEXT_FIELDS.concat(PIC_FIELDS).some(function (f) { return entry[f]; });
     if (anything) next[branch()] = entry; else delete next[branch()];
     try {
@@ -697,10 +711,61 @@
     form.signature = url;
     renderPics();
     setDirty(dirty);
-    setImage(el("esign"), branchValue("signature"), "esign", "Signature", "");
+    setImage(el("esign"), signatureUrl(), "esign", "Signature", "");
+    sigLayout();
     el('infoMsg').textContent = url ? 'Signature saved.' : 'Signature removed.';
     el('status').textContent = url ? 'Signature saved' : 'Signature removed';
   }
+
+  // A signature saved before the clean-up (paper edges and specks cut away) can have empty space around it, so it
+  // moved right when made bigger: it is cleaned once, by itself, and saved again.
+  // The e-signature is for head office accounts only: a branch account's quotation has none, and no E-SIGNATURE card.
+  function signatureUrl() { return data.headOffice ? branchValue("signature") : ""; }
+  function cleanOldSignature() {
+    var b = branch(), s = savedInfo[b];
+    if (!data.headOffice || !s || !s.signature || s.signatureClean) return;
+    clearBackground(s.signature).then(function (url) {
+      var next = Object.assign({}, savedInfo);
+      if (!next[b] || next[b].signature !== s.signature) return;
+      next[b] = Object.assign({}, next[b], { signature: url, signatureClean: 1 });
+      try { localStorage.setItem(INFO_KEY, JSON.stringify(next)); } catch (err) { return; }
+      savedInfo = next;
+      if (branch() !== b) return;
+      form.signature = url;
+      renderPics();
+      setImage(el("esign"), signatureUrl(), "esign", "Signature", "");
+    });
+  }
+
+  // The signature's size (height in px) and how far it comes down onto the name, per branch, saved at once.
+  function SIG() { return { size: 66, gap: 18 }; } // the defaults (a function, so they are there before this line runs)
+  function sigLayout() {
+    var s = saved() || {};
+    var size = Number(s.signatureSize) || SIG().size, gap = s.signatureGap == null ? SIG().gap : Number(s.signatureGap);
+    el("esign").style.setProperty("--sig-h", size + "px");
+    el("esign").style.setProperty("--sig-gap", gap + "px");
+    el("sigSize").value = size; el("sigGap").value = gap;
+    el("sigAdj").hidden = !signatureUrl();
+    el("sigCard").hidden = !data.headOffice;
+  }
+  function previewSig() {
+    el("esign").style.setProperty("--sig-h", el("sigSize").value + "px");
+    el("esign").style.setProperty("--sig-gap", el("sigGap").value + "px");
+  }
+  function keepSigLayout(size, gap) {
+    var next = Object.assign({}, savedInfo);
+    next[branch()] = Object.assign({}, next[branch()] || {}, { signatureSize: size, signatureGap: gap, savedAt: new Date().toISOString() });
+    try { localStorage.setItem(INFO_KEY, JSON.stringify(next)); } catch (err) { return; }
+    savedInfo = next;
+    sigLayout();
+    showPages();
+    el('status').textContent = 'Signature adjusted';
+  }
+  ["sigSize", "sigGap"].forEach(function (id) {
+    el(id).addEventListener("input", previewSig);
+    el(id).addEventListener("change", function () { keepSigLayout(Number(el("sigSize").value), Number(el("sigGap").value)); });
+  });
+  el("sigReset").addEventListener("click", function () { keepSigLayout(SIG().size, SIG().gap); });
 
   // ---------- e-signature ----------
   // An uploaded signature: its white or light-grey paper made see-through, so it sits over the name like ink.
@@ -708,15 +773,62 @@
     return new Promise(function (resolve) {
       var img = new Image();
       img.onload = function () {
+        // Photos are made at most 1600 px wide first, so the clean-up below stays quick.
+        var fit = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
         var c = document.createElement("canvas");
-        c.width = img.naturalWidth; c.height = img.naturalHeight;
+        c.width = Math.max(1, Math.round(img.naturalWidth * fit)); c.height = Math.max(1, Math.round(img.naturalHeight * fit));
         var g = c.getContext("2d");
-        g.drawImage(img, 0, 0);
-        var px = g.getImageData(0, 0, c.width, c.height), d = px.data;
+        g.drawImage(img, 0, 0, c.width, c.height);
+        var W = c.width, H = c.height;
+        var px = g.getImageData(0, 0, W, H), d = px.data;
         for (var i = 0; i < d.length; i += 4) {
           var light = Math.min(d[i], d[i + 1], d[i + 2]);
           if (light > 215) d[i + 3] = 0;
           else if (light > 170) d[i + 3] = Math.round(d[i + 3] * (215 - light) / 45);
+          if (d[i + 3] < 40) d[i + 3] = 0; // faint paper grain
+        }
+        // Dark parts touching the picture's edge (a photo's shadow, the table or the paper's border) are not the
+        // signature: they are removed, so only the signature is kept.
+        var seen = new Uint8Array(W * H), stack = [];
+        var push = function (p) { if (!seen[p] && d[p * 4 + 3]) { seen[p] = 1; stack.push(p); } };
+        for (var x = 0; x < W; x++) { push(x); push((H - 1) * W + x); }
+        for (var y = 0; y < H; y++) { push(y * W); push(y * W + W - 1); }
+        while (stack.length) {
+          var p = stack.pop(), px0 = p % W;
+          d[p * 4 + 3] = 0;
+          if (px0 > 0) push(p - 1);
+          if (px0 < W - 1) push(p + 1);
+          if (p >= W) push(p - W);
+          if (p < W * (H - 1)) push(p + W);
+        }
+        // Specks and smudges: blots much smaller than the signature's strokes, away from them, are removed (a dot
+        // near the strokes, like an "i"'s, stays).
+        var label = new Int32Array(W * H), parts = [], biggest = 0;
+        for (var start = 0; start < W * H; start++) {
+          if (!d[start * 4 + 3] || label[start]) continue;
+          var part = { id: parts.length + 1, size: 0, x0: W, y0: H, x1: 0, y1: 0, pixels: [] };
+          label[start] = part.id; stack.push(start);
+          while (stack.length) {
+            var q = stack.pop(), qx = q % W, qy = (q - qx) / W;
+            part.size++; part.pixels.push(q);
+            if (qx < part.x0) part.x0 = qx; if (qx > part.x1) part.x1 = qx; if (qy < part.y0) part.y0 = qy; if (qy > part.y1) part.y1 = qy;
+            for (var ny = Math.max(0, qy - 1); ny <= Math.min(H - 1, qy + 1); ny++) for (var nx = Math.max(0, qx - 1); nx <= Math.min(W - 1, qx + 1); nx++) {
+              var n = ny * W + nx;
+              if (d[n * 4 + 3] && !label[n]) { label[n] = part.id; stack.push(n); }
+            }
+          }
+          parts.push(part);
+          if (part.size > biggest) biggest = part.size;
+        }
+        var main = parts.filter(function (pt) { return pt.size >= biggest * 0.05; });
+        if (main.length) {
+          var bx0 = Math.min.apply(null, main.map(function (pt) { return pt.x0; })), bx1 = Math.max.apply(null, main.map(function (pt) { return pt.x1; }));
+          var by0 = Math.min.apply(null, main.map(function (pt) { return pt.y0; })), by1 = Math.max.apply(null, main.map(function (pt) { return pt.y1; }));
+          var mx = (bx1 - bx0) * 0.08 + 4, my = (by1 - by0) * 0.15 + 4;
+          parts.forEach(function (pt) {
+            var near = pt.x1 >= bx0 - mx && pt.x0 <= bx1 + mx && pt.y1 >= by0 - my && pt.y0 <= by1 + my;
+            if (main.indexOf(pt) < 0 && !near) pt.pixels.forEach(function (q) { d[q * 4 + 3] = 0; });
+          });
         }
         g.putImageData(px, 0, 0);
         resolve(trimmed(c) || url);
@@ -726,13 +838,22 @@
     });
   }
   // The signature cut to its ink (with a small margin), as a PNG data: address; null when the canvas is empty.
-  function trimmed(canvas) {
+  // cut: the share of ink left out on each side (0.003 for an upload, so a few stray specks don't widen it).
+  function trimmed(canvas, cut) {
     var g = canvas.getContext("2d"), d = g.getImageData(0, 0, canvas.width, canvas.height).data;
-    var top = canvas.height, left = canvas.width, right = -1, bottom = -1;
+    var cols = new Uint32Array(canvas.width), rows = new Uint32Array(canvas.height), total = 0;
     for (var y = 0; y < canvas.height; y++) for (var x = 0; x < canvas.width; x++) {
-      if (d[(y * canvas.width + x) * 4 + 3] > 20) { if (x < left) left = x; if (x > right) right = x; if (y < top) top = y; if (y > bottom) bottom = y; }
+      if (d[(y * canvas.width + x) * 4 + 3] > 20) { cols[x]++; rows[y]++; total++; }
     }
-    if (right < 0) return null;
+    if (!total) return null;
+    var skip = Math.floor(total * (cut || 0));
+    var edge = function (counts, fromEnd) {
+      var n = counts.length, sum = 0;
+      for (var k = 0; k < n; k++) { var i = fromEnd ? n - 1 - k : k; sum += counts[i]; if (sum > skip) return i; }
+      return fromEnd ? n - 1 : 0;
+    };
+    var left = edge(cols, false), right = edge(cols, true), top = edge(rows, false), bottom = edge(rows, true);
+    if (right < left || bottom < top) return null;
     var pad = 8, w = right - left + 1 + pad * 2, h = bottom - top + 1 + pad * 2;
     var out = document.createElement("canvas");
     // At most 600 px wide, like the other pictures, so it stays small on the laptop.
@@ -1589,8 +1710,10 @@
           copy.style.objectFit = "fill";
           // Centred in its box, keeping its own margins (the e-signature's -10px that tucks it over the name).
           var cs = getComputedStyle(original), dy = (h - fh) / 2, dx = (w - fw) / 2;
-          copy.style.margin = (parseFloat(cs.marginTop) + dy) + "px " + (parseFloat(cs.marginRight) + dx) + "px "
-            + (parseFloat(cs.marginBottom) + dy) + "px " + (parseFloat(cs.marginLeft) + dx) + "px";
+          // The e-signature sits at the bottom left of its box (object-position), the other pictures in the middle.
+          var lb = original.classList.contains("esign");
+          copy.style.margin = (parseFloat(cs.marginTop) + (lb ? 2 * dy : dy)) + "px " + (parseFloat(cs.marginRight) + (lb ? 2 * dx : dx)) + "px "
+            + (parseFloat(cs.marginBottom) + (lb ? 0 : dy)) + "px " + (parseFloat(cs.marginLeft) + (lb ? 0 : dx)) + "px";
         });
         unpaginate(doc.getElementById("sheet"));
         contentPx = paginate(doc.getElementById("sheet"));
@@ -1672,7 +1795,7 @@
     if (event.source !== window.parent || !event.data) return;
     var m = event.data;
     if (m.channel === "saleskit-quotation-data") {
-      data = { laptops: m.laptops || [], branchDetails: m.branchDetails || {}, logos: m.logos || {}, homeBranch: m.homeBranch || "", branches: m.branches || [], lockBranch: Boolean(m.lockBranch) };
+      data = { laptops: m.laptops || [], branchDetails: m.branchDetails || {}, logos: m.logos || {}, homeBranch: m.homeBranch || "", branches: m.branches || [], lockBranch: Boolean(m.lockBranch), headOffice: Boolean(m.headOffice) };
       byCode = {};
       data.laptops.forEach(function (l) { byCode[key(l.code)] = l; });
       data.hasStock = Boolean(m.hasStock);

@@ -177,6 +177,8 @@
       homeBranch,
       branches,
       lockBranch,
+      // The e-signature is for head office accounts (HO / ALL) only; branch accounts have none.
+      headOffice: FULL_ACCESS.includes(homeBranch) || FULL_ACCESS.includes(accountBranch),
       // Branch stock is shown only when the server has stock counts at all.
       hasStock: laptops.some((l) => l.stock && Object.keys(l.stock).length),
       stockAsOf: data.inventoryAsOf || ''
@@ -204,9 +206,21 @@
     if (typeof window.navigateTo === 'function') window.navigateTo('quotation');
   };
 
+  // The signed-in account's branch (the header's HO badge). The server sends homeBranch only for branch accounts,
+  // so a head office account is known from here.
+  let accountBranch = '';
+  let lastData = null;
+  if (window.saleskit && typeof window.saleskit.getCurrentUser === 'function') {
+    window.saleskit.getCurrentUser().then((user) => {
+      accountBranch = key(user && user.branch);
+      if (lastData) window.updateQuotationPage(lastData);
+    }).catch(() => {});
+  }
+
   // Called by the page whenever SalesKit data is loaded or refreshed.
   window.updateQuotationPage = function (data) {
-    latest = build(data || {});
+    lastData = data || {};
+    latest = build(lastData);
     send(latest);
   };
 

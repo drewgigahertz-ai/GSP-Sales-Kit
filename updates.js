@@ -9,7 +9,8 @@
       version: '1.0.48',
       date: 'November 26, 2026',
       changes: [
-        'Quotation: add your e-signature in Branch details (E-SIGNATURE): Draw it with the mouse, touchpad or a pen, or Upload a picture of it (a white background is made see-through). It is saved at once (a new one replaces the old) and shows over your name on the quotation, the PDF and the print.',
+        'Quotation (head office accounts): add your e-signature in Branch details (E-SIGNATURE): Draw it with the mouse, touchpad or a pen, or Upload a picture of it (a white background is made see-through). It is saved at once (a new one replaces the old) and shows over your name on the quotation, the PDF and the print.',
+        'Quotation e-signature: an uploaded picture keeps only the signature (paper edges, shadows and specks are cut away), and it is a bit bigger and closer to the name. Size and Closer to name sliders under it adjust it per branch (Reset goes back). Branch accounts have no e-signature on their quotations.',
         'Quotation: the Viber and FB page QR codes and the branch logo are no longer at the bottom of the quotation, and the note above now points to the Viber number and email under the name.',
         'Quotation: a Remarks box under TOTAL for notes to the customer. It is kept with the quotation (also in History), printed and in the PDF, and left out when empty.',
         'Pricing Matrix: the LOWEST tag beside the monthly amounts is removed.',
