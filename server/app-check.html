@@ -263,7 +263,7 @@ code{background:var(--ghz-soft);padding:1px 5px;border-radius:5px;font-size:.85e
   <section data-view="monitor" hidden>
     <div class="toolbar">
       <div><h2 class="section-title">Monitoring</h2><div class="section-sub">Laptops with Gigahertz Sales Tools, how many are online now, and which have each tested app installed.</div></div>
-      <div class="toolbar-right"><label class="field">Branch <select class="branch-filter" id="mBranch"><option value="">All branches</option></select></label></div>
+      <div class="toolbar-right"><label class="field">Branch <select class="branch-filter" id="mBranch"><option value="">All branches</option></select></label><button class="btn" id="mExport" title="One row per laptop: branch, Sales Tools version, online or offline, last seen, and each tested app (installed or not), for Excel. Follows the Branch filter.">Export CSV</button></div>
     </div>
     <div class="cards" id="mCards"></div>
     <div class="mon-grid">
@@ -313,7 +313,7 @@ code{background:var(--ghz-soft);padding:1px 5px;border-radius:5px;font-size:.85e
     </div>
 
     <div class="panel">
-      <div class="mon-head"><h2 class="section-title">Export CSV</h2><span class="section-sub">Every check and test, one row per app, for Excel</span></div>
+      <div class="mon-head"><h2 class="section-title">Export CSV</h2><span class="section-sub">Every check and test, one row each, with a column per app, for Excel</span></div>
       <div class="export">
         <label>From<input type="date" id="xFrom"></label>
         <label>To<input type="date" id="xTo"></label>
@@ -671,6 +671,20 @@ function renderMonitor(){
 }
 $('mApps').addEventListener('click',e=>{const row=e.target.closest('tr[data-app]');if(!row)return;const n=row.dataset.app;openApps.has(n)?openApps.delete(n):openApps.add(n);renderMonitor()});
 $('mBranch').addEventListener('change',renderMonitor);
+// Monitoring export: one row per laptop (the Branch filter applies), with a column per tested app.
+$('mExport').addEventListener('click',()=>{
+  const b=$('mBranch').value,all=state.laptops.filter(l=>!b||l.branch===b).sort((x,y)=>(!x.branch-!y.branch)||(x.branch||'').localeCompare(y.branch||'')||nameOf(x).localeCompare(nameOf(y)));
+  const names=appColumns(state.laptops.filter(l=>l.last).map(l=>l.last));
+  const cell=v=>{const t=String(v??'');return/[",\r\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t};
+  const when=t=>t?new Date(t).toLocaleString():'';
+  const APP={yes:'Installed',no:'Not installed',untested:'Not tested yet'};
+  const rows=[['Branch','Laptop SKU','Laptop','Computer name','Signed in','Sales Tools','Online','Last seen','Last test',...names],
+    ...all.map(l=>[l.branch||'Branch unknown',l.sku||'',[l.make,l.model].filter(Boolean).join(' '),l.name,l.user||'',l.version?'v'+l.version:'',l.online?'Online':'Offline',l.online?'Online now':when(l.lastSeen),l.last?when(l.last.time):'',
+      ...names.map(n=>l.apps&&!l.apps.includes(n)&&!(l.appStatus&&l.appStatus[n])?'Not tested on this laptop':APP[appState(l,n)])])];
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.map(r=>r.map(cell).join(',')).join('\r\n')+'\r\n'],{type:'text/csv;charset=utf-8'}));
+  a.download=`monitoring-${b?b.replace(/[^A-Za-z0-9]+/g,'-')+'-':''}${new Date().toISOString().slice(0,10)}.csv`;document.body.append(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+});
 
 function fillBranches(){
   const branches=[...new Set(state.laptops.map(l=>l.branch).filter(Boolean))].sort();

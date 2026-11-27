@@ -102,25 +102,22 @@ const BANNER_LABEL = { match: 'Matches the laptop', different: 'Different laptop
 const STATUS_LABEL = { done: 'Done', interrupted: 'Stopped: laptop used', missed: 'Not checked', nocheck: 'Not checked' };
 const APP_LABEL = { ok: 'Passed', not_installed: 'Not installed', exited: 'Closed early', crashed: 'Crashed', failed: 'Failed', missing: 'No demo file', stopped: 'Stopped' };
 
-// The CSV rows for checks and manual tests between from and to ("YYYY-MM-DD", both included), one row per app tested
-// (a check without app tests is one row). filter: { branch, type: '' | 'daily' | 'apps' | 'manual' }.
-// laptops: [{ name, branch }] now, to list the scheduled checks that never reported as "Not checked".
+// The CSV rows for checks and manual tests between from and to ("YYYY-MM-DD", both included): one row per check or
+// test, with a column per app (its result) after the banner and desktop. filter: { branch, type: '' | 'daily' | 'apps' | 'manual' }.
 function csvRows({ checks, runs, schedules, laptops, from, to, branch, type }) {
   const inRange = (date) => (!from || date >= from) && (!to || date <= to);
   const wanted = (job, br) => (!type || type === job) && (!branch || br === branch);
   const secs = (ms) => (ms === undefined || ms === null ? '' : Math.round(ms / 1000));
-  const header = ['Date', 'Time', 'Check', 'Started by', 'Branch', 'Laptop SKU', 'Laptop', 'Computer name', 'Status', 'Reason', 'Banner', 'Banner on screen', 'Desktop', 'Desktop: not allowed', 'Desktop: missing', 'Wi-Fi', 'App', 'App result', 'App seconds', 'App detail'];
-  const rows = [];
+  const header = ['Date', 'Time', 'Check', 'Started by', 'Branch', 'Laptop SKU', 'Laptop', 'Computer name', 'Status', 'Reason', 'Banner', 'Banner on screen', 'Desktop', 'Desktop: not allowed', 'Desktop: missing', 'Wi-Fi', 'Apps passed'];
+  const rows = []; // { base, apps: [{ target, status, ms, detail }], note }
   for (const c of checks) {
     if (!inRange(c.date) || !wanted(c.job, c.branch)) continue;
     const t = new Date(c.time);
-    const base = [c.date, t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), JOB_LABEL[c.job] || c.job, c.trigger === 'now' ? 'Run now (App Tests page)' : 'Schedule',
+    rows.push({ ts: t.getTime(), apps: c.apps || [], note: c.appsNote || '', base: [c.date, t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), JOB_LABEL[c.job] || c.job, c.trigger === 'now' ? 'Run now (App Tests page)' : 'Schedule',
       c.branch, c.sku || '', [c.make, c.model].filter(Boolean).join(' '), c.laptop, STATUS_LABEL[c.status] || c.status, c.reason || '',
       c.banner ? BANNER_LABEL[c.banner.status] || c.banner.status : '', c.banner ? c.banner.item || '' : '',
       c.desktop ? (c.desktop.status === 'ok' ? 'Correct' : c.desktop.status === 'check' ? 'Not correct' : 'Not reported') : '',
-      c.desktop ? (c.desktop.extra || []).join(', ') : '', c.desktop ? (c.desktop.missing || []).join(', ') : '', c.wifi || ''];
-    if (c.apps && c.apps.length) for (const r of c.apps) rows.push([...base, r.target, APP_LABEL[r.status] || r.status, secs(r.ms), r.detail || '']);
-    else rows.push([...base, '', c.appsNote || '', '', '']);
+      c.desktop ? (c.desktop.extra || []).join(', ') : '', c.desktop ? (c.desktop.missing || []).join(', ') : '', c.wifi || ''] });
   }
   // Manual tests (Run test on the Laptops tab); scheduled ones are in the checks above.
   if (!type || type === 'manual') {
@@ -129,9 +126,8 @@ function csvRows({ checks, runs, schedules, laptops, from, to, branch, type }) {
       const t = new Date(run.startedAt || run.time);
       const date = localDate(t);
       if (!inRange(date) || (branch && run.branch !== branch)) continue;
-      const base = [date, t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), JOB_LABEL.manual, 'Run test (App Tests page)', run.branch, run.sku || '', [run.make, run.model].filter(Boolean).join(' '), run.laptop,
-        run.stoppedOnLaptop ? 'Stopped on the laptop' : run.stoppedByAdmin ? 'Cancelled' : 'Done', '', '', '', '', '', '', ''];
-      for (const r of run.results) rows.push([...base, r.target, APP_LABEL[r.status] || r.status, secs(r.ms), r.detail || '']);
+      rows.push({ ts: t.getTime(), apps: run.results || [], note: '', base: [date, t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), JOB_LABEL.manual, 'Run test (App Tests page)', run.branch, run.sku || '', [run.make, run.model].filter(Boolean).join(' '), run.laptop,
+        run.stoppedOnLaptop ? 'Stopped on the laptop' : run.stoppedByAdmin ? 'Cancelled' : 'Done', '', '', '', '', '', '', ''] });
     }
   }
   // Scheduled checks with no report at all: each day in the range the schedule was on, for the laptops it is for now.
@@ -151,12 +147,25 @@ function csvRows({ checks, runs, schedules, laptops, from, to, branch, type }) {
       for (const l of laptops) {
         if (!inScope(s, l.name, l.branch) || (branch && l.branch !== branch)) continue;
         if (checks.some((c) => c.laptop === l.name && c.job === id && c.date === date && c.trigger !== 'now')) continue;
-        rows.push([date, '', JOB_LABEL[id], 'Schedule', l.branch, l.sku || '', [l.make, l.model].filter(Boolean).join(' '), l.name, 'Not checked', 'No report: Sales Tools was closed or the laptop was off', '', '', '', '', '', '', '', '', '', '']);
+        rows.push({ ts: day.getTime(), apps: [], note: '', base: [date, '', JOB_LABEL[id], 'Schedule', l.branch, l.sku || '', [l.make, l.model].filter(Boolean).join(' '), l.name, 'Not checked', 'No report: Sales Tools was closed or the laptop was off', '', '', '', '', '', ''] });
       }
     }
   }
-  rows.sort((a, b) => `${a[0]} ${a[4]} ${a[7]}`.localeCompare(`${b[0]} ${b[4]} ${b[7]}`));
-  return [header, ...rows];
+  // A column per app, in the order they were first tested; a cell is the result, with the seconds and the message
+  // when it did not pass. Empty: that app was not tested in that check.
+  const appNames = [...new Set(rows.flatMap((r) => r.apps.map((a) => a.target)).filter(Boolean))];
+  const cell = (a) => {
+    if (!a) return '';
+    const label = APP_LABEL[a.status] || a.status;
+    if (a.status === 'ok') return a.ms ? `${label} (${secs(a.ms)} s)` : label;
+    return a.detail ? `${label}: ${a.detail}` : label;
+  };
+  rows.sort((a, b) => `${a.base[0]} ${a.base[4]} ${a.base[7]}`.localeCompare(`${b.base[0]} ${b.base[4]} ${b.base[7]}`) || a.ts - b.ts);
+  const out = rows.map((r) => {
+    const passed = r.apps.filter((a) => a.status === 'ok').length;
+    return [...r.base, r.apps.length ? `${passed}/${r.apps.length}` : r.note, ...appNames.map((name) => cell(r.apps.find((a) => a.target === name)))];
+  });
+  return [[...header, ...appNames], ...out];
 }
 
 module.exports = { JOBS, cleanSchedules, scheduleFor, todayFor, csvRows, localDate, inScope };
