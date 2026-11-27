@@ -103,12 +103,14 @@ const STATUS_LABEL = { done: 'Done', interrupted: 'Stopped: laptop used', missed
 const APP_LABEL = { ok: 'Passed', not_installed: 'Not installed', exited: 'Closed early', crashed: 'Crashed', failed: 'Failed', missing: 'No demo file', stopped: 'Stopped' };
 
 // The CSV rows for checks and manual tests between from and to ("YYYY-MM-DD", both included): one row per check or
-// test, with a column per app (its result) after the banner and desktop. filter: { branch, type: '' | 'daily' | 'apps' | 'manual' }.
-function csvRows({ checks, runs, schedules, laptops, from, to, branch, type }) {
+// test, with a column per app (its result) after the banner and desktop. The History tab's download and the Schedules
+// tab's export are both this file. filter: { branch, type: '' | 'daily' | 'apps' | 'manual', result: '' | 'PASS' | 'CHECK' }
+// (result: only checks with app tests, every app passed or not).
+function csvRows({ checks, runs, schedules, laptops, from, to, branch, type, result = '' }) {
   const inRange = (date) => (!from || date >= from) && (!to || date <= to);
   const wanted = (job, br) => (!type || type === job) && (!branch || br === branch);
   const secs = (ms) => (ms === undefined || ms === null ? '' : Math.round(ms / 1000));
-  const header = ['Date', 'Time', 'Check', 'Started by', 'Branch', 'Laptop SKU', 'Laptop', 'Computer name', 'Status', 'Reason', 'Banner', 'Banner on screen', 'Desktop', 'Desktop: not allowed', 'Desktop: missing', 'Wi-Fi', 'Apps passed'];
+  const header = ['Date', 'Time', 'Check', 'Started by', 'Branch', 'Laptop SKU', 'Laptop', 'Computer name', 'Status', 'Reason', 'Banner', 'Banner on screen', 'Desktop', 'Desktop: not allowed', 'Desktop: missing', 'Wi-Fi', 'Apps passed', 'Test result'];
   const rows = []; // { base, apps: [{ target, status, ms, detail }], note }
   for (const c of checks) {
     if (!inRange(c.date) || !wanted(c.job, c.branch)) continue;
@@ -160,10 +162,13 @@ function csvRows({ checks, runs, schedules, laptops, from, to, branch, type }) {
     if (a.status === 'ok') return a.ms ? `${label} (${secs(a.ms)} s)` : label;
     return a.detail ? `${label}: ${a.detail}` : label;
   };
+  // Test result as on the History tab: PASS when every app passed, CHECK otherwise (only checks with app tests).
+  const resultOf = (r) => (r.apps.length ? (r.apps.every((a) => a.status === 'ok') ? 'PASS' : 'CHECK') : '');
+  if (result) rows.splice(0, rows.length, ...rows.filter((r) => resultOf(r) === result));
   rows.sort((a, b) => `${a.base[0]} ${a.base[4]} ${a.base[7]}`.localeCompare(`${b.base[0]} ${b.base[4]} ${b.base[7]}`) || a.ts - b.ts);
   const out = rows.map((r) => {
     const passed = r.apps.filter((a) => a.status === 'ok').length;
-    return [...r.base, r.apps.length ? `${passed}/${r.apps.length}` : r.note, ...appNames.map((name) => cell(r.apps.find((a) => a.target === name)))];
+    return [...r.base, r.apps.length ? `${passed}/${r.apps.length}` : r.note, resultOf(r), ...appNames.map((name) => cell(r.apps.find((a) => a.target === name)))];
   });
   return [[...header, ...appNames], ...out];
 }

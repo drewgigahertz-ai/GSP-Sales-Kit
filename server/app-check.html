@@ -313,7 +313,7 @@ code{background:var(--ghz-soft);padding:1px 5px;border-radius:5px;font-size:.85e
     </div>
 
     <div class="panel">
-      <div class="mon-head"><h2 class="section-title">Export CSV</h2><span class="section-sub">Every check and test, one row each, with a column per app, for Excel</span></div>
+      <div class="mon-head"><h2 class="section-title">Export CSV</h2><span class="section-sub">Every scheduled and manual check and test, one row each, with a column per app, for Excel (the same file as Export CSV on the History tab)</span></div>
       <div class="export">
         <label>From<input type="date" id="xFrom"></label>
         <label>To<input type="date" id="xTo"></label>
@@ -331,7 +331,7 @@ code{background:var(--ghz-soft);padding:1px 5px;border-radius:5px;font-size:.85e
         <label class="field">Branch <select class="branch-filter" id="hBranch"><option value="">All branches</option></select></label>
         <label class="field">Result <select id="hResult"><option value="">All</option><option value="PASS">PASS</option><option value="CHECK">CHECK</option></select></label>
       </div>
-      <div class="toolbar-right"><button class="btn light" id="download">Download results (CSV)</button><button class="btn danger" id="clearBtn">Clear history</button></div>
+      <div class="toolbar-right"><button class="btn light" id="download" title="Every scheduled and manual check and test, one row each with a column per app (the same file as Export CSV on the Schedules tab). Follows the Branch and Result filters.">Export CSV</button><button class="btn danger" id="clearBtn">Clear history</button></div>
     </div>
     <div class="panel list"><table><thead id="hhead"></thead><tbody id="hist"></tbody></table><div class="empty" id="hempty">No finished tests yet.</div></div>
     <div class="legend">Click a test to see each app's message.</div>
@@ -620,10 +620,12 @@ $('hBranch').addEventListener('change',renderHistory);
 $('hResult').addEventListener('change',renderHistory);
 $('clearBtn').addEventListener('click',async()=>{if(confirm('Delete the whole test history (also results.csv on the server)? This cannot be undone.')){await api('clear',{}).catch(()=>{});load()}});
 $('download').addEventListener('click',async()=>{
-  const r=await fetch('/app-check/api/results.csv',{headers:{'X-SalesKit-Session':key}});
+  // The same file as the Schedules tab's Export CSV (scheduled and manual tests, one row each), with this tab's filters.
+  const r=await fetch('/app-check/api/checks.csv?'+new URLSearchParams({branch:$('hBranch').value,result:$('hResult').value}),{headers:{'X-SalesKit-Session':key}});
   if(r.status===401)return showSignin('Please sign in again.');
   const a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());
-  a.download=`app-test-results-${new Date().toISOString().slice(0,10)}.csv`;document.body.append(a);a.click();a.remove();
+  const hb=$('hBranch').value,hr=$('hResult').value;
+  a.download=`app-checks-${[hb&&hb.replace(/[^A-Za-z0-9]+/g,'-'),hr].filter(Boolean).map(x=>x+'-').join('')}all-to-${new Date().toISOString().slice(0,10)}.csv`;document.body.append(a);a.click();a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href),5000);
 });
 

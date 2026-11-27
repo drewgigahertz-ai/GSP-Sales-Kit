@@ -413,27 +413,14 @@ function createAppCheck({ dataDir, accounts, canAdmin, log = () => {}, getLogoPa
       accounts.logout(request.headers['x-saleskit-session']);
       return send(response, 200, { ok: true });
     }
-    // Every test ever recorded (runs.jsonl), one row per app, so the columns stay the same when the app list changes.
-    if (route === '/app-check/api/results.csv' && request.method === 'GET') {
-      let runs = [];
-      try { runs = fs.readFileSync(F.runs, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line)); } catch { /* none yet */ }
-      const secs = (ms) => (ms === undefined || ms === null ? '' : Math.round(ms / 1000));
-      const rows = [['Started', 'Finished', 'Branch', 'Laptop SKU', 'Laptop', 'Computer name', 'Signed in', 'Sales Tools', 'App', 'Status', 'App seconds', 'Detail', 'Test result', 'Test seconds']];
-      for (const run of runs) {
-        const device = [run.make, run.model].filter(Boolean).join(' ');
-        for (const r of run.results) rows.push([run.startedAt ? new Date(run.startedAt).toLocaleString() : '', new Date(run.time).toLocaleString(), run.branch, run.sku || '', device, run.laptop, run.user, run.version, r.target, r.status, secs(r.ms), r.detail, passed(run) ? 'PASS' : 'CHECK', secs(run.durationMs)]);
-      }
-      response.writeHead(200, { 'Cache-Control': 'no-store', 'Content-Type': 'text/csv; charset=utf-8' });
-      // The byte-order mark makes Excel read the file as UTF-8.
-      response.end(`﻿${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`);
-      return;
-    }
-    // Every check and test between two dates, one row per app: ?from=YYYY-MM-DD&to=YYYY-MM-DD&branch=&type=.
-    if (route === '/app-check/api/checks.csv' && request.method === 'GET') {
+    // Every check and test (scheduled and manual) between two dates, one row each with a column per app (the History
+    // tab's download and the Schedules tab's export): ?from=YYYY-MM-DD&to=YYYY-MM-DD&branch=&type=&result=.
+    // results.csv (older pages) is the same file.
+    if ((route === '/app-check/api/checks.csv' || route === '/app-check/api/results.csv') && request.method === 'GET') {
       const q = url.searchParams;
       const day = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? v : '');
       const list = [...laptops.values()].map((l) => ({ name: l.name, branch: branchOf(l).branch, sku: l.sku, make: l.make, model: l.model }));
-      const rows = csvRows({ checks: readLines(F.checks), runs: readLines(F.runs), schedules, laptops: list, from: day(q.get('from')), to: day(q.get('to')), branch: text(q.get('branch'), 40).toUpperCase(), type: ['daily', 'apps', 'manual'].includes(q.get('type')) ? q.get('type') : '' });
+      const rows = csvRows({ checks: readLines(F.checks), runs: readLines(F.runs), schedules, laptops: list, from: day(q.get('from')), to: day(q.get('to')), branch: text(q.get('branch'), 40).toUpperCase(), type: ['daily', 'apps', 'manual'].includes(q.get('type')) ? q.get('type') : '', result: ['PASS', 'CHECK'].includes(q.get('result')) ? q.get('result') : '' });
       response.writeHead(200, { 'Cache-Control': 'no-store', 'Content-Type': 'text/csv; charset=utf-8' });
       response.end(`\ufeff${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`);
       return;
