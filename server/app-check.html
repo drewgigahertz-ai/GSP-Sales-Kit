@@ -272,7 +272,7 @@ code{background:var(--ghz-soft);padding:1px 5px;border-radius:5px;font-size:.85e
         <table><thead><tr><th>App</th><th class="num">Tested on</th><th class="num">Installed</th><th class="num">Installed &amp; online</th><th class="num">Not installed</th><th class="num">Not tested yet</th><th class="c-meter"></th></tr></thead><tbody id="mApps"></tbody></table>
       </div>
       <div class="panel">
-        <div class="mon-head"><h2 class="section-title">By branch</h2><span class="section-sub">Sales Tools installed and online</span></div>
+        <div class="mon-head"><h2 class="section-title">By branch</h2><span class="section-sub">Sales Tools installed and online <button class="btn light sm" id="mBranchExport" title="This table as a CSV for Excel: one row per branch. Follows the Branch filter.">Export CSV</button></span></div>
         <table><thead><tr><th>Branch</th><th class="num">Installed</th><th class="num">Online</th><th class="num">Offline</th><th>Last seen</th></tr></thead><tbody id="mBranches"></tbody></table>
       </div>
     </div>
@@ -671,19 +671,36 @@ function renderMonitor(){
 }
 $('mApps').addEventListener('click',e=>{const row=e.target.closest('tr[data-app]');if(!row)return;const n=row.dataset.app;openApps.has(n)?openApps.delete(n):openApps.add(n);renderMonitor()});
 $('mBranch').addEventListener('change',renderMonitor);
+// Monitoring CSVs: saved in the browser from what the page shows (the Branch filter applies).
+function saveCsv(rows,name){
+  const cell=v=>{const t=String(v??'');return/[",\r\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t};
+  const b=$('mBranch').value;
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+rows.map(r=>r.map(cell).join(',')).join('\r\n')+'\r\n'],{type:'text/csv;charset=utf-8'}));
+  a.download=`${name}-${b?b.replace(/[^A-Za-z0-9]+/g,'-')+'-':''}${new Date().toISOString().slice(0,10)}.csv`;document.body.append(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+}
+const csvWhen=t=>t?new Date(t).toLocaleString():'';
+// By branch: one row per branch, like the table (Last seen as a date and time).
+$('mBranchExport').addEventListener('click',()=>{
+  const b=$('mBranch').value,groups=new Map();
+  for(const l of state.laptops.filter(l=>!b||l.branch===b)){const k=l.branch||'';if(!groups.has(k))groups.set(k,[]);groups.get(k).push(l)}
+  const rows=[...groups.entries()].sort((x,y)=>(!x[0]-!y[0])||x[0].localeCompare(y[0])).map(([br,ls])=>{
+    const on=ls.filter(l=>l.online).length,last=Math.max(...ls.map(l=>l.lastSeen||0));
+    return[br||'Branch unknown',ls.length,on,ls.length-on,on?'Online now':last?csvWhen(last):'Never'];
+  });
+  const total=rows.reduce((t,r)=>[t[0]+r[1],t[1]+r[2],t[2]+r[3]],[0,0,0]);
+  saveCsv([['Branch','Installed','Online','Offline','Last seen'],...rows,['Total',...total,'']],'monitoring-by-branch');
+});
 // Monitoring export: one row per laptop (the Branch filter applies), with a column per tested app.
 $('mExport').addEventListener('click',()=>{
   const b=$('mBranch').value,all=state.laptops.filter(l=>!b||l.branch===b).sort((x,y)=>(!x.branch-!y.branch)||(x.branch||'').localeCompare(y.branch||'')||nameOf(x).localeCompare(nameOf(y)));
   const names=appColumns(state.laptops.filter(l=>l.last).map(l=>l.last));
-  const cell=v=>{const t=String(v??'');return/[",\r\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t};
-  const when=t=>t?new Date(t).toLocaleString():'';
+  const when=csvWhen;
   const APP={yes:'Installed',no:'Not installed',untested:'Not tested yet'};
   const rows=[['Branch','Laptop SKU','Laptop','Computer name','Signed in','Sales Tools','Online','Last seen','Last test',...names],
     ...all.map(l=>[l.branch||'Branch unknown',l.sku||'',[l.make,l.model].filter(Boolean).join(' '),l.name,l.user||'',l.version?'v'+l.version:'',l.online?'Online':'Offline',l.online?'Online now':when(l.lastSeen),l.last?when(l.last.time):'',
       ...names.map(n=>l.apps&&!l.apps.includes(n)&&!(l.appStatus&&l.appStatus[n])?'Not tested on this laptop':APP[appState(l,n)])])];
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.map(r=>r.map(cell).join(',')).join('\r\n')+'\r\n'],{type:'text/csv;charset=utf-8'}));
-  a.download=`monitoring-${b?b.replace(/[^A-Za-z0-9]+/g,'-')+'-':''}${new Date().toISOString().slice(0,10)}.csv`;document.body.append(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+  saveCsv(rows,'monitoring');
 });
 
 function fillBranches(){
