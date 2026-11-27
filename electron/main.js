@@ -443,11 +443,17 @@ ipcMain.handle('images:cache', async (_event, url) => {
   await imageCache.sync([url]);
   return imageCache.resolve(url);
 });
-// Laptop SKU (laptop-sku-prompt.js): branch accounts must enter it once; HO and ALL accounts are not asked.
-const FULL_ACCESS = ['HO', 'ALL'];
+// Laptop SKU (laptop-sku-prompt.js): branch accounts must pick it once; HO and ALL accounts are not asked.
+const FULL_ACCESS = ['HO', 'ALL', 'ALL BRANCHES'];
 ipcMain.handle('laptopsku:get', () => {
-  const saved = laptopSku ? laptopSku.get() : null;
   const branch = String((session && session.user && session.user.branch) || '').trim().toUpperCase();
+  // A SKU typed in before it had to be picked from the list is cleared when a branch account signs in, so branch
+  // staff pick the correct one (HO and ALL BRANCHES laptops keep theirs).
+  if (laptopSku && session && branch && !FULL_ACCESS.includes(branch)) {
+    const old = laptopSku.get();
+    if (old && !old.picked) laptopSku.clear();
+  }
+  const saved = laptopSku ? laptopSku.get() : null;
   return { sku: saved ? saved.sku : '', required: Boolean(session) && !!branch && !FULL_ACCESS.includes(branch) && !saved };
 });
 // Only a SKU in SalesKit's list (skuChoices) can be saved, with the list's spelling.

@@ -180,6 +180,14 @@
       line-height: 1.2;
     }
 
+    /* The header row: the name, sign-out and a long laptop SKU wrap under the title, so Price changes, Updates,
+       zoom and OSD / SMT always stay on the right. */
+    .header-row { flex-wrap: nowrap; }
+    .header-brand { flex: 1 1 auto; min-width: 0; }
+    .header-brand > div:last-child { min-width: 0; }
+    .header-row > :last-child { flex-shrink: 0; margin-left: auto; }
+    .header-row .header-actions { flex-wrap: nowrap; }
+
     .dashboard-subtitle {
       font-size: 0.75rem;
       color: rgba(255, 255, 255, 0.7);
@@ -2722,8 +2730,8 @@
 
   <!-- Header Bar -->
   <div class="header-bar">
-    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
-      <div class="d-flex align-items-center gap-3">
+    <div class="d-flex align-items-center justify-content-between gap-3 header-row">
+      <div class="d-flex align-items-center gap-3 header-brand">
         <div class="brand-logo-circle" title="GigaHertz" id="headerLogoWrapper">
           <img id="headerLogoImg" alt="GigaHertz" style="display:none;" referrerpolicy="no-referrer" onerror="handleHeaderLogoError()">
         </div>

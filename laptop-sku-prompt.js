@@ -39,12 +39,27 @@
     .laptop-sku-cancel { border: 1px solid #cbd8eb; background: #fff; color: #334155; }
     .laptop-sku-error { color: #c42424; font-size: .82rem; font-weight: 700; }
     .laptop-sku-label { margin-left: 8px; }
+    .laptop-sku-label .laptop-sku-text { text-decoration: none; }
     .laptop-sku-label button { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
   `;
   document.head.appendChild(style);
 
   let choices = [];
   let current = '';
+  let showWhole = false;
+
+  // The SKU up to its part number ("LAP-ASUS K3605VC-RP493W i5-13420H …" → "LAP-ASUS K3605VC-RP493W"); clicking it
+  // in the header shows the whole SKU. The part number comes from the SKU list; without it, the first word after
+  // the brand with a digit in it.
+  function shortSku(sku) {
+    const choice = choices.find((c) => String(c.sku).toUpperCase() === String(sku).toUpperCase());
+    const part = choice && String(choice.partNumber || '').trim();
+    const at = part ? sku.toUpperCase().indexOf(part.toUpperCase()) : -1;
+    if (part && at > 0) return sku.slice(0, at + part.length).trim();
+    const words = sku.split(/s+/);
+    const index = words.findIndex((w, i) => i > 0 && /d/.test(w));
+    return words.slice(0, index > 0 ? index + 1 : 2).join(' ');
+  }
 
   async function loadChoices() {
     try { choices = await api.getLaptopSkuChoices(); } catch { choices = []; }
@@ -177,7 +192,18 @@
     }
     label.replaceChildren();
     const text = document.createElement('span');
-    text.textContent = current ? `SKU: ${current} · ` : 'No laptop SKU · ';
+    const short = current ? shortSku(current) : '';
+    if (!current) text.textContent = 'No laptop SKU · ';
+    else if (short === current) text.textContent = `SKU: ${current} · `;
+    else {
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'laptop-sku-text';
+      toggle.textContent = showWhole ? current : `${short} …`;
+      toggle.title = showWhole ? 'Click to show less' : current;
+      toggle.addEventListener('click', () => { showWhole = !showWhole; renderLabel(); });
+      text.append('SKU: ', toggle, ' · ');
+    }
     const change = document.createElement('button');
     change.type = 'button';
     change.textContent = current ? 'Change' : 'Set';
@@ -192,6 +218,7 @@
     let state;
     try { state = await api.getLaptopSku(); } catch { return; }
     current = state.sku || '';
+    if (current) await loadChoices();
     renderLabel();
     if (state.required) {
       await loadChoices();

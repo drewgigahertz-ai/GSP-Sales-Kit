@@ -15,7 +15,8 @@ const skuKey = (sku) => {
   return clean(/^LAP\s*-/.test(text) ? text : `LAP-${text}`, 60).replace(/^LAP\s*-\s*/, 'LAP-').replace(/\s+/g, '');
 };
 
-// The SKU saved on this laptop: { sku, setAt, setBy } in <userData>/laptop-sku.json.
+// The SKU saved on this laptop: { sku, setAt, setBy, picked } in <userData>/laptop-sku.json. picked: chosen from
+// SalesKit's list (older saves were typed in and are cleared for branch accounts, see main.js).
 function createLaptopSkuStore(filePath) {
   let saved = null;
   try { saved = JSON.parse(fs.readFileSync(filePath, 'utf8')); } catch { /* not set yet */ }
@@ -24,9 +25,13 @@ function createLaptopSkuStore(filePath) {
     set(sku, setBy = '') {
       const value = clean(sku, 60);
       if (!value) throw new Error('Enter the laptop SKU.');
-      saved = { sku: value, setAt: new Date().toISOString(), setBy: clean(setBy, 60) };
+      saved = { sku: value, setAt: new Date().toISOString(), setBy: clean(setBy, 60), picked: 1 };
       fs.writeFileSync(filePath, JSON.stringify(saved, null, 2));
       return saved;
+    },
+    clear() {
+      saved = null;
+      try { fs.unlinkSync(filePath); } catch { /* nothing saved */ }
     }
   };
 }

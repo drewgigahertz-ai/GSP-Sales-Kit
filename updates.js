@@ -6,6 +6,14 @@
   // A version with nothing for the laptops gets no entry (the window then does not open by itself for it).
   const RELEASES = [
     {
+      version: '1.0.49',
+      date: 'November 27, 2026',
+      changes: [
+        'Laptop SKU: branch laptops whose SKU was typed in (not picked from the list) are asked again once, to pick the correct SKU from the list. HO and ALL BRANCHES laptops keep theirs.',
+        'Header: the laptop SKU shows up to its part number (LAP-ASUS K3605VC-RP493W …). Click it to see the whole SKU, and again to shorten it. Price changes, Updates, zoom and OSD / SMT stay on the right.'
+      ]
+    },
+    {
       version: '1.0.48',
       date: 'November 26, 2026',
       changes: [

@@ -183,6 +183,10 @@ code{background:var(--ghz-soft);padding:1px 5px;border-radius:5px;font-size:.85e
 .days label.on{background:var(--ghz-soft);border-color:#9db1f0;color:var(--ghz-btn)}
 .inc{display:flex;gap:8px;align-items:flex-start;font-size:.82rem;margin-bottom:12px;cursor:pointer}
 .inc input{width:auto;margin:3px 0 0}
+.pick-tools{display:flex;gap:8px;align-items:center;margin-top:6px}
+.pick-tools select{flex:1;min-width:0}
+.pick-tools input[type=search]{flex:1.4;min-width:0;margin:0}
+.pick-tools .btn{white-space:nowrap}
 .picklist{max-height:230px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:6px 8px;margin-top:6px}
 .picklist label{display:flex;align-items:center;gap:8px;padding:4px 2px;font-size:.8rem;cursor:pointer}
 .picklist input[type=checkbox]{width:auto;margin:0}
@@ -754,13 +758,26 @@ $('desktopAllowed').addEventListener('input',unsaved);
 const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const JOB_INFO={daily:{title:'Daily check',sub:'Banner on screen and desktop. Tick "Include app tests" to test the apps too.'},apps:{title:'App tests',sub:'The apps on the Apps to test tab, on their own schedule.'}};
 let sched=null,schedDirty=false;const schedSearch={daily:'',apps:''};
+// Chosen laptops: the branch whose laptops the list shows ('' = every branch, NO_BRANCH = branch unknown).
+const schedBranch={daily:'',apps:''},NO_BRANCH=' none';
+const inBranch=(l,b)=>!b||(b===NO_BRANCH?!l.branch:l.branch===b);
+// The laptops the Chosen laptops list shows: the picked branch, then the search.
+function shownLaptops(id){const q=schedSearch[id].toLowerCase();return state.laptops.filter(l=>inBranch(l,schedBranch[id])&&(!q||[l.branch,nameOf(l),l.name].join(' ').toLowerCase().includes(q)))}
+function laptopTools(id){
+  const sc=sched[id].scope,count=b=>{const ls=state.laptops.filter(l=>inBranch(l,b));return`${ls.filter(l=>sc.laptops.includes(l.name)).length}/${ls.length}`};
+  const branches=[...state.branches];if(state.laptops.some(l=>!l.branch))branches.push(NO_BRANCH);
+  const shown=shownLaptops(id),all=shown.length&&shown.every(l=>sc.laptops.includes(l.name));
+  return`<div class="pick-tools"><select data-pickbranch="${id}" title="Show the laptops of one branch"><option value="">All branches (${count('')} chosen)</option>${branches.map(b=>`<option value="${esc(b)}"${schedBranch[id]===b?' selected':''}>${esc(b===NO_BRANCH?'Branch unknown':b)} (${count(b)} chosen)</option>`).join('')}</select>
+    <input type="search" data-search="${id}" placeholder="Search laptop or branch" value="${esc(schedSearch[id])}">
+    <button type="button" class="btn light sm" data-pickall="${id}"${shown.length?'':' disabled'} title="${all?'Untick the laptops listed below':'Tick every laptop listed below'}">${all?'Clear all':'Select all'}</button></div>`;
+}
 const ST_LABEL={done:'Done',interrupted:'Stopped: laptop used',missed:'Not checked',nocheck:'Not checked',waiting:'Waiting',running:'Check time now',off:'Not today'};
 const schedUnsaved=()=>{schedDirty=true;$('smsg').textContent='Not saved yet.';$('smsg').className='msg'};
 function scopeCount(s){return s.scope.mode==='all'?state.laptops.length:state.laptops.filter(l=>s.scope.mode==='branches'?s.scope.branches.includes(l.branch):s.scope.laptops.includes(l.name)).length}
 function schedCard(id){
   const s=sched[id],info=JOB_INFO[id],sc=s.scope;
   const pick=sc.mode==='branches'?state.branches.map(b=>`<label><input type="checkbox" data-s="${id}" data-branch="${esc(b)}"${sc.branches.includes(b)?' checked':''}> <b>${esc(b)}</b> <span class="sub">${state.laptops.filter(l=>l.branch===b).length} laptops</span></label>`).join('')||'<div class="sub">No branches yet.</div>'
-    :sc.mode==='laptops'?state.laptops.filter(l=>{const q=schedSearch[id].toLowerCase();return!q||[l.branch,nameOf(l),l.name].join(' ').toLowerCase().includes(q)}).map(l=>`<label><input type="checkbox" data-s="${id}" data-laptop="${esc(l.name)}"${sc.laptops.includes(l.name)?' checked':''}> <span class="dot ${l.online?'on':''}"></span> <span><b>${esc(nameOf(l))}</b><div class="sub">${esc([l.branch||'Branch unknown',l.name,l.version&&'v'+l.version].filter(Boolean).join(' · '))}${l.version&&!atLeast(l.version,'1.0.43')?' · needs Sales Tools 1.0.43':''}</div></span></label>`).join('')||'<div class="sub">No laptop matches.</div>':'';
+    :sc.mode==='laptops'?shownLaptops(id).map(l=>`<label><input type="checkbox" data-s="${id}" data-laptop="${esc(l.name)}"${sc.laptops.includes(l.name)?' checked':''}> <span class="dot ${l.online?'on':''}"></span> <span><b>${esc(nameOf(l))}</b><div class="sub">${esc([l.branch||'Branch unknown',l.name,l.version&&'v'+l.version].filter(Boolean).join(' · '))}${l.version&&!atLeast(l.version,'1.0.43')?' · needs Sales Tools 1.0.43':''}</div></span></label>`).join('')||'<div class="sub">No laptop matches.</div>':'';
   const n=scopeCount(s);
   return`<div class="panel sched" data-card="${id}">
     <div class="sched-head"><div><h3>${info.title}</h3><div class="section-sub">${info.sub}</div></div><label class="toggle${s.enabled?' on':''}" title="${s.enabled?'Laptops run this check. Click to turn it off.':'No laptop runs this check. Click to turn it on.'}"><input type="checkbox" data-s="${id}" data-k="enabled"${s.enabled?' checked':''}><span class="knob"></span>${s.enabled?'On':'Off: click to turn on'}</label></div>
@@ -768,7 +785,7 @@ function schedCard(id){
     <div class="row2"><label>From<input type="time" data-s="${id}" data-k="start" value="${esc(s.start)}"></label><label>Until<input type="time" data-s="${id}" data-k="end" value="${esc(s.end)}"></label>
       <label>On<select data-s="${id}" data-k="mode"><option value="laptops"${sc.mode==='laptops'?' selected':''}>Chosen laptops</option><option value="branches"${sc.mode==='branches'?' selected':''}>Chosen branches</option><option value="all"${sc.mode==='all'?' selected':''}>All laptops</option></select></label></div>
     ${id==='daily'?`<label class="inc"><input type="checkbox" data-s="daily" data-k="includeApps"${s.includeApps?' checked':''}><span><b>Include app tests</b><div class="sub" style="white-space:normal">Also test the apps in the daily check, right after the banner and desktop. Leave off when App tests has its own schedule.</div></span></label>`:''}
-    ${sc.mode==='laptops'?`<input type="search" data-search="${id}" placeholder="Search laptop or branch" value="${esc(schedSearch[id])}">`:''}
+    ${sc.mode==='laptops'?laptopTools(id):''}
     ${sc.mode!=='all'?`<div class="picklist">${pick}</div>`:''}
     <div class="sched-sum">${s.enabled?`On <b>${s.days.length?s.days.map(d=>DAYS[d]).join(', '):'no days'}</b>, ${esc(s.start)}–${esc(s.end)}, on <b>${n} laptop${n===1?'':'s'}</b>.`:'Off: no laptop runs it.'}</div>
     <div class="sched-foot"><button class="btn light sm" data-now="${id}" title="Run this check now on the chosen laptops that are online, whatever the time (for trying it out). It does not count as the day's check.">Run now on chosen laptops</button></div>
@@ -799,6 +816,7 @@ function renderToday(){
   }).join(''):'<tr><td colspan="9"><div class="empty"><strong>No checks yet.</strong></div></td></tr>';
 }
 $('schedCards').addEventListener('change',e=>{
+  if(e.target.dataset.pickbranch){schedBranch[e.target.dataset.pickbranch]=e.target.value;renderSchedules();return}
   const el=e.target,id=el.dataset.s;if(!id)return;const s=sched[id];
   if(el.dataset.day!==undefined){const d=+el.dataset.day;s.days=el.checked?[...new Set([...s.days,d])].sort():s.days.filter(x=>x!==d)}
   else if(el.dataset.branch!==undefined){s.scope.branches=el.checked?[...s.scope.branches,el.dataset.branch]:s.scope.branches.filter(b=>b!==el.dataset.branch)}
@@ -810,6 +828,14 @@ $('schedCards').addEventListener('change',e=>{
 });
 $('schedCards').addEventListener('input',e=>{const id=e.target.dataset.search;if(id){schedSearch[id]=e.target.value;renderSchedules()}});
 $('schedCards').addEventListener('click',async e=>{
+  const all=e.target.closest('[data-pickall]');
+  if(all){
+    // Select all / Clear all: the laptops the list shows (the picked branch and the search).
+    const id=all.dataset.pickall,sc=sched[id].scope,names=shownLaptops(id).map(l=>l.name);
+    const tick=!names.every(n=>sc.laptops.includes(n));
+    sc.laptops=tick?[...new Set([...sc.laptops,...names])]:sc.laptops.filter(n=>!names.includes(n));
+    schedUnsaved();renderSchedules();return;
+  }
   const b=e.target.closest('[data-now]');if(!b)return;
   const id=b.dataset.now,s=sched[id];
   const names=state.laptops.filter(l=>l.online&&(s.scope.mode==='all'||(s.scope.mode==='branches'?s.scope.branches.includes(l.branch):s.scope.laptops.includes(l.name)))).map(l=>l.name);
